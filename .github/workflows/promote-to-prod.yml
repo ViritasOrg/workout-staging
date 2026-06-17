@@ -52,18 +52,27 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
         run: |
-          cd prod
-          PR_URL=$(gh pr create \
-            --repo henrikschaub/workout \
-            --base main \
-            --head "$BRANCH" \
-            --title "Promote staging changes ($GITHUB_SHA)" \
-            --body "Auto-generated PR mirroring the diff on workout-staging@main (commit ${GITHUB_SHA}), triggered manually via the staging app's 'Push to Prod' button. Merges automatically once prod's required CI check passes.")
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/henrikschaub/workout/pulls \
+            -d "{\"title\":\"Promote staging changes (${GITHUB_SHA::7})\",\"head\":\"$BRANCH\",\"base\":\"main\",\"body\":\"Auto-generated PR from workout-staging@main (${GITHUB_SHA}), triggered via Push to Prod.\"}")
+          PR_URL=$(echo "$RESPONSE" | jq -r '.html_url')
+          PR_NODE_ID=$(echo "$RESPONSE" | jq -r '.node_id')
+          if [ "$PR_URL" = "null" ] || [ -z "$PR_URL" ]; then
+            echo "PR creation failed: $RESPONSE"
+            exit 1
+          fi
           echo "PR_URL=$PR_URL" >> "$GITHUB_ENV"
+          echo "PR_NODE_ID=$PR_NODE_ID" >> "$GITHUB_ENV"
 
       - name: Enable auto-merge on the PR
-        if: env.PR_URL != ''
+        if: env.PR_NODE_ID != ''
         env:
           GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
         run: |
-          gh pr merge --repo henrikschaub/workout --auto --squash "$PR_URL"
+          curl -s -X POST \
+            -H "Authorization: bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            https://api.github.com/graphql \
+            -d "{\"query\":\"mutation { enablePullRequestAutoMerge(input: {pullRequestId: \\\"$PR_NODE_ID\\\", mergeMethod: SQUASH}) { pullRequest { autoMergeRequest { mergeMethod } } } }\"}"
