@@ -28,13 +28,9 @@ jobs:
           BRANCH="promote/staging-$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
           git checkout -b "$BRANCH"
 
-          # Mirror staging's tracked files into prod, except files prod owns independently
-          rsync -a --delete \
-            --exclude='.git' \
-            --exclude='version.json' \
-            --exclude='.github/workflows/version-bump.yml' \
-            --exclude='CLAUDE.md' \
-            ../staging/ ./
+          # Copy only index.html from staging — prod owns everything else
+          # (version.json, .github/workflows/, CLAUDE.md, assets, etc.)
+          cp ../staging/index.html ./index.html
 
           # Reset VERSION in the promoted index.html to prod's current version so
           # const VERSION and version.json stay in sync (staging has its own counter)
