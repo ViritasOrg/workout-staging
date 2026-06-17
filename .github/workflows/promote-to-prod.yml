@@ -1,0 +1,73 @@
+name: Promote to prod
+
+on:
+  repository_dispatch:
+    types: [promote]
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          path: staging
+
+      - name: Checkout prod
+        uses: actions/checkout@v4
+        with:
+          repository: henrikschaub/workout
+          token: ${{ secrets.PROMOTE_TOKEN }}
+          path: prod
+
+      - name: Sync files into prod branch
+        run: |
+          cd prod
+          git config user.name "staging-promote-bot"
+          git config user.email "actions@github.com"
+          BRANCH="promote/staging-$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          git checkout -b "$BRANCH"
+
+          # Mirror staging's tracked files into prod, except files prod owns independently
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='version.json' \
+            --exclude='.github/workflows/version-bump.yml' \
+            --exclude='CLAUDE.md' \
+            ../staging/ ./
+
+          # Reset VERSION in the promoted index.html to prod's current version so
+          # const VERSION and version.json stay in sync (staging has its own counter)
+          PROD_VERSION=$(jq -r '.version' version.json)
+          sed -i "s/const VERSION='[0-9.]*'/const VERSION='${PROD_VERSION}'/" index.html
+
+          if git diff --quiet; then
+            echo "No changes to promote"
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "Promote staging changes (${GITHUB_SHA::7})"
+          git push origin "$BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Open PR on prod
+        if: env.BRANCH != ''
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
+        run: |
+          cd prod
+          PR_URL=$(gh pr create \
+            --repo henrikschaub/workout \
+            --base main \
+            --head "$BRANCH" \
+            --title "Promote staging changes ($GITHUB_SHA)" \
+            --body "Auto-generated PR mirroring the diff on workout-staging@main (commit ${GITHUB_SHA}), triggered manually via the staging app's 'Push to Prod' button. Merges automatically once prod's required CI check passes.")
+          echo "PR_URL=$PR_URL" >> "$GITHUB_ENV"
+
+      - name: Enable auto-merge on the PR
+        if: env.PR_URL != ''
+        env:
+          GH_TOKEN: ${{ secrets.PROMOTE_TOKEN }}
+        run: |
+          gh pr merge --repo henrikschaub/workout --auto --squash "$PR_URL"

@@ -11,16 +11,20 @@ Claude may freely branch, commit, push, open PRs, and merge on this repo.
 3. Create a PR, then **check its CI status before merging** — call `pull_request_read` with `method: get_check_runs` (or `get_status`) and confirm `conclusion`/`state` is `success`. **Never merge a PR with a failing or pending check.**
 4. Once CI is green, merge it yourself — never stop and ask the user to merge, never push directly to main
 5. After merge the `version-bump` GitHub Action auto-increments the minor version in `version.json` and `const VERSION` in `index.html` and commits with `[skip ci]`
-6. **After merging, poll `https://henrikschaub.github.io/workout-staging/version.json` every 30 s until the new version appears, then tell the user "live as vX.XXX — test now"**
+6. **After merging, confirm the version-bump workflow run completed successfully via `mcp__github__actions_list` (method: list_workflow_runs, resource_id: version-bump.yml). Then tell the user "live as vX.XXX — test now" based on the bumped version from the commit message. DO NOT attempt to curl or WebFetch `henrikschaub.github.io` — outbound network access to that host is always blocked in this remote environment and will always fail.**
 
 ## Promotion to prod — Claude must NOT do this directly
-There is currently no automated staging → prod promotion pipeline for this
-repo (unlike `peptidetracker-staging`, which has a "Push to Prod" button +
-`repository_dispatch` workflow). Until one exists, **never** push or open a PR
-directly on `workout` (prod) yourself. If staging changes need to reach prod,
-tell Henrik and let him decide how — manually porting a diff, or building a
-promotion pipeline mirroring peptidetracker-staging's, requires his explicit
-go-ahead first.
+Promotion happens via **Henrik clicking "Push to Prod"** in the staging app's
+Settings UI, which fires a `repository_dispatch` event that runs
+`.github/workflows/promote-to-prod.yml`. That workflow diffs staging against
+`workout` and opens a PR there. Claude must **never** merge that PR, or make
+any other change directly to `workout`, without Henrik's explicit go-ahead in
+that specific moment.
+
+**PROMOTE_TOKEN secret required:** The promotion workflow needs a repo secret
+named `PROMOTE_TOKEN` — a GitHub PAT with write access to `henrikschaub/workout`.
+Add it under Settings → Secrets and variables → Actions on this repo.
+Claude cannot create or edit repo secrets.
 
 ## ⚠️ AUTH WARNING — READ BEFORE TOUCHING ANY AUTH CODE ⚠️
 **PIN/passcode auth has been PERMANENTLY REMOVED.** Google Sign-In is the ONLY
@@ -34,4 +38,15 @@ tooling, never by end-user-facing apps.
 
 ## Deployment
 - GitHub Pages (staging URL) — deploys automatically on push to `main`
-- Monitor live version: `https://henrikschaub.github.io/workout-staging/version.json`
+- Monitor live version: `https://henrikschaub.github.io/workout-staging/version.json` — **CANNOT be fetched by Claude** (outbound network to `henrikschaub.github.io` is blocked in this remote environment). Use `mcp__github__actions_list` to confirm deployments instead.
+
+## Environment-aware code — NEVER hardcode staging/prod URLs
+`index.html` is a single file that gets promoted from staging to prod verbatim.
+Any URL or value that differs between environments **must** use `IS_STAGING`:
+
+```js
+const IS_STAGING = (window.location.pathname||'').startsWith('/workout-staging');
+```
+
+The `IS_STAGING` constant is declared at the top of the `<script>` block, right after `const VERSION`.
+Use it to gate any staging-only UI (e.g., `if(IS_STAGING)buildDeployCard();`).
