@@ -31,6 +31,12 @@ Shared infrastructure (non-exhaustive):
 When you fix or change any of the above in one app, immediately check the other
 app for the same issue and fix it before closing the session.
 
+## ⚠️ TESTS ARE MANDATORY — NO EXCEPTIONS ⚠️
+- **New feature or changed feature** → add tests covering the new behaviour in `tests/test_frontend.js`
+- **Bug fix** → add a regression test that would have caught the bug
+- **Run `node tests/test_frontend.js` and confirm 0 failures before opening any PR**
+- Never merge a PR whose CI test job is failing or pending
+
 ## ⚠️ ONLY FIX WHAT WAS ASKED — NO UNSOLICITED CHANGES ⚠️
 Fix exactly what Henrik asked. **Never change anything else**, even if it looks
 like an improvement. This applies especially to:
