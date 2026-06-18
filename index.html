@@ -381,10 +381,10 @@ function sSecBody(id){return '<div class="s-sec-body'+(!_sOpen[id]?' collapsed':
 function toggleSSec(id){_sOpen[id]=!_sOpen[id];setData('wkt-settings-open',_sOpen);var b=document.getElementById('s-sec-'+id);if(!b)return;b.classList.toggle('collapsed',!_sOpen[id]);var h=b.previousElementSibling;if(h)h.classList.toggle('open',!!_sOpen[id]);}
 (function(){['backend','data','app','account'].forEach(function(id){if(!_sOpen[id])return;var b=document.getElementById('s-sec-'+id);if(!b)return;b.classList.remove('collapsed');var h=b.previousElementSibling;if(h)h.classList.add('open');});})();
 const THEMES=[
-  {id:1,name:'VOLTAGE',label:'Dark Neon',vars:{bg:'#0a0a0a',surface:'#131313',surface2:'#1c1c1c',border:'#2a2a2a',accent:'#e8ff3c',accent2:'#ff6b2b',text:'#f0f0f0',muted:'#999',success:'#3cffa0',danger:'#ff3c3c'},preview:['#e8ff3c','#ff6b2b','#3cffa0']},
-  {id:2,name:'ROSE',label:'Dark Rose',vars:{bg:'#1a0f12',surface:'#221318',surface2:'#2d1a20',border:'#3d2530',accent:'#e8a8c4',accent2:'#c480a0',text:'#f0e8ec',muted:'#907880',success:'#5B8C6E',danger:'#C4627A'},preview:['#e8a8c4','#c480a0','#3d2530']},
-  {id:3,name:'FOREST',label:'Dark Forest',vars:{bg:'#0d1410',surface:'#121c15',surface2:'#18261c',border:'#243828',accent:'#78c896',accent2:'#5aaa78',text:'#e8f0ea',muted:'#789080',success:'#78c896',danger:'#c06060'},preview:['#78c896','#5aaa78','#243828']},
-  {id:4,name:'EARTH',label:'Dark Earth',vars:{bg:'#1a1208',surface:'#221810',surface2:'#2d2015',border:'#3d2d1e',accent:'#d4a870',accent2:'#b88850',text:'#f0e8dc',muted:'#907060',success:'#9C7B63',danger:'#A04040'},preview:['#d4a870','#b88850','#3d2d1e']}
+  {id:1,name:'VOLTAGE',label:'Dark Neon',vars:{bg:'#000000',surface:'#131313',surface2:'#1c1c1c',border:'#2a2a2a',accent:'#e8ff3c',accent2:'#ff6b2b',text:'#f0f0f0',muted:'#999',success:'#3cffa0',danger:'#ff3c3c'},preview:['#e8ff3c','#ff6b2b','#3cffa0']},
+  {id:2,name:'ROSE',label:'Dark Rose',vars:{bg:'#000000',surface:'#150c10',surface2:'#1e1218',border:'#2d1820',accent:'#e8a8c4',accent2:'#c480a0',text:'#f0e8ec',muted:'#907880',success:'#5B8C6E',danger:'#C4627A'},preview:['#e8a8c4','#c480a0','#2d1820']},
+  {id:3,name:'FOREST',label:'Dark Forest',vars:{bg:'#000000',surface:'#0a110c',surface2:'#121b14',border:'#1c2d1e',accent:'#78c896',accent2:'#5aaa78',text:'#e8f0ea',muted:'#789080',success:'#78c896',danger:'#c06060'},preview:['#78c896','#5aaa78','#1c2d1e']},
+  {id:4,name:'EARTH',label:'Dark Earth',vars:{bg:'#000000',surface:'#120c06',surface2:'#1c140c',border:'#2d1e10',accent:'#d4a870',accent2:'#b88850',text:'#f0e8dc',muted:'#907060',success:'#9C7B63',danger:'#A04040'},preview:['#d4a870','#b88850','#2d1e10']}
 ];
 function applyTheme(id){var t=THEMES.find(function(x){return x.id===id;})||THEMES[0];var r=document.documentElement.style;Object.entries(t.vars).forEach(function(e){r.setProperty('--'+e[0],e[1]);});setData('wkt-theme',id);}
 (function(){var _st=getData('wkt-theme',3);if(_st!==1)applyTheme(_st);})();
