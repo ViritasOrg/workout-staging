@@ -74,7 +74,8 @@ const patched = rawScript
   .replace('let _weightWindow=',     'var _weightWindow=')
   .replace('let _chartScale=',       'var _chartScale=')
   .replace('let _programs=',         'var _programs=')
-  .replace('let _pageVis=',          'var _pageVis=');
+  .replace('let _pageVis=',          'var _pageVis=')
+  .replace('let bfLog=',             'var bfLog=');
 
 const noop = () => {};
 
@@ -1189,6 +1190,91 @@ check('sync: source has no byDate dedup key',   !rawScript.includes('byDate'));
   _remote2.forEach(l => { _byId2[String(l.id)] = l; });
   check('sync merge: remote overwrites local on same ID', Object.values(_byId2)[0].notes === 'remote', `got "${Object.values(_byId2)[0].notes}"`);
 }
+
+// ── 34. getProgramRest — rest recommendation by program goal ──────────────────
+console.log('\n── getProgramRest — rest by program goal ────────────────────');
+check('getProgramRest defined', typeof G.getProgramRest === 'function');
+check('getProgramRest: strength → 3–5 min',     G.getProgramRest({goal:'strength'}).includes('3') && G.getProgramRest({goal:'strength'}).includes('5'));
+check('getProgramRest: hypertrophy → 60–90 s',  G.getProgramRest({goal:'hypertrophy'}).includes('60'));
+check('getProgramRest: aesthetic → 60–90 s',    G.getProgramRest({goal:'aesthetic'}).includes('60'));
+check('getProgramRest: rehab → 90 s – 2 min',   G.getProgramRest({goal:'rehab'}).includes('90'));
+check('getProgramRest: null prog → default (hypertrophy)', G.getProgramRest(null).includes('60'));
+check('getProgramRest: no goal → default (hypertrophy)',   G.getProgramRest({}).includes('60'));
+check('getProgramRest: strength label is string', typeof G.getProgramRest({goal:'strength'}) === 'string');
+
+// ── 35. BF% log — saveBf / deleteBf ──────────────────────────────────────────
+console.log('\n── BF% log — saveBf / deleteBf ─────────────────────────────');
+check('saveBf defined',   typeof G.saveBf   === 'function');
+check('deleteBf defined', typeof G.deleteBf === 'function');
+check('drawBfChart defined', typeof G.drawBfChart === 'function');
+// bfLog key persisted in getData/setData
+check('bfLog key: bf_log used for storage', rawScript.includes("'bf_log'") || rawScript.includes('"bf_log"'));
+// saveBf dedupes by date (only one entry per date in bfLog after save)
+{
+  const _origBfLog = [...G.bfLog];
+  const _today = new Date().toISOString().split('T')[0];
+  G.bfLog.push({date:_today, bf:15});
+  G.bfLog.push({date:_today, bf:16});
+  const _deduped = G.bfLog.filter((e,_,arr) => arr.findIndex(x=>x.date===e.date)===arr.indexOf(e));
+  check('bfLog: deduplication keeps only one entry per date', _deduped.filter(e=>e.date===_today).length === 1);
+  G.bfLog.length = 0; _origBfLog.forEach(e=>G.bfLog.push(e)); // restore
+}
+// deleteBf removes the entry with matching date
+{
+  const _origBfLog2 = [...G.bfLog];
+  G.bfLog.push({date:'2026-01-01', bf:18});
+  G.deleteBf('2026-01-01');
+  check('deleteBf: removes entry with matching date', !G.bfLog.find(e=>e.date==='2026-01-01'), `still ${G.bfLog.length} entries`);
+  G.bfLog.length = 0; _origBfLog2.forEach(e=>G.bfLog.push(e)); // restore
+}
+
+// ── 36. BMI — derived chart from weight log + profile height ──────────────────
+console.log('\n── BMI chart — derived from weight + height ─────────────────');
+check('drawBmiChart defined', typeof G.drawBmiChart === 'function');
+// BMI = weight / height_m^2
+{
+  const _hM = 1.80; // 180 cm
+  const _wKg = 80;
+  const _bmi = Math.round((_wKg/(_hM*_hM))*10)/10;
+  check('BMI formula: 80kg / 1.80m^2 = 24.7', _bmi === 24.7, `got ${_bmi}`);
+}
+{
+  const _hM = 1.75;
+  const _wKg = 90;
+  const _bmi = Math.round((_wKg/(_hM*_hM))*10)/10;
+  check('BMI formula: 90kg / 1.75m^2 = 29.4', _bmi === 29.4, `got ${_bmi}`);
+}
+// BMI categories
+{
+  const cat = (bmi) => bmi<18.5?'Underweight':bmi<25?'Normal':bmi<30?'Overweight':'Obese';
+  check('BMI category: 17.5 → Underweight', cat(17.5)==='Underweight');
+  check('BMI category: 22.0 → Normal',      cat(22.0)==='Normal');
+  check('BMI category: 27.0 → Overweight',  cat(27.0)==='Overweight');
+  check('BMI category: 32.0 → Obese',       cat(32.0)==='Obese');
+}
+// drawBmiChart uses wkt-profile height
+check('drawBmiChart uses wkt-profile for height', rawScript.includes("'wkt-profile'") || rawScript.includes('"wkt-profile"'));
+
+// ── 37. Rest timer — showRestTimer / startRest / cancelRest ──────────────────
+console.log('\n── Rest timer ───────────────────────────────────────────────');
+check('showRestTimer defined', typeof G.showRestTimer === 'function');
+check('startRest defined',     typeof G.startRest     === 'function');
+check('cancelRest defined',    typeof G.cancelRest    === 'function');
+// Timer bar element exists in HTML
+check('rest-timer-bar element in HTML', rawScript.includes('rest-timer-bar'));
+// Preset buttons exist (in HTML body, not script block)
+check('60s preset in HTML',  html.includes('startRest(60)'));
+check('90s preset in HTML',  html.includes('startRest(90)'));
+check('120s preset in HTML', html.includes('startRest(120)'));
+check('180s preset in HTML', html.includes('startRest(180)'));
+check('300s preset in HTML', html.includes('startRest(300)'));
+// cancelRest clears the interval and hides bar
+check('cancelRest clears _restTid', rawScript.includes('_restTid'));
+check('cancelRest sets _restEnd to 0', rawScript.includes('_restEnd=0'));
+// Web Notification API requested on start
+check('Notification.requestPermission called', rawScript.includes('Notification.requestPermission'));
+// REST TIMER button present in log form
+check('REST TIMER button in log form', rawScript.includes('showRestTimer'));
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
