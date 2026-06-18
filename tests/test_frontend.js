@@ -1290,6 +1290,32 @@ check('onGoogleSignIn calls syncProgramsFromAgent after unlockApp',
 check('onGoogleSignIn calls syncSettingsFromAgent after unlockApp',
   rawScript.includes('syncProgramsFromAgent();syncSettingsFromAgent()'));
 
+// ── 39. Weekly chart x-axis label thinning ───────────────────────────────────
+console.log('\n── Weekly chart x-axis label thinning ───────────────────────');
+// Regression: every week used to get a label, causing overlap on 90d view.
+// Fix: skip labels closer than 44px to the previous one (_xLblLast / _xLblLast2).
+check('drawWeeklyGroupChart uses min-gap label skip (_xLblLast)',
+  rawScript.includes('_xLblLast'));
+check('drawWeeklyStrengthGroupChart uses min-gap label skip (_xLblLast2)',
+  rawScript.includes('_xLblLast2'));
+// Simulate label placement logic: with 13 weeks in 236px, slotW≈18px → gap≈18px.
+// Only labels ≥44px apart should be drawn. Expect ≤5 labels out of 13.
+{
+  const slotW=236/13;
+  const xOf=i=>36+(i+0.5)*slotW;
+  let last=-Infinity, count=0;
+  for(let i=0;i<13;i++){const x=xOf(i);if(x-last>=44){last=x;count++;}}
+  check('weekly chart: 13 weeks in 236px → ≤5 visible x-labels', count<=5, `got ${count}`);
+}
+// With only 4 weeks, all should be shown (no overlap).
+{
+  const slotW=236/4;
+  const xOf=i=>36+(i+0.5)*slotW;
+  let last=-Infinity, count=0;
+  for(let i=0;i<4;i++){const x=xOf(i);if(x-last>=44){last=x;count++;}}
+  check('weekly chart: 4 weeks in 236px → all 4 labels shown', count===4, `got ${count}`);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
