@@ -234,11 +234,11 @@ check('all themes have preview array', G.THEMES?.every(t => Array.isArray(t.prev
 check('theme 1 is VOLTAGE (default)', G.THEMES?.[0]?.name === 'VOLTAGE');
 check('theme 1 accent is yellow',    G.THEMES?.[0]?.vars?.accent === '#e8ff3c');
 check('theme 2 is ROSE',             G.THEMES?.[1]?.name === 'ROSE');
-check('theme 2 accent is blush',     G.THEMES?.[1]?.vars?.accent === '#D7A9BC');
+check('theme 2 accent is dark rose',     G.THEMES?.[1]?.vars?.accent === '#e8a8c4');
 check('theme 3 is FOREST',           G.THEMES?.[2]?.name === 'FOREST');
-check('theme 3 accent is sage',      G.THEMES?.[2]?.vars?.accent === '#4A6B57');
+check('theme 3 accent is dark forest green',      G.THEMES?.[2]?.vars?.accent === '#78c896');
 check('theme 4 is EARTH',            G.THEMES?.[3]?.name === 'EARTH');
-check('theme 4 accent is terracotta',G.THEMES?.[3]?.vars?.accent === '#7A5C48');
+check('theme 4 accent is dark earth gold',G.THEMES?.[3]?.vars?.accent === '#d4a870');
 
 // ── 11. applyTheme ────────────────────────────────────────────────────────────
 console.log('\n── applyTheme ─────────────────────────────────────────────');
@@ -253,16 +253,16 @@ check('applyTheme(1) persists to localStorage',
   sandbox.localStorage._s['wkt-theme'] === 1 || sandbox.localStorage._s['wkt-theme'] === '1');
 
 G.applyTheme(2);
-check('applyTheme(2) sets --accent to ROSE blush',
-  _cssVars['--accent'] === '#D7A9BC', `got "${_cssVars['--accent']}"`);
+check('applyTheme(2) sets --accent to ROSE dark pink',
+  _cssVars['--accent'] === '#e8a8c4', `got "${_cssVars['--accent']}"`);
 
 G.applyTheme(3);
-check('applyTheme(3) sets --accent to FOREST sage',
-  _cssVars['--accent'] === '#4A6B57', `got "${_cssVars['--accent']}"`);
+check('applyTheme(3) sets --accent to FOREST green',
+  _cssVars['--accent'] === '#78c896', `got "${_cssVars['--accent']}"`);
 
 G.applyTheme(4);
-check('applyTheme(4) sets --accent to EARTH terracotta',
-  _cssVars['--accent'] === '#7A5C48', `got "${_cssVars['--accent']}"`);
+check('applyTheme(4) sets --accent to EARTH gold',
+  _cssVars['--accent'] === '#d4a870', `got "${_cssVars['--accent']}"`);
 
 G.applyTheme(99); // invalid id → falls back to first theme
 check('applyTheme(invalid) falls back to THEMES[0]',
