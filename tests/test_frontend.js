@@ -950,6 +950,246 @@ try {
   check('toggleWeightHist does not throw', false, e.message);
 }
 
+// ── 26. isPressEx (DB button trigger) ─────────────────────────────────────────
+console.log('\n── isPressEx (DB button trigger) ───────────────────────────');
+check('isPressEx defined', typeof G.isPressEx === 'function');
+// Press variants
+check('isPressEx: "Bench Press" → true',          G.isPressEx('Bench Press'));
+check('isPressEx: "Overhead Press" → true',        G.isPressEx('Overhead Press'));
+check('isPressEx: "Arnold Press" → true',           G.isPressEx('Arnold Press'));
+check('isPressEx: "Incline DB Press" → true',       G.isPressEx('Incline DB Press'));
+check('isPressEx: "Landmine Press" → true',         G.isPressEx('Landmine Press'));
+check('isPressEx: "Chest Machine Press" → true',    G.isPressEx('Chest Machine Press'));
+// Raise variants — regression for PR #41 (regex changed from /press/ to /press|raise/)
+check('isPressEx: "Lateral Raise" → true [PR #41]',       G.isPressEx('Lateral Raise'));
+check('isPressEx: "Cable Lateral Raise" → true [PR #41]', G.isPressEx('Cable Lateral Raise'));
+check('isPressEx: "Y-Raise" → true [PR #41]',             G.isPressEx('Y-Raise'));
+check('isPressEx: "Front Raise" → true [PR #41]',         G.isPressEx('Front Raise'));
+// Non-press/raise exercises must return false
+check('isPressEx: "Squat" → false',        !G.isPressEx('Squat'));
+check('isPressEx: "Deadlift" → false',     !G.isPressEx('Deadlift'));
+check('isPressEx: "Barbell Row" → false',  !G.isPressEx('Barbell Row'));
+check('isPressEx: "Upright Row" → false',  !G.isPressEx('Upright Row'));
+check('isPressEx: "Pull-ups" → false',     !G.isPressEx('Pull-ups'));
+check('isPressEx: "Barbell Curl" → false', !G.isPressEx('Barbell Curl'));
+check('isPressEx: "Face Pulls" → false',   !G.isPressEx('Face Pulls'));
+// Case-insensitive
+check('isPressEx: case-insensitive "lateral raise"', G.isPressEx('lateral raise'));
+check('isPressEx: case-insensitive "BENCH PRESS"',   G.isPressEx('BENCH PRESS'));
+
+// ── 27. toggleDb ──────────────────────────────────────────────────────────────
+console.log('\n── toggleDb ────────────────────────────────────────────────');
+check('toggleDb defined', typeof G.toggleDb === 'function');
+{
+  // Activate: inactive (db=1) → active (db=2)
+  const _card = { dataset: {}, style: {} };
+  const _btn = { dataset: { db: '1', exn: 'Lateral Raise' }, textContent: 'DB',
+                  style: { background: '', color: '' }, closest: () => _card };
+  G.toggleDb(_btn, 'Lateral Raise');
+  check('toggleDb activate: btn.dataset.db = 2',          parseFloat(_btn.dataset.db) === 2,          `got ${_btn.dataset.db}`);
+  check('toggleDb activate: btn.textContent stays "DB"',  _btn.textContent === 'DB',                  `got "${_btn.textContent}"`);
+  check('toggleDb activate: card.dataset.gear = 2',       parseFloat(_card.dataset.gear) === 2,       `got ${_card.dataset.gear}`);
+  check('toggleDb activate: localStorage persisted = 2',  parseFloat(G.localStorage.getItem('wk-db-Lateral Raise')) === 2);
+  check('toggleDb activate: btn.style.color = "#000"',    _btn.style.color === '#000',                `got "${_btn.style.color}"`);
+
+  // Deactivate: active (db=2) → inactive (db=1)
+  G.toggleDb(_btn, 'Lateral Raise');
+  check('toggleDb deactivate: btn.dataset.db = 1',         parseFloat(_btn.dataset.db) === 1,         `got ${_btn.dataset.db}`);
+  check('toggleDb deactivate: btn.textContent stays "DB"', _btn.textContent === 'DB');
+  check('toggleDb deactivate: card.dataset.gear = 1',      parseFloat(_card.dataset.gear) === 1,      `got ${_card.dataset.gear}`);
+  check('toggleDb deactivate: localStorage persisted = 1', parseFloat(G.localStorage.getItem('wk-db-Lateral Raise')) === 1);
+}
+{
+  // Fallback to btn.dataset.exn when exName not provided
+  const _card2 = { dataset: {}, style: {} };
+  const _btn2 = { dataset: { db: '1', exn: 'Front Raise' }, textContent: 'DB', style: {}, closest: () => _card2 };
+  G.toggleDb(_btn2);
+  check('toggleDb: no exName param → fallback to btn.dataset.exn', G.localStorage.getItem('wk-db-Front Raise') !== null);
+}
+
+// ── 28. toggleGear ────────────────────────────────────────────────────────────
+console.log('\n── toggleGear ──────────────────────────────────────────────');
+check('toggleGear defined', typeof G.toggleGear === 'function');
+{
+  // Activate: gear=1 → gear=0.5
+  const _card = { dataset: {}, style: {} };
+  const _btn = { dataset: { gear: '1', exn: 'Cable Row' }, textContent: '1× cable',
+                  style: { background: '', color: '' }, closest: () => _card };
+  G.toggleGear(_btn, 'Cable Row');
+  check('toggleGear activate: btn.dataset.gear = 0.5',         parseFloat(_btn.dataset.gear) === 0.5,       `got ${_btn.dataset.gear}`);
+  check('toggleGear activate: btn.textContent = "½ cable"',    _btn.textContent === '½ cable',              `got "${_btn.textContent}"`);
+  check('toggleGear activate: card.dataset.gear = 0.5',        parseFloat(_card.dataset.gear) === 0.5,      `got ${_card.dataset.gear}`);
+  check('toggleGear activate: localStorage persisted = 0.5',   parseFloat(G.localStorage.getItem('wk-gear-Cable Row')) === 0.5);
+  check('toggleGear activate: btn.style.color = "#000"',       _btn.style.color === '#000',                 `got "${_btn.style.color}"`);
+
+  // Deactivate: gear=0.5 → gear=1
+  G.toggleGear(_btn, 'Cable Row');
+  check('toggleGear deactivate: btn.dataset.gear = 1',         parseFloat(_btn.dataset.gear) === 1,         `got ${_btn.dataset.gear}`);
+  check('toggleGear deactivate: btn.textContent = "1× cable"', _btn.textContent === '1× cable',             `got "${_btn.textContent}"`);
+  check('toggleGear deactivate: card.dataset.gear = 1',        parseFloat(_card.dataset.gear) === 1,        `got ${_card.dataset.gear}`);
+  check('toggleGear deactivate: localStorage persisted = 1',   parseFloat(G.localStorage.getItem('wk-gear-Cable Row')) === 1);
+}
+{
+  // Fallback to btn.dataset.exn when exName not provided
+  const _card2 = { dataset: {}, style: {} };
+  const _btn2 = { dataset: { gear: '1', exn: 'Lat Pulldown' }, textContent: '1× cable', style: {}, closest: () => _card2 };
+  G.toggleGear(_btn2);
+  check('toggleGear: no exName param → fallback to btn.dataset.exn', G.localStorage.getItem('wk-gear-Lat Pulldown') !== null);
+}
+
+// ── 29. getBestKgFromLogs ─────────────────────────────────────────────────────
+console.log('\n── getBestKgFromLogs ───────────────────────────────────────');
+check('getBestKgFromLogs defined', typeof G.getBestKgFromLogs === 'function');
+{
+  const _saved = G.logs;
+  // logs ordered newest-first (as they are after sync); function returns best from first match
+  G.logs = [
+    { date: '2026-06-15', exercises: [{ name: 'Bench Press', sets: [{kg:75,reps:6}] }] },
+    { date: '2026-06-08', exercises: [{ name: 'Bench Press', sets: [{kg:60,reps:10},{kg:70,reps:8}] }] },
+    { date: '2026-06-01', exercises: [{ name: 'Squat',       sets: [{kg:100,reps:5}] }] },
+  ];
+  // returns best set kg from the first (most recent) log containing that exercise
+  check('getBestKgFromLogs: returns best kg from first matching log', G.getBestKgFromLogs('Bench Press') === 75, `got ${G.getBestKgFromLogs('Bench Press')}`);
+  check('getBestKgFromLogs: correct exercise matched',          G.getBestKgFromLogs('Squat') === 100,      `got ${G.getBestKgFromLogs('Squat')}`);
+  check('getBestKgFromLogs: unknown exercise → null',           G.getBestKgFromLogs('Unknown XYZ') === null);
+
+  G.logs = [{ date: '2026-06-01', exercises: [{ name: 'Pull-ups', sets: [{kg:0,reps:10}] }] }];
+  check('getBestKgFromLogs: all sets kg=0 → null',              G.getBestKgFromLogs('Pull-ups') === null);
+
+  G.logs = [];
+  check('getBestKgFromLogs: empty logs → null',                  G.getBestKgFromLogs('Bench Press') === null);
+
+  G.logs = [{ date: '2026-06-01', notes: 'Bench Press 60kg 10' }]; // notes-only, no exercises array
+  check('getBestKgFromLogs: notes-only log (no exercises key) → null', G.getBestKgFromLogs('Bench Press') === null);
+
+  G.logs = _saved;
+}
+
+// ── 30. Draft lifecycle (saveDraft / restoreDraft / clearDraft) ───────────────
+console.log('\n── Draft lifecycle ─────────────────────────────────────────');
+check('saveDraft defined',    typeof G.saveDraft    === 'function');
+check('restoreDraft defined', typeof G.restoreDraft === 'function');
+check('clearDraft defined',   typeof G.clearDraft   === 'function');
+
+// clearDraft removes the key
+G.setData('wkt-draft', { test: 1 });
+check('clearDraft: before clear, draft exists', G.getData('wkt-draft', null) !== null);
+G.clearDraft();
+check('clearDraft: removes wkt-draft from localStorage', G.getData('wkt-draft', null) === null);
+G.clearDraft(); // second call
+check('clearDraft: idempotent (no throw on second call)',  G.getData('wkt-draft', null) === null);
+
+// saveDraft writes structured data
+G.clearDraft();
+G.saveDraft();
+const _draft30 = G.getData('wkt-draft', null);
+check('saveDraft: writes wkt-draft to localStorage',       _draft30 !== null);
+check('saveDraft: draft has day property',                  _draft30 && 'day' in _draft30);
+check('saveDraft: draft has tmpl object',                   _draft30 && typeof _draft30.tmpl === 'object');
+check('saveDraft: draft has custom array',                  _draft30 && Array.isArray(_draft30.custom));
+
+// restoreDraft: day mismatch → returns early, no throw
+G.setData('wkt-draft', { day: '3', date: '2026-06-01', weight: '80', tmpl: {}, custom: [] });
+try {
+  G.restoreDraft('5');
+  check('restoreDraft: day mismatch → no throw', true);
+} catch(e) {
+  check('restoreDraft: day mismatch → no throw', false, e.message);
+}
+
+// restoreDraft: no draft → no throw
+G.clearDraft();
+try {
+  G.restoreDraft('1');
+  check('restoreDraft: no draft → no throw', true);
+} catch(e) {
+  check('restoreDraft: no draft → no throw', false, e.message);
+}
+
+// ── 31. buildSessionGroupVol — gear factors ───────────────────────────────────
+console.log('\n── buildSessionGroupVol gear factors ───────────────────────');
+check('buildSessionGroupVol defined', typeof G.buildSessionGroupVol === 'function');
+{
+  const _saved = G.logs;
+  const _yday = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
+
+  // Baseline: gear=1 (chest fraction for bench = 0.6 → 100×10×0.6×1 = 600)
+  G.logs = [{ date: _yday, exercises: [{ name: 'Bench Press', gear: 1, sets: [{kg:100,reps:10}] }] }];
+  const _base = G.buildSessionGroupVol('chest', 30);
+  const _baseVol = _base[0]?.vol;
+  check('buildSessionGroupVol: gear=1 records volume', _base.length === 1, `got ${_base.length} sessions`);
+
+  // gear=2 (DB mode) doubles effective volume
+  G.logs = [{ date: _yday, exercises: [{ name: 'Bench Press', gear: 2, sets: [{kg:100,reps:10}] }] }];
+  const _db = G.buildSessionGroupVol('chest', 30);
+  check('buildSessionGroupVol: gear=2 doubles volume (DB mode)',
+    _db.length === 1 && Math.abs(_db[0].vol - _baseVol * 2) < 0.01,
+    `expected ${_baseVol * 2} got ${_db[0]?.vol}`);
+
+  // gear=0.5 (cable half-effort) halves effective volume
+  G.logs = [{ date: _yday, exercises: [{ name: 'Bench Press', gear: 0.5, sets: [{kg:100,reps:10}] }] }];
+  const _cable = G.buildSessionGroupVol('chest', 30);
+  check('buildSessionGroupVol: gear=0.5 halves volume (cable mode)',
+    _cable.length === 1 && Math.abs(_cable[0].vol - _baseVol * 0.5) < 0.01,
+    `expected ${_baseVol * 0.5} got ${_cable[0]?.vol}`);
+
+  // Log outside cutoff window is excluded
+  G.logs = [{ date: '2020-01-01', exercises: [{ name: 'Bench Press', gear: 1, sets: [{kg:100,reps:10}] }] }];
+  check('buildSessionGroupVol: log outside window excluded', G.buildSessionGroupVol('chest', 30).length === 0);
+
+  // Zero-rep sets are not counted
+  G.logs = [{ date: _yday, exercises: [{ name: 'Bench Press', gear: 1, sets: [{kg:100,reps:0}] }] }];
+  check('buildSessionGroupVol: zero-rep sets excluded', G.buildSessionGroupVol('chest', 30).length === 0);
+
+  // Exercise in wrong group is excluded
+  G.logs = [{ date: _yday, exercises: [{ name: 'Bench Press', gear: 1, sets: [{kg:100,reps:10}] }] }];
+  check('buildSessionGroupVol: exercise not in target group excluded', G.buildSessionGroupVol('legs', 30).length === 0);
+
+  G.logs = _saved;
+}
+
+// ── 32. getExGroup ────────────────────────────────────────────────────────────
+console.log('\n── getExGroup ──────────────────────────────────────────────');
+check('getExGroup defined', typeof G.getExGroup === 'function');
+check('getExGroup: "Squat" → "legs"',              G.getExGroup('Squat') === 'legs',       `got "${G.getExGroup('Squat')}"`);
+check('getExGroup: "Romanian Deadlift" → "legs"',  G.getExGroup('Romanian Deadlift') === 'legs', `got "${G.getExGroup('Romanian Deadlift')}"`);
+check('getExGroup: "Deadlift" → "legs"',            G.getExGroup('Deadlift') === 'legs',    `got "${G.getExGroup('Deadlift')}"`);
+check('getExGroup: "Pull-ups" → "back"',            G.getExGroup('Pull-ups') === 'back',    `got "${G.getExGroup('Pull-ups')}"`);
+check('getExGroup: "Barbell Row" → "back"',         G.getExGroup('Barbell Row') === 'back', `got "${G.getExGroup('Barbell Row')}"`);
+check('getExGroup: "Lat Pulldown" → "back"',        G.getExGroup('Lat Pulldown') === 'back',`got "${G.getExGroup('Lat Pulldown')}"`);
+check('getExGroup: "Bench Press" → "chest"',        G.getExGroup('Bench Press') === 'chest',`got "${G.getExGroup('Bench Press')}"`);
+check('getExGroup: "Lateral Raise" → "shoulders"',  G.getExGroup('Lateral Raise') === 'shoulders', `got "${G.getExGroup('Lateral Raise')}"`);
+check('getExGroup: "Overhead Press" → "shoulders"', G.getExGroup('Overhead Press') === 'shoulders', `got "${G.getExGroup('Overhead Press')}"`);
+check('getExGroup: "Barbell Curl" → "arms"',        G.getExGroup('Barbell Curl') === 'arms',`got "${G.getExGroup('Barbell Curl')}"`);
+check('getExGroup: "Tricep Pushdown" → "arms"',     G.getExGroup('Tricep Pushdown') === 'arms', `got "${G.getExGroup('Tricep Pushdown')}"`);
+check('getExGroup: unknown → null',                  G.getExGroup('Unknown Exercise XYZ') === null);
+check('getExGroup: case-insensitive ("SQUAT" → "legs")', G.getExGroup('SQUAT') === 'legs', `got "${G.getExGroup('SQUAT')}"`);
+
+// ── 33. syncWorkoutLogsFromAgent — merge by ID (no date dedup) ────────────────
+console.log('\n── syncWorkoutLogsFromAgent — merge by ID ───────────────────');
+check('syncWorkoutLogsFromAgent defined', typeof G.syncWorkoutLogsFromAgent === 'function');
+// Regression guard: source must merge by ID, never by date (PR #32 fix)
+check('sync: source uses byId merge key',       rawScript.includes('byId'));
+check('sync: source has no byDate dedup key',   !rawScript.includes('byDate'));
+// Verify the ID-based merge logic keeps entries with same date but different IDs
+{
+  const _local  = [{id:'100',date:'2026-06-01',day:1},{id:'200',date:'2026-06-01',day:2}];
+  const _remote = [{id:'300',date:'2026-06-01',day:3}];
+  const _byId = {};
+  _local.forEach(l  => { _byId[String(l.id)] = l; });
+  _remote.forEach(l => { _byId[String(l.id)] = l; });
+  check('sync merge: same-date different IDs → all 3 kept',   Object.keys(_byId).length === 3, `got ${Object.keys(_byId).length}`);
+}
+// Remote entry overwrites local entry on same ID
+{
+  const _local2  = [{id:'100',date:'2026-06-01',day:1,notes:'local'}];
+  const _remote2 = [{id:'100',date:'2026-06-01',day:1,notes:'remote'}];
+  const _byId2 = {};
+  _local2.forEach(l  => { _byId2[String(l.id)] = l; });
+  _remote2.forEach(l => { _byId2[String(l.id)] = l; });
+  check('sync merge: remote overwrites local on same ID', Object.values(_byId2)[0].notes === 'remote', `got "${Object.values(_byId2)[0].notes}"`);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
