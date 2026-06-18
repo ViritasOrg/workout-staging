@@ -1276,6 +1276,20 @@ check('Notification.requestPermission called', rawScript.includes('Notification.
 // REST TIMER button present in log form
 check('REST TIMER button in log form', rawScript.includes('showRestTimer'));
 
+// ── 38. PWA sync after sign-in (regression: PWA had stale data) ──────────────
+console.log('\n── PWA sync after fresh sign-in ─────────────────────────────');
+// onGoogleSignIn must call all four sync functions after unlockApp() so that a
+// PWA (which has empty localStorage and fires syncs before auth completes) gets
+// a full data pull once the user signs in.
+check('onGoogleSignIn calls syncWeightsFromAgent after unlockApp',
+  rawScript.includes('unlockApp();syncWeightsFromAgent()'));
+check('onGoogleSignIn calls syncWorkoutLogsFromAgent after unlockApp',
+  rawScript.includes('syncWeightsFromAgent();syncWorkoutLogsFromAgent()'));
+check('onGoogleSignIn calls syncProgramsFromAgent after unlockApp',
+  rawScript.includes('syncWorkoutLogsFromAgent();syncProgramsFromAgent()'));
+check('onGoogleSignIn calls syncSettingsFromAgent after unlockApp',
+  rawScript.includes('syncProgramsFromAgent();syncSettingsFromAgent()'));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
