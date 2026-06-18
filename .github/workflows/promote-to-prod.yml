@@ -28,9 +28,9 @@ jobs:
           BRANCH="promote/staging-$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
           git checkout -b "$BRANCH"
 
-          # Copy only index.html from staging — prod owns everything else
-          # (version.json, .github/workflows/, CLAUDE.md, assets, etc.)
+          # Copy app files from staging — prod owns version.json, .github/workflows/, CLAUDE.md, assets, etc.
           cp ../staging/index.html ./index.html
+          cp ../staging/tests/test_frontend.js ./tests/test_frontend.js
 
           # Reset VERSION in the promoted index.html to prod's current version so
           # const VERSION and version.json stay in sync (staging has its own counter)
