@@ -1,5 +1,23 @@
 # Workout Staging — Claude Instructions
 
+## ⚠️ BACKEND IS THE SOURCE OF TRUTH — EVERY SAVE MUST HIT THE BACKEND ⚠️
+**Every user-facing data operation (save, update, delete) MUST be persisted to
+the backend immediately — no exceptions, ever.** localStorage is only a local
+cache for display. The backend is the source of truth.
+
+Rules that are NOT negotiable:
+- Every `save*()` function MUST call the corresponding `push*ToAgent()` function
+- Every `delete*()` function MUST call the corresponding `delete*FromAgent()` function
+- Every new data type added to the app needs BOTH a localStorage write AND a
+  backend push in the same operation
+- `setData(key, value)` alone is NEVER sufficient — always pair it with the backend call
+- The backend data file for every endpoint MUST use the persistent volume pattern:
+  `Path("/data/foo.json") if Path("/data").exists() else Path(...) / "data" / "foo.json"`
+  (ephemeral container filesystem is wiped on every redeploy)
+
+This rule applies to weights, workout logs, body comp, programs, settings —
+**everything**. Violating this has caused repeated data loss incidents.
+
 ## ⚠️ LOCAL CLONE RULE — NEVER SKIP ⚠️
 Local clones at `/home/user/<repo>` are **NOT automatically up to date**. A
 session can be hours old and the remote may have moved on. **Before reading or
