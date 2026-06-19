@@ -1634,6 +1634,28 @@ console.log('\n── Backup status in Settings ──────────�
   check("Backup logic detects monthly by date ending '-01'", src.includes("d.slice(8)==='01'"));
 }
 
+// ── 47. syncBodyCompFromAgent present and wired up ────────────────────────────
+console.log('\n── syncBodyCompFromAgent present and wired up ───────────────');
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  check('syncBodyCompFromAgent function defined',
+    src.includes('async function syncBodyCompFromAgent()'));
+  check('syncBodyCompFromAgent fetches /bodycomp endpoint',
+    src.includes("AGENT_URL+'/bodycomp'"));
+  check('syncBodyCompFromAgent merges bf field from remote entries',
+    src.includes('return{date:e.date,bf:e.bf}'));
+  check('syncBodyCompFromAgent updates bfLog variable',
+    src.includes('bfLog=merged'));
+  check('syncBodyCompFromAgent saves to bf_log localStorage',
+    src.includes("setData('bf_log',merged)"));
+  check('syncBodyCompFromAgent redraws chart and history',
+    src.includes('drawBfChart();renderBfHistory()'));
+  check('syncBodyCompFromAgent called at startup (init sequence)',
+    /syncSettingsFromAgent\(\);syncBodyCompFromAgent\(\)/.test(src));
+  check('syncBodyCompFromAgent called after Google Sign-In',
+    /syncSettingsFromAgent\(\);syncBodyCompFromAgent\(\)/.test(src));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
