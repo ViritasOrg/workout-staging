@@ -1439,9 +1439,6 @@ check('prefillLog uses last weight entry for body-weight pre-fill',
 
 // ── 43. Overview vol stats populated by renderProgress (regression) ───────────
 console.log('\n── Overview vol stats populated without visiting Volume tab ─');
-// Regression: stat-volume and stat-volume-total were only set inside
-// drawVolumeChart, which only runs when the Volume tab is active. The Overview
-// tab showed "—" permanently. Fix: updateVolStats() called from renderProgress.
 check('updateVolStats defined', typeof G.updateVolStats === 'function');
 check('renderProgress calls updateVolStats',
   G.renderProgress.toString().includes('updateVolStats'));
@@ -1449,9 +1446,9 @@ check('updateVolStats reads stat-volume element',
   G.updateVolStats.toString().includes('stat-volume'));
 check('updateVolStats reads stat-volume-total element',
   G.updateVolStats.toString().includes('stat-volume-total'));
-// Verify updateVolStats uses logs (not a Volume-tab-only path)
 check('updateVolStats references logs directly',
   G.updateVolStats.toString().includes('logs'));
+
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
