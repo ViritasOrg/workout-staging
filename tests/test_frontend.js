@@ -1532,6 +1532,85 @@ console.log('\n── Weighted pull-up volume fix ──────────
     G.syncWorkoutLogsFromAgent.toString().includes('wk-weighted-pu-vol-v1'));
 }
 
+// ── 45. localStorage isolation Proxy ─────────────────────────────────────────
+console.log('\n── localStorage isolation Proxy ─────────────────────────────');
+{
+  // Simulate IS_STAGING proxy by constructing one directly
+  const rawStore = {};
+  const PREFIX = 'staging:';
+  const rawLS = {
+    getItem: k => rawStore[k] !== undefined ? rawStore[k] : null,
+    setItem: (k, v) => { rawStore[k] = v; },
+    removeItem: k => { delete rawStore[k]; },
+    clear: () => { Object.keys(rawStore).forEach(k => delete rawStore[k]); },
+    key: i => Object.keys(rawStore)[i] || null,
+    get length() { return Object.keys(rawStore).length; },
+  };
+  const proxy = new Proxy(rawLS, {
+    get: function(t, n) {
+      if (n === 'getItem') return k => rawLS.getItem(PREFIX + k);
+      if (n === 'setItem') return (k, v) => rawLS.setItem(PREFIX + k, v);
+      if (n === 'removeItem') return k => rawLS.removeItem(PREFIX + k);
+      if (n === 'clear') return () => { Object.keys(rawStore).filter(k => k.startsWith(PREFIX)).forEach(k => rawLS.removeItem(k)); };
+      if (n === 'key') return i => Object.keys(rawStore).filter(k => k.startsWith(PREFIX)).map(k => k.slice(PREFIX.length))[i] || null;
+      if (n === 'length') return Object.keys(rawStore).filter(k => k.startsWith(PREFIX)).length;
+      if (typeof t[n] === 'function') return t[n].bind(t);
+      return t[n];
+    },
+    set: (t, n, v) => { t[n] = v; return true; },
+    ownKeys: () => Object.keys(rawStore).filter(k => k.startsWith(PREFIX)).map(k => k.slice(PREFIX.length)),
+    getOwnPropertyDescriptor: (t, n) => {
+      const keys = Object.keys(rawStore).filter(k => k.startsWith(PREFIX)).map(k => k.slice(PREFIX.length));
+      if (keys.includes(n)) return { configurable: true, enumerable: true, value: rawLS.getItem(PREFIX + n) };
+      return undefined;
+    },
+    has: (t, n) => rawLS.getItem(PREFIX + n) !== null,
+  });
+
+  // Direct rawStore write should NOT be visible through proxy (different namespace)
+  rawLS.setItem('foo', 'bar');
+  check('Proxy: non-prefixed raw key not visible through proxy', proxy.getItem('foo') === null);
+
+  // Writing through proxy prefixes the key
+  proxy.setItem('foo', 'staged');
+  check('Proxy: setItem writes with prefix', rawStore['staging:foo'] === 'staged');
+  check('Proxy: getItem reads prefixed key', proxy.getItem('foo') === 'staged');
+
+  // Non-prefixed key still inaccessible
+  check('Proxy: non-prefixed key still separate', proxy.getItem('foo') !== rawStore['foo']);
+
+  // Object.keys via ownKeys trap returns unprefixed names
+  proxy.setItem('bar', '42');
+  const keys = Object.keys(proxy);
+  check('Proxy: Object.keys returns unprefixed staging keys', keys.includes('foo') && keys.includes('bar'));
+  check('Proxy: Object.keys excludes non-prefixed keys', !keys.includes('staging:foo'));
+
+  // removeItem removes the right key
+  proxy.removeItem('foo');
+  check('Proxy: removeItem removes prefixed key', rawStore['staging:foo'] === undefined);
+  check('Proxy: non-prefixed raw key still intact', rawStore['foo'] === 'bar');
+
+  // length counts only staging keys
+  check('Proxy: length counts only staging-prefixed keys', proxy.length === 1);
+
+  // localStorage isolation: the proxy blob is present in the index.html source
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  check('localStorage isolation: IS_STAGING proxy present in index.html',
+    src.includes("var _S='staging:'") && src.includes('Object.defineProperty(window,\'localStorage\''));
+}
+
+// ── 46. Backup status in Settings ────────────────────────────────────────────
+console.log('\n── Backup status in Settings ────────────────────────────────');
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  check('Settings HTML has s-backup-daily element', src.includes('id="s-backup-daily"'));
+  check('Settings HTML has s-backup-weekly element', src.includes('id="s-backup-weekly"'));
+  check('Settings HTML has s-backup-monthly element', src.includes('id="s-backup-monthly"'));
+  check('loadSettings fetches /backups endpoint', src.includes("AGENT_URL+'/backups'"));
+  check('Backup logic detects weekly (Monday) by getDay()===1', src.includes('getDay()===1'));
+  check("Backup logic detects monthly by date ending '-01'", src.includes("d.slice(8)==='01'"));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
