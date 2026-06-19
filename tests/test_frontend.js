@@ -1365,6 +1365,78 @@ check('pollProdVersion only starts when a PR was opened (pr_url guard)',
 check('pollProdVersion max attempts extended to 40',
   rawScript.includes('attempt>40') && !rawScript.includes('attempt>20'));
 
+// ── 42. Profile backend sync ──────────────────────────────────────────────────
+console.log('\n── Profile backend sync ─────────────────────────────────────');
+
+// 42a. syncSettingsFromAgent reads profile keys
+check('syncSettingsFromAgent reads user_sex from backend',
+  G.syncSettingsFromAgent.toString().includes("user_sex"));
+check('syncSettingsFromAgent reads user_height from backend',
+  G.syncSettingsFromAgent.toString().includes("user_height"));
+check('syncSettingsFromAgent reads user_weight from backend',
+  G.syncSettingsFromAgent.toString().includes("user_weight"));
+check('syncSettingsFromAgent reads user_age from backend',
+  G.syncSettingsFromAgent.toString().includes("user_age"));
+check('syncSettingsFromAgent updates wkt-profile in localStorage',
+  G.syncSettingsFromAgent.toString().includes("wkt-profile"));
+
+// 42b. obFinish pushes profile to backend
+check('obFinish pushes user_sex to backend',
+  G.obFinish.toString().includes("user_sex"));
+check('obFinish pushes user_age to backend',
+  G.obFinish.toString().includes("user_age"));
+check('obFinish pushes user_height to backend',
+  G.obFinish.toString().includes("user_height"));
+check('obFinish pushes user_weight to backend',
+  G.obFinish.toString().includes("user_weight"));
+check('obFinish calls pushSettingsToAgent with profile data',
+  G.obFinish.toString().includes("pushSettingsToAgent"));
+
+// 42c. openOnboarding pre-fills _obData from existing profile when onboarded
+{
+  const _origObData = Object.assign({}, G._obData);
+  sandbox.localStorage.setItem('wkt-profile', JSON.stringify({
+    onboarded: true, gender: 'female', age: 30, height: 165, weight: 62, neck: 32, waist: 70, hips: 95
+  }));
+  delete _idStore['onboarding-overlay'];
+  _idStore['onboarding-overlay'] = makeTrackingEl(['hidden']);
+  try {
+    G.openOnboarding();
+    check('openOnboarding pre-fills gender from profile', G._obData.gender === 'female',  `got "${G._obData.gender}"`);
+    check('openOnboarding pre-fills age from profile',    G._obData.age    === '30',       `got "${G._obData.age}"`);
+    check('openOnboarding pre-fills height from profile', G._obData.height === '165',      `got "${G._obData.height}"`);
+    check('openOnboarding pre-fills weight from profile', G._obData.weight === '62',       `got "${G._obData.weight}"`);
+    check('openOnboarding pre-fills neck from profile',   G._obData.neck   === '32',       `got "${G._obData.neck}"`);
+    check('openOnboarding pre-fills waist from profile',  G._obData.waist  === '70',       `got "${G._obData.waist}"`);
+    check('openOnboarding pre-fills hips from profile',   G._obData.hips   === '95',       `got "${G._obData.hips}"`);
+  } catch(e) {
+    ['gender','age','height','weight','neck','waist','hips'].forEach(f =>
+      check(`openOnboarding pre-fills ${f} from profile`, false, e.message));
+  }
+  Object.assign(G._obData, _origObData);
+  sandbox.localStorage.removeItem('wkt-profile');
+}
+
+// openOnboarding must NOT pre-fill if profile.onboarded is false
+{
+  G._obData = { gender: null, age: '', height: '', weight: '', neck: '', waist: '', hips: '', theme: 3 };
+  sandbox.localStorage.setItem('wkt-profile', JSON.stringify({
+    onboarded: false, gender: 'male', age: 25, height: 180, weight: 80
+  }));
+  delete _idStore['onboarding-overlay'];
+  _idStore['onboarding-overlay'] = makeTrackingEl(['hidden']);
+  G.openOnboarding();
+  check('openOnboarding: does NOT pre-fill when profile.onboarded=false',
+    G._obData.gender === null, `got "${G._obData.gender}"`);
+  sandbox.localStorage.removeItem('wkt-profile');
+}
+
+// 42d. prefillLog pre-fills log-weight from latest weight
+check('prefillLog sets log-weight input',
+  G.prefillLog.toString().includes('log-weight'));
+check('prefillLog uses last weight entry for body-weight pre-fill',
+  G.prefillLog.toString().includes('weights[weights.length-1].weight'));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
