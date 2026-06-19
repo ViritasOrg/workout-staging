@@ -1660,6 +1660,8 @@ console.log('\n── BF% backend sync — save, delete, load ──────
     src.includes('pushBodyCompToAgent(today,val)'));
   check('deleteBf calls deleteBodyCompFromAgent',
     src.includes('deleteBodyCompFromAgent(date)'));
+  check('syncBodyCompFromAgent uploads local-only entries to backend',
+    src.includes('const toUpload=local.filter') && src.includes('pushBodyCompToAgent(e.date,e.bf)'));
 }
 
 // ── 47b. BF% pre-isolation migration ─────────────────────────────────────────
