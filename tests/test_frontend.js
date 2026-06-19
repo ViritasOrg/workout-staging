@@ -1593,10 +1593,33 @@ console.log('\n── localStorage isolation Proxy ─────────�
   // length counts only staging keys
   check('Proxy: length counts only staging-prefixed keys', proxy.length === 1);
 
+  // Rebuild proxy with passthrough support (mirrors the actual proxy in index.html)
+  const PT = new Set(['google_token']);
+  const pk = k => PT.has(k) ? k : (PREFIX + k);
+  const proxyPT = new Proxy(rawLS, {
+    get: function(t, n) {
+      if (n === 'getItem') return k => rawLS.getItem(pk(k));
+      if (n === 'setItem') return (k, v) => rawLS.setItem(pk(k), v);
+      if (n === 'removeItem') return k => rawLS.removeItem(pk(k));
+      if (typeof t[n] === 'function') return t[n].bind(t);
+      return t[n];
+    },
+    set: (t, n, v) => { t[n] = v; return true; },
+    has: (t, n) => rawLS.getItem(pk(n)) !== null,
+  });
+  proxyPT.setItem('google_token', 'jwt-tok');
+  check('Proxy: google_token stored without staging prefix', rawStore['google_token'] === 'jwt-tok');
+  check('Proxy: google_token readable via passthrough', proxyPT.getItem('google_token') === 'jwt-tok');
+  check('Proxy: google_token not stored with staging: prefix', rawStore['staging:google_token'] === undefined);
+  proxyPT.removeItem('google_token');
+  check('Proxy: google_token removeItem removes unprefixed key', rawStore['google_token'] === undefined);
+
   // localStorage isolation: the proxy blob is present in the index.html source
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
   check('localStorage isolation: IS_STAGING proxy present in index.html',
     src.includes("var _S='staging:'") && src.includes('Object.defineProperty(window,\'localStorage\''));
+  check('localStorage isolation: google_token passthrough present',
+    src.includes("new Set(['google_token'])") && src.includes('_pk=function(k)'));
 }
 
 // ── 46. Backup status in Settings ────────────────────────────────────────────
