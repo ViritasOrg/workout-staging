@@ -1662,6 +1662,25 @@ console.log('\n── BF% backend sync — save, delete, load ──────
     src.includes('deleteBodyCompFromAgent(date)'));
 }
 
+// ── 47b. BF% pre-isolation migration ─────────────────────────────────────────
+console.log('\n── 47b. BF% pre-isolation migration ────────────────────────────────');
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  check('migration checks IS_STAGING guard',
+    src.includes("if(!IS_STAGING||localStorage.getItem('wk-bf-isol-v1'))return"));
+  check('migration uses _r to read raw pre-isolation bf_log',
+    src.includes("_r.getItem?_r.getItem('bf_log'):null"));
+  check('migration posts each old entry to backend via pushBodyCompToAgent',
+    src.includes('pushBodyCompToAgent(e.date,e.bf)'));
+  check('migration triggers re-sync after posting old entries',
+    src.includes('setTimeout(syncBodyCompFromAgent,2000)'));
+  check('migration flag wk-bf-isol-v1 stored to prevent re-run',
+    src.includes("localStorage.setItem('wk-bf-isol-v1','1')"));
+  check('migration placed in startup sequence (not inside onGoogleSignIn)',
+    src.includes("syncBodyCompFromAgent();(function(){if(!IS_STAGING||localStorage.getItem('wk-bf-isol-v1'))"));
+}
+
+
 // ── 48. Program wizard — days 1-7 + sets per muscle ──────────────────────────
 console.log('\n── 48. Program wizard days/sets ─────────────────────────────────');
 {
