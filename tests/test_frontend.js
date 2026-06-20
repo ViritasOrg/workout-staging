@@ -1704,6 +1704,8 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     src.includes('pool.length<nDays'));
   check('pool padding uses IIFE to capture base length',
     src.includes('var _base=pool.length'));
+  check('pool extension uses muscle-group conflict scoring to avoid consecutive same-group days',
+    src.includes('function _mGroup(nm)') && src.includes('_cg===_pg?2:0'));
   check('scaleSets applied to all exercises before slice',
     src.includes('sets:scaleSets(ex.sets)'));
   check('setsPerMuscle stored in generated program object',
@@ -1751,14 +1753,16 @@ console.log('\n── 48. Program wizard days/sets ─────────�
 
     // Test 7-day program
     try {
-      const prog7 = ctx._generateWorkoutProgram('hypertrophy','balanced',7,'7-Day Test',12);
+      const prog7 = ctx._generateWorkoutProgram('strength','hybrid',7,'7-Day Test',12);
       check('7-day program generates 7 days', prog7 && prog7.days && prog7.days.length === 7);
-      const day1Name = prog7 && prog7.days[0] && prog7.days[0].name;
-      const day7Name = prog7 && prog7.days[6] && prog7.days[6].name;
-      check('7-day program Day 7 is Active Recovery (not duplicate of Day 1)',
-        day7Name && day7Name.includes('Active Recovery'));
-      check('7-day program Day 1 and Day 7 have different names (no push/push collision)',
-        day1Name !== day7Name);
+      function _mGroupTest(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      const day1G = _mGroupTest(prog7.days[0].name);
+      const day6G = _mGroupTest(prog7.days[5].name);
+      const day7G = _mGroupTest(prog7.days[6].name);
+      check('7-day wizard: Day 7 does not share muscle group with Day 6 (no back-to-back conflict)',
+        day7G !== day6G);
+      check('7-day wizard: Day 7 does not share muscle group with Day 1 (no wrap-around conflict)',
+        day7G !== day1G);
     } catch(e) {
       check('7-day program generation (caught)', false, String(e));
     }
