@@ -1682,6 +1682,17 @@ console.log('\n── 47b. BF% pre-isolation migration ────────�
     src.includes("syncBodyCompFromAgent();(function(){if(!IS_STAGING||localStorage.getItem('wk-bf-isol-v1'))"));
 }
 
+// ── 47c. BF_SEED baseline entries ────────────────────────────────────────────
+console.log('\n── 47c. BF_SEED baseline entries ────────────────────────────────');
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  check('BF_SEED constant defined with 3 baseline entries',
+    src.includes('const BF_SEED=') && src.includes('2026-03-23') && src.includes('2026-05-02') && src.includes('2026-05-03'));
+  check('syncBodyCompFromAgent merges BF_SEED entries missing from backend+local',
+    src.includes('const seedToAdd=BF_SEED.filter') && src.includes('mergedDates.has(s.date)'));
+  check('syncBodyCompFromAgent pushes missing seed entries to backend',
+    src.includes('seedToAdd') && src.includes('uploads.map'));
+}
 
 // ── 48. Program wizard — days 1-7 + sets per muscle ──────────────────────────
 console.log('\n── 48. Program wizard days/sets ─────────────────────────────────');
