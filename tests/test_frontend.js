@@ -1892,6 +1892,28 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     ptBody.includes("name==='weight'") && ptBody.includes('syncWeightsFromAgent()'));
 }
 
+// ── Section 57: Storage inspector (IS_STAGING only) ──────────────────────────
+console.log('\n── Storage inspector ────────────────────────────────────────');
+{
+  const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  check('nav-btn-storage exists in HTML (hidden by default)',
+    src.includes('id="nav-btn-storage"') && src.includes("style=\"display:none\""));
+  check('page-storage div exists in HTML',
+    src.includes('id="page-storage"'));
+  check('buildStoragePage function defined',
+    src.includes('function buildStoragePage()'));
+  check('showPage calls buildStoragePage for storage tab',
+    src.includes("if(name==='storage')buildStoragePage()"));
+  check('lsDbgCopy function defined',
+    src.includes('function lsDbgCopy('));
+  check('lsDbgCopyAll function defined',
+    src.includes('function lsDbgCopyAll()'));
+  check('storage nav button shown in staging at startup',
+    src.includes("IS_STAGING){var _ssb=document.getElementById('nav-btn-storage')"));
+  check('buildStoragePage uses clipboard API to copy',
+    src.includes('navigator.clipboard.writeText'));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
