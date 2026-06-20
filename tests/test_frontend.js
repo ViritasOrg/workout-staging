@@ -1787,6 +1787,15 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   }
 }
 
+// ── Section 49: BF chart index-based x-spacing ───────────────────────────────
+{
+  const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  check('drawBfChart uses index-based xp (not time-based dates)',
+    src.includes('var xp=function(i){return pad.l+(pts.length===1?cW/2:(i/(pts.length-1))*cW);}'));
+  check('drawBfChart draws dots for all entries via forEach',
+    src.includes('pts.forEach(function(p,i){var x=xp(i)'));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
