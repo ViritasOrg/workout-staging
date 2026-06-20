@@ -1753,6 +1753,12 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     try {
       const prog7 = ctx._generateWorkoutProgram('hypertrophy','balanced',7,'7-Day Test',12);
       check('7-day program generates 7 days', prog7 && prog7.days && prog7.days.length === 7);
+      const day1Name = prog7 && prog7.days[0] && prog7.days[0].name;
+      const day7Name = prog7 && prog7.days[6] && prog7.days[6].name;
+      check('7-day program Day 7 is Active Recovery (not duplicate of Day 1)',
+        day7Name && day7Name.includes('Active Recovery'));
+      check('7-day program Day 1 and Day 7 have different names (no push/push collision)',
+        day1Name !== day7Name);
     } catch(e) {
       check('7-day program generation (caught)', false, String(e));
     }
