@@ -1914,6 +1914,18 @@ console.log('\n── Storage inspector ─────────────�
     src.includes('navigator.clipboard.writeText'));
 }
 
+// ── Section 58: syncSettingsFromAgent re-draws BMI chart when weight panel visible ──
+{
+  const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const ssStart = src.indexOf('async function syncSettingsFromAgent()');
+  const ssEnd = ssStart >= 0 ? src.indexOf('async function ', ssStart + 30) : -1;
+  const ssBody = ssStart >= 0 && ssEnd > ssStart ? src.slice(ssStart, ssEnd) : '';
+  check('syncSettingsFromAgent re-draws BMI chart after fetching profile (timing fix)',
+    ssBody.includes('ppanel-weight') && ssBody.includes('drawBmiChart()'));
+  check('syncSettingsFromAgent checks panel visibility before redraw',
+    ssBody.includes("classList.contains('hidden')") && ssBody.includes('drawBmiChart()'));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
