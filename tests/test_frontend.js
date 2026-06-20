@@ -1661,7 +1661,7 @@ console.log('\n── BF% backend sync — save, delete, load ──────
   check('deleteBf calls deleteBodyCompFromAgent',
     src.includes('deleteBodyCompFromAgent(date)'));
   check('syncBodyCompFromAgent uploads local-only entries to backend',
-    src.includes('const toUpload=local.filter') && src.includes('pushBodyCompToAgent(e.date,e.bf)'));
+    src.includes('toUpload') && src.includes('pushBodyCompToAgent(e.date,e.bf)'));
 }
 
 // ── 47b. BF% pre-isolation migration ─────────────────────────────────────────
@@ -1869,6 +1869,20 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     ptBody.includes("name==='weight'") && ptBody.includes('syncBodyCompFromAgent()'));
   check("showProgressTab weight tab calls syncWeightsFromAgent (fresh weight data)",
     ptBody.includes("name==='weight'") && ptBody.includes('syncWeightsFromAgent()'));
+}
+
+// ── Section 57: syncBodyCompFromAgent merges peptide tracker's localStorage ───
+console.log('\n── syncBodyCompFromAgent: merges proto-bodycomp-v2 (pep localStorage) ───');
+{
+  const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const fnStart = src.indexOf('async function syncBodyCompFromAgent(');
+  const fnBody = fnStart >= 0 ? src.slice(fnStart, src.indexOf('}catch(e){}}\n', fnStart) + 13) : '';
+  check('syncBodyCompFromAgent reads proto-bodycomp-v2 from localStorage',
+    fnBody.includes("localStorage.getItem('proto-bodycomp-v2')"));
+  check('syncBodyCompFromAgent zero-pads pep dates with padStart before upload',
+    fnBody.includes('padStart(2,') && fnBody.includes('pepData'));
+  check('syncBodyCompFromAgent merges pepNew into chart data',
+    fnBody.includes('pepNew') && fnBody.includes('bfLog=merged'));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
