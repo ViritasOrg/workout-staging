@@ -1830,6 +1830,60 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   }
 }
 
+// ── Section 48b: Rehab dropdowns, font sizes, cancel bug ─────────────────────
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+
+  // Fix 1: rehab-add-orig and rehab-add-sub must be <select> not <input type="text">
+  check('rehab-add-orig is a <select> dropdown (not a text input)',
+    src.includes('id="rehab-add-orig"') &&
+    src.includes('<select id="rehab-add-orig"') &&
+    !src.includes('<input id="rehab-add-orig"'));
+  check('rehab-add-sub is a <select> dropdown (not a text input)',
+    src.includes('id="rehab-add-sub"') &&
+    src.includes('<select id="rehab-add-sub"') &&
+    !src.includes('<input id="rehab-add-sub"'));
+  check('rehab-add-orig select is populated with EX_OPTS_HTML',
+    src.includes('<select id="rehab-add-orig"') &&
+    (function(){var i=src.indexOf('<select id="rehab-add-orig"');return i>=0&&src.slice(i,i+400).includes('EX_OPTS_HTML');})());
+  check('rehab-add-sub select is populated with EX_OPTS_HTML',
+    src.includes('<select id="rehab-add-sub"') &&
+    (function(){var i=src.indexOf('<select id="rehab-add-sub"');return i>=0&&src.slice(i,i+400).includes('EX_OPTS_HTML');})());
+
+  // Fix 2: font sizes in rehab section must be ≥ 13px (20% increase from ≤12px originals)
+  const rehabStart = src.indexOf('🔧 Rehab Substitutions');
+  const rehabEnd   = src.indexOf('body.innerHTML=html;', rehabStart);
+  const rehabBlock = rehabStart >= 0 && rehabEnd > rehabStart ? src.slice(rehabStart, rehabEnd) : '';
+  const fontMatches = [...rehabBlock.matchAll(/font-size:(\d+)px/g)].map(m=>parseInt(m[1]));
+  check('rehab section has font-size declarations to verify',
+    fontMatches.length > 0, `found ${fontMatches.length} font-size declarations`);
+  check('all font-size values in rehab section are ≥ 12px (20% up from 10px min)',
+    fontMatches.every(sz => sz >= 12),
+    `found sizes: ${fontMatches.join(', ')}`);
+  check('no 10px or 11px font-size remains in rehab section',
+    !rehabBlock.match(/font-size:(10|11)px/),
+    'found small font sizes in rehab block');
+
+  // Fix 3: _progWizGenerate must NOT call savePrograms() — only _progIsNew and closeProgramOverlay path should
+  const genStart = src.indexOf('function _progWizGenerate()');
+  const genEnd   = genStart >= 0 ? src.indexOf('\n}', genStart) : -1;
+  const genBody  = genStart >= 0 && genEnd > genStart ? src.slice(genStart, genEnd) : '';
+  check('_progWizGenerate does NOT call savePrograms() (cancel bug fix)',
+    genBody.length > 0 && !genBody.includes('savePrograms()'),
+    `found savePrograms() in _progWizGenerate body: "${genBody.slice(0,200)}"`);
+  check('_progWizGenerate still pushes to _programs array',
+    genBody.includes('_programs.push(prog)'));
+  check('_progWizGenerate still sets _progIsNew=true',
+    genBody.includes('_progIsNew=true'));
+  check('closeProgramOverlay still calls savePrograms() after splice (cancel path cleans up)',
+    (function(){
+      var ci=src.indexOf('function closeProgramOverlay()');
+      var ce=ci>=0?src.indexOf('\n}',ci):-1;
+      var cb=ci>=0&&ce>ci?src.slice(ci,ce):'';
+      return cb.includes('savePrograms()');
+    })());
+}
+
 // ── Section 49: BF chart index-based x-spacing ───────────────────────────────
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
