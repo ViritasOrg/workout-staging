@@ -857,7 +857,7 @@ check('getDayLabel(1): string returned', typeof dl1 === 'string' && dl1.length >
 check('getDayLabel(1): extracts focus after em-dash (Push A)',
   dl1 === 'Push A', `got "${dl1}"`);
 check('getDayLabel(2): Pull A', G.getDayLabel(2) === 'Pull A', `got "${G.getDayLabel(2)}"`);
-check('getDayLabel(3): Legs',   G.getDayLabel(3) === 'Legs',   `got "${G.getDayLabel(3)}"`);
+check('getDayLabel(3): Legs A',  G.getDayLabel(3) === 'Legs A', `got "${G.getDayLabel(3)}"`);
 check('getDayLabel(4): Push B', G.getDayLabel(4) === 'Push B', `got "${G.getDayLabel(4)}"`);
 check('getDayLabel(5): Pull B', G.getDayLabel(5) === 'Pull B', `got "${G.getDayLabel(5)}"`);
 check('getDayLabel(6): Arms & Delts', G.getDayLabel(6) === 'Arms & Delts', `got "${G.getDayLabel(6)}"`);
@@ -1804,6 +1804,28 @@ console.log('\n── 48. Program wizard days/sets ─────────�
         true, 'verified by existing cyclic formula (last%days.length)+1');
     } catch(e) {
       check('5-day circular check (caught)', false, String(e));
+    }
+
+    // Test 7-day hypertrophy-upper produces 5+2 upper/lower split (not 3 pull days)
+    try {
+      function _mGrpU(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      const progHU7 = ctx._generateWorkoutProgram('hypertrophy','upper',7,'7-Day Upper',12);
+      check('7-day hypertrophy-upper generates 7 days', progHU7 && progHU7.days && progHU7.days.length === 7,
+        `got ${progHU7 && progHU7.days && progHU7.days.length} days`);
+      if(progHU7 && progHU7.days && progHU7.days.length === 7) {
+        const groups7 = progHU7.days.map(d => _mGrpU(d.name));
+        const legCount  = groups7.filter(g => g === 'legs').length;
+        const pullCount = groups7.filter(g => g === 'pull').length;
+        check('7-day hypertrophy-upper has exactly 2 leg days (5+2 split)',
+          legCount === 2, `got ${legCount} leg days: ${JSON.stringify(progHU7.days.map(d=>d.name))}`);
+        check('7-day hypertrophy-upper has ≤ 2 pull days (not 3)',
+          pullCount <= 2, `got ${pullCount} pull days`);
+        check('7-day hypertrophy-upper day 7 is a legs day',
+          _mGrpU(progHU7.days[6].name) === 'legs',
+          `day 7 = "${progHU7.days[6].name}" (${_mGrpU(progHU7.days[6].name)})`);
+      }
+    } catch(e) {
+      check('7-day hypertrophy-upper 5+2 split (caught)', false, String(e));
     }
   }
 }
