@@ -1908,8 +1908,8 @@ console.log('\n── Storage inspector ─────────────�
     src.includes('function lsDbgCopy('));
   check('lsDbgCopyAll function defined',
     src.includes('function lsDbgCopyAll()'));
-  check('storage nav button shown in staging at startup',
-    src.includes("IS_STAGING){var _ssb=document.getElementById('nav-btn-storage')"));
+  check('storage tab included in PAGE_LABELS and PAGE_DEFAULTS via IS_STAGING (toggleable in Settings)',
+    src.includes("IS_STAGING?{storage:'Storage'}:{}") && src.includes('IS_STAGING?{storage:true}:{}'));
   check('buildStoragePage uses clipboard API to copy',
     src.includes('navigator.clipboard.writeText'));
 }
