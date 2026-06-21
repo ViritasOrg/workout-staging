@@ -1,5 +1,13 @@
 # Workout Staging — Claude Instructions
 
+## ⚠️ NO PRICES IN THE APP — NEVER ⚠️
+Supplier pricing is commercially sensitive and must **NEVER** appear in any app UI, rendered HTML, or user-facing output. If a `PRICELIST` or similar pricing structure is ever added to this app, it must contain only vial sizes and quantities — **no `usd` or price fields**.
+
+Rules:
+- **Never add a `usd`, `price`, or any cost field** to any pricelist data structure
+- **Never display US$ amounts, per-unit prices, or cost totals** in any modal or UI
+- Any pricelist CSV must have no price column ever
+
 ## ⚠️ localStorage IS A CACHE — NEVER THE SOURCE OF TRUTH ⚠️
 localStorage is a read cache for performance only. It is NEVER the source of truth.
 
