@@ -672,24 +672,24 @@ function _renderProgOverlay(){
   if(buf.days.length<7)html+='<button onclick="_progAddDay()" style="width:100%;background:none;border:1px dashed var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:DM Sans,sans-serif;margin-top:4px;">+ Add Day</button>';
   var rehabSubs=buf.rehabSubs||{};var subEntries=Object.entries(rehabSubs);
   html+='<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">';
-  html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">🔧 Rehab Substitutions</div>';
+  html+='<div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px;">🔧 Rehab Substitutions</div>';
   html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">';
-  REHAB_CONDITIONS.forEach(function(c){html+='<button onclick="_applyRehabCondition(\''+c.id+'\')" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;" title="'+_escP(c.desc)+'">+ '+_escP(c.label)+'</button>';});
+  REHAB_CONDITIONS.forEach(function(c){html+='<button onclick="_applyRehabCondition(\''+c.id+'\')" style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;" title="'+_escP(c.desc)+'">+ '+_escP(c.label)+'</button>';});
   html+='</div>';
   subEntries.forEach(function(e){var orig=e[0],sub=e[1];var qOrig="'"+orig.replace(/\\/g,"\\\\").replace(/'/g,"\\'")+"'";
     html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">';
-    html+='<div style="font-size:11px;color:var(--muted);min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_escP(orig)+' →</div>';
-    html+='<input type="text" value="'+_escP(sub)+'" oninput="_rehabSetSub('+qOrig+',this.value)" placeholder="substitute" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--accent);border-radius:6px;padding:5px 8px;color:var(--accent);font-size:11px;font-family:DM Sans,sans-serif;outline:none;">';
+    html+='<div style="font-size:13px;color:var(--muted);min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_escP(orig)+' →</div>';
+    html+='<input type="text" value="'+_escP(sub)+'" oninput="_rehabSetSub('+qOrig+',this.value)" placeholder="substitute" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--accent);border-radius:6px;padding:5px 8px;color:var(--accent);font-size:13px;font-family:DM Sans,sans-serif;outline:none;">';
     html+='<button onclick="_rehabRemoveSub('+qOrig+')" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;flex-shrink:0;line-height:1;">×</button>';
     html+='</div>';
   });
   html+='<div style="margin-top:4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;">';
-  html+='<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Add custom substitution</div>';
+  html+='<div style="font-size:13px;color:var(--muted);margin-bottom:6px;">Add custom substitution</div>';
   html+='<div style="display:flex;gap:6px;align-items:center;">';
-  html+='<input id="rehab-add-orig" type="text" placeholder="Original exercise" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:12px;font-family:DM Sans,sans-serif;outline:none;">';
-  html+='<span style="color:var(--muted);font-size:12px;">→</span>';
-  html+='<input id="rehab-add-sub" type="text" placeholder="Substitute" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:12px;font-family:DM Sans,sans-serif;outline:none;">';
-  html+='<button onclick="_rehabDoAdd()" style="background:var(--accent);border:none;color:#000;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;flex-shrink:0;">Add</button>';
+  html+='<select id="rehab-add-orig" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:14px;font-family:DM Sans,sans-serif;outline:none;"><option value="">Original exercise</option>'+EX_OPTS_HTML+'</select>';
+  html+='<span style="color:var(--muted);font-size:14px;">→</span>';
+  html+='<select id="rehab-add-sub" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:14px;font-family:DM Sans,sans-serif;outline:none;"><option value="">Substitute</option>'+EX_OPTS_HTML+'</select>';
+  html+='<button onclick="_rehabDoAdd()" style="background:var(--accent);border:none;color:#000;border-radius:6px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;flex-shrink:0;">Add</button>';
   html+='</div></div></div>';
   body.innerHTML=html;
   footer.innerHTML='<button onclick="_saveProgEdit()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;">Save Program</button>';
@@ -767,7 +767,7 @@ function _progWizDefaultName(){
 function _progWizGenerate(){
   var wiz=_progWiz;var name=(wiz.name&&wiz.name.trim())||_progWizDefaultName();
   var prog=_generateWorkoutProgram(wiz.goal,wiz.sub,wiz.nDays,name,wiz.setsPerMuscle||12);
-  _programs.push(prog);savePrograms();buildProgramSettingsCard();
+  _programs.push(prog);buildProgramSettingsCard();
   _progWiz=null;_progReadOnly=false;_progEditIdx=_programs.length-1;_progEditBuf=JSON.parse(JSON.stringify(_programs[_progEditIdx]));_progIsNew=true;_renderProgOverlay();
 }
 function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle){
