@@ -1355,7 +1355,19 @@ console.log('\n── pollProdVersion waits for actual version change ───�
 check('_prevProdVer variable declared',
   rawScript.includes('let _prevProdVer=null'));
 check('pushToProd snapshots current prod version into _prevProdVer',
-  rawScript.includes("_prevProdVer=null;fetch('https://henrikschaub.github.io/workout/version.json'"));
+  rawScript.includes("_prevProdVer=null;") && rawScript.includes("fetch('https://henrikschaub.github.io/workout/version.json'"));
+check('pushToProd captures staging version at push time (_stagingVer=VERSION)',
+  rawScript.includes('_stagingVer=VERSION'));
+check('saveLastPush accepts stagingVer parameter',
+  rawScript.includes('function saveLastPush(data,prodVer,stagingVer)'));
+check('saveLastPush stores stagingVer in the push record',
+  rawScript.includes('stagingVer:stagingVer||null'));
+check('pollPromoteStatus passes _stagingVer to saveLastPush',
+  rawScript.includes('saveLastPush(data,null,_stagingVer)'));
+check('pollProdVersion passes _stagingVer to saveLastPush',
+  rawScript.includes('saveLastPush(_lastPushData,v,_stagingVer)'));
+check('buildLastPushDropdown shows staging ver → prod ver in summary when both known',
+  rawScript.includes("rec.stagingVer&&rec.prodVer?' · v'+rec.stagingVer+' → v'+rec.prodVer"));
 check('pollProdVersion shows "Pages deploying..." when version unchanged',
   rawScript.includes('Pages deploying...'));
 check('pollProdVersion only marks success when version has changed (_prevProdVer check)',
