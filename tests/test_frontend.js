@@ -1701,10 +1701,10 @@ console.log('\n── 48. Program wizard days/sets ─────────�
 
   check('wizard init includes setsPerMuscle:12',
     src.includes('setsPerMuscle:12'));
-  check('wizard step 2 has nDays stepper with min 1 max 7',
-    src.includes('Math.max(1,') && src.includes('Math.min(7,'));
-  check('wizard step 2 has setsPerMuscle stepper min 5 max 20',
-    src.includes('Math.max(5,') && src.includes('Math.min(20,'));
+  check('wizard step 2 days shown as 7 selectable cards (loop 1–7)',
+    src.includes('for(var _di=1;_di<=7;_di++)'));
+  check('wizard step 2 sets shown as presets: 9/15/21 odd days, 10/16/20 even days',
+    src.includes('[9,15,21]') && src.includes('[10,16,20]'));
   check('_progWizGenerate passes setsPerMuscle to _generateWorkoutProgram',
     src.includes('wiz.setsPerMuscle||12'));
   check('_generateWorkoutProgram accepts setsPerMuscle param',
