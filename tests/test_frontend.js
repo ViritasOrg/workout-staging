@@ -1926,6 +1926,24 @@ console.log('\n── Storage inspector ─────────────�
     ssBody.includes("classList.contains('hidden')") && ssBody.includes('drawBmiChart()'));
 }
 
+// ── Section 59: Programs card lives in Program tab, not Settings ──────────────
+{
+  const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const progPageStart = src.indexOf('id="page-program"');
+  const progPageEnd = src.indexOf('id="page-log"');
+  const progPageHtml = progPageStart >= 0 && progPageEnd > progPageStart ? src.slice(progPageStart, progPageEnd) : '';
+  const settingsPageStart = src.indexOf('id="page-settings"');
+  const settingsHtml = settingsPageStart >= 0 ? src.slice(settingsPageStart, settingsPageStart + 2000) : '';
+  check('s-programs-card div is inside page-program',
+    progPageHtml.includes('id="s-programs-card"'));
+  check('s-programs-card div is NOT inside page-settings',
+    !settingsHtml.includes('id="s-programs-card"'));
+  check('showPage calls buildProgramSettingsCard when navigating to program tab',
+    src.includes("name==='program')buildProgramSettingsCard()"));
+  check('loadSettings does not call buildProgramSettingsCard (card is in Program tab)',
+    !src.slice(src.indexOf('async function loadSettings('), src.indexOf('async function loadSettings(') + 4000).includes('buildProgramSettingsCard()'));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
