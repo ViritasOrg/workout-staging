@@ -731,20 +731,16 @@ function _renderProgWiz(title,body,footer){
     footer.innerHTML='<button onclick="_progWiz.step=0;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">← Back</button>';
   }else if(wiz.step===2){
     if(title)title.textContent='NEW PROGRAM';
-    var curD=wiz.nDays||4;var curS=wiz.setsPerMuscle||12;
+    var curD=wiz.nDays||4;var _sPresets=curD%2!==0?[9,15,21]:[10,16,20];var curS=wiz.setsPerMuscle||12;
+    if(!_sPresets.includes(curS)){var _cl=_sPresets.reduce(function(a,b){return Math.abs(b-curS)<Math.abs(a-curS)?b:a;});_progWiz.setsPerMuscle=_cl;curS=_cl;}
+    var _sLabels=['Low','Moderate','High'];
     var html='<div style="margin-bottom:24px;font-size:13px;color:var(--muted);line-height:1.6;">Configure your training volume.</div>';
-    html+='<div style="margin-bottom:24px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">Days per week</div>';
-    html+='<div style="display:flex;align-items:center;gap:0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;">';
-    html+='<button onclick="_progWiz.nDays=Math.max(1,(_progWiz.nDays||4)-1);_renderProgOverlay()" style="background:none;border:none;color:var(--text);font-size:22px;padding:14px 20px;cursor:pointer;font-family:DM Sans,sans-serif;">−</button>';
-    html+='<div style="flex:1;text-align:center;font-family:Bebas Neue,sans-serif;font-size:42px;color:var(--accent);line-height:1;">'+curD+'</div>';
-    html+='<button onclick="_progWiz.nDays=Math.min(7,(_progWiz.nDays||4)+1);_renderProgOverlay()" style="background:none;border:none;color:var(--text);font-size:22px;padding:14px 20px;cursor:pointer;font-family:DM Sans,sans-serif;">+</button>';
+    html+='<div style="margin-bottom:24px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">Days per week</div><div style="display:flex;gap:8px;">';
+    for(var _di=1;_di<=7;_di++){var _dSel=(_di===curD);html+='<div onclick="_progWiz.nDays='+_di+';_renderProgOverlay()" style="flex:1;text-align:center;padding:12px 0;border-radius:10px;cursor:pointer;background:'+(_dSel?'var(--accent)':'var(--surface2)')+';color:'+(_dSel?'#000':'var(--muted)')+';border:1px solid '+(_dSel?'transparent':'var(--border)')+';font-family:Bebas Neue,sans-serif;font-size:22px;line-height:1;user-select:none;">'+_di+'</div>';}
     html+='</div><div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px;">'+(curD===1?'1 training day per cycle':curD+' training days per cycle — program loops back to day 1')+'</div></div>';
-    html+='<div style="margin-bottom:8px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">Sets per muscle / week</div>';
-    html+='<div style="display:flex;align-items:center;gap:0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;">';
-    html+='<button onclick="_progWiz.setsPerMuscle=Math.max(5,(_progWiz.setsPerMuscle||12)-1);_renderProgOverlay()" style="background:none;border:none;color:var(--text);font-size:22px;padding:14px 20px;cursor:pointer;font-family:DM Sans,sans-serif;">−</button>';
-    html+='<div style="flex:1;text-align:center;font-family:Bebas Neue,sans-serif;font-size:42px;color:var(--accent);line-height:1;">'+curS+'</div>';
-    html+='<button onclick="_progWiz.setsPerMuscle=Math.min(20,(_progWiz.setsPerMuscle||12)+1);_renderProgOverlay()" style="background:none;border:none;color:var(--text);font-size:22px;padding:14px 20px;cursor:pointer;font-family:DM Sans,sans-serif;">+</button>';
-    html+='</div><div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px;">'+(curS<=7?'Low volume — good for recovery / beginners':curS<=13?'Moderate volume — solid muscle stimulus':curS<=17?'High volume — advanced / hypertrophy focus':'Very high volume — experienced lifters only')+'</div></div>';
+    html+='<div style="margin-bottom:8px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">Sets per muscle / week</div><div style="display:flex;gap:10px;">';
+    for(var _si=0;_si<3;_si++){var _sp=_sPresets[_si];var _sSel=(_sp===curS);html+='<div onclick="_progWiz.setsPerMuscle='+_sp+';_renderProgOverlay()" style="flex:1;text-align:center;padding:14px 8px;border-radius:10px;cursor:pointer;background:'+(_sSel?'rgba(232,255,60,0.12)':'var(--surface2)')+';border:1px solid '+(_sSel?'var(--accent)':'var(--border)')+';user-select:none;"><div style="font-family:Bebas Neue,sans-serif;font-size:36px;color:'+(_sSel?'var(--accent)':'var(--text)')+';line-height:1;">'+_sp+'</div><div style="font-size:11px;color:'+(_sSel?'var(--accent)':'var(--muted)')+';margin-top:4px;">'+_sLabels[_si]+'</div></div>';}
+    html+='</div></div>';
     body.innerHTML=html;
     footer.innerHTML='<button onclick="_progWiz.name=_progWizDefaultName();_progWiz.step=3;_renderProgOverlay()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;margin-bottom:8px;">Next →</button><button onclick="_progWiz.step=1;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">← Back</button>';
   }else if(wiz.step===3){
