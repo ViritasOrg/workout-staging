@@ -2032,6 +2032,17 @@ console.log('\n── Storage inspector ─────────────�
     !src.slice(src.indexOf('async function loadSettings('), src.indexOf('async function loadSettings(') + 4000).includes('buildProgramSettingsCard()'));
 }
 
+// ── Section 60a: No rehab tag in non-rehab programs ──────────────────────────
+{
+  const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  check('pool.forEach remaps rehab→volume for non-rehab goals',
+    src.includes("_isRehabGoal=key.startsWith('rehab-')") &&
+    src.includes("(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag"));
+  check('_ensurePrograms normalizes rehab tags in non-rehab stored programs',
+    src.includes("(p.goal||'')!=='rehab'") &&
+    src.includes("if(e.tag==='rehab'){e.tag='volume';changed=true;}"));
+}
+
 // ── Section 60: Program card toggle switch ────────────────────────────────────
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
@@ -2065,7 +2076,7 @@ console.log('\n── Storage inspector ─────────────�
     fbBody.includes("pw('Plank'"));
   check('aesthetic-upperlower includes at least two yoga/pilates core exercises',
     [ulBody.includes("pw('Dead Bug'"), ulBody.includes("pw('Bird Dog'"), ulBody.includes("pw('Plank'"), ulBody.includes("pw('Pallof Press'")].filter(Boolean).length >= 2);
-  check('core exercises in aesthetic programs use rehab tag (appropriate intensity)',
+  check('core exercises in aesthetic pool carry rehab tag (remapped to volume at runtime for non-rehab goals)',
     fbBody.includes("'Dead Bug','3") && fbBody.includes(",'rehab'") &&
     fbBody.includes("'Bird Dog','3") && fbBody.includes("'Plank','3"));
 }
