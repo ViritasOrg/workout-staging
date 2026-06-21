@@ -1,5 +1,20 @@
 # Workout Staging — Claude Instructions
 
+## ⚠️ COMPOUND DATA LIVES IN BACKEND ONLY — NEVER IN PUBLIC REPOS ⚠️
+All peptide and compound information is **commercially sensitive and proprietary**. It must **NEVER** be stored in any public repository (`peptidetracker`, `peptidetracker-staging`, `workout`, `workout-staging`).
+
+This includes, but is not limited to:
+- Peptide catalogue data (names, SKUs, mechanisms, protocols, side effects, dosing defaults)
+- Enhancement compound data (concentrations, vial sizes, anabolic profiles, dosing guidance)
+- Reconstitution data (vial/water volumes, concentration defaults)
+- Dose guidance tiers and risk labels
+- Pricelist / SKU mappings
+- Any supplier-specific product data
+
+**The only place this data may live is `claude-agent-backend`.** The frontend apps must fetch it from the backend at runtime — never hardcode it into `index.html` or any other file in a public repo.
+
+**Current state (as of 2026-06-21):** Any such data that exists in the public repos is known technical debt. **Do not add new compound data to these files** — any new compounds or data updates must go into the backend and be served via API.
+
 ## ⚠️ NO PRICES IN THE APP — NEVER ⚠️
 Supplier pricing is commercially sensitive and must **NEVER** appear in any app UI, rendered HTML, or user-facing output. If a `PRICELIST` or similar pricing structure is ever added to this app, it must contain only vial sizes and quantities — **no `usd` or price fields**.
 
