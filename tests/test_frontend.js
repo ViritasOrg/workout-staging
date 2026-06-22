@@ -2105,11 +2105,15 @@ console.log('\n── prefillLog — WPU / reps / scheme label ─────�
   check('prefillLog: repsVal is always empty string',
     fn.includes("repsVal=''") && !fn.includes("repsVal=r==='max'"));
 
-  // 62c. Scheme label uses accent colour and larger font
+  // 62c. Scheme label uses accent colour, larger font, no weight
   check('prefillLog: scheme label uses font-size:13px',
     fn.includes('font-size:13px'));
   check('prefillLog: scheme label uses var(--accent)',
-    fn.includes('color:var(--accent)') && fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
+    fn.includes('color:var(--accent)') && fn.includes("margin-top:2px"));
+  check('prefillLog: scheme label shows sets only (no weight)',
+    fn.includes(">\'+ex.sets+\'</div>") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
+  check('prefillLog: exercise name is heading above scheme label (not same line)',
+    fn.includes('margin-bottom:10px') && fn.includes("margin-top:2px"));
   // Regression: must NOT still use the old muted/11px combo for the scheme label
   check('prefillLog: scheme label no longer uses font-size:11px+var(--muted) combo',
     !fn.includes('font-size:11px;color:var(--muted)'));
