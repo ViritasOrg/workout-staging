@@ -1,5 +1,12 @@
 # Workout Staging — Claude Instructions
 
+## ⚠️ RESEARCH SCOPE — ALWAYS THE FULL CATALOGUE ⚠️
+When conducting research, building databases, or compiling reference data for these apps:
+- **Never** scope research to only the features Henrik is currently using
+- **Always** scope to the **complete catalogue** of features, exercises, compounds, and use cases the app supports or will support
+- The database must serve all potential users and all potential use cases — not just the current user's active configuration
+- This applies to: exercise databases, reference data, AI prompt design, knowledge base construction, and any other research task
+
 ## ⚠️ COMPOUND DATA LIVES IN BACKEND ONLY — NEVER IN PUBLIC REPOS ⚠️
 All peptide and compound information is **commercially sensitive and proprietary**. It must **NEVER** be stored in any public repository (`peptidetracker`, `peptidetracker-staging`, `workout`, `workout-staging`).
 
