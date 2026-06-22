@@ -1852,6 +1852,35 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     } catch(e) {
       check('7-day hypertrophy-upper no-consecutive-muscles (caught)', false, String(e));
     }
+
+    // 7-day hypertrophy-upper: purpose-built split (Push/Pull/Legs/Upper Horiz/Vertical/Legs B/Light Pull)
+    try {
+      function _mGrpU7(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      const prog7b = ctx._generateWorkoutProgram('hypertrophy','upper',7,'7-Day Split',16);
+      check('wizard hypertrophy-upper 7-day: generates 7 days',
+        prog7b && prog7b.days && prog7b.days.length === 7,
+        `got ${prog7b && prog7b.days ? prog7b.days.length : 'null'} days`);
+      if(prog7b && prog7b.days && prog7b.days.length === 7) {
+        check('wizard hypertrophy-upper 7-day: day 4 is Upper Horizontal',
+          prog7b.days[3].name.includes('Upper Horizontal'),
+          `day 4 = "${prog7b.days[3].name}"`);
+        check('wizard hypertrophy-upper 7-day: day 5 is Vertical Push/Pull',
+          prog7b.days[4].name.includes('Vertical'),
+          `day 5 = "${prog7b.days[4].name}"`);
+        check('wizard hypertrophy-upper 7-day: day 7 is Light Pull',
+          prog7b.days[6].name.includes('Light Pull'),
+          `day 7 = "${prog7b.days[6].name}"`);
+        const grps7b = prog7b.days.map(d => _mGrpU7(d.name));
+        const consec7b = grps7b.some((g,i) => i>0 && g!=='other' && g===grps7b[i-1]);
+        check('wizard hypertrophy-upper 7-day: no consecutive same muscle group', !consec7b,
+          `groups: ${JSON.stringify(grps7b)}`);
+        const wrapConflict = grps7b[6]!=='other' && grps7b[0]!=='other' && grps7b[6]===grps7b[0];
+        check('wizard hypertrophy-upper 7-day: day 7 → day 1 no wrap-around conflict', !wrapConflict,
+          `day7=${grps7b[6]}, day1=${grps7b[0]}`);
+      }
+    } catch(e) {
+      check('wizard hypertrophy-upper 7-day: no error', false, String(e));
+    }
   }
 }
 
