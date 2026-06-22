@@ -139,6 +139,11 @@ time. **One PR = one explicitly requested change.**
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 
 ## Git workflow — ALWAYS follow this
+0. **Always create new branches from the latest remote main — never from a local clone's stale HEAD:**
+   ```
+   git fetch origin && git checkout -b <branch-name> origin/main
+   ```
+   This ensures any AI (Claude, or another AI picking up when Claude hits token limits) always starts from a clean, up-to-date base and can hand off without conflicts.
 1. Make changes on a feature branch
 2. Before opening the PR, locally extract the `<script>` block from `index.html` and run `node --check` on it
 3. Create a PR, then **check its CI status before merging** — call `pull_request_read` with `method: get_check_runs` (or `get_status`) and confirm `conclusion`/`state` is `success`. **Never merge a PR with a failing or pending check.**
