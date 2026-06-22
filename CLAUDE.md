@@ -114,6 +114,23 @@ in your reply — do NOT silently change it. Unsolicited "improvements" cause
 confusion, break things Henrik didn't intend to change, and waste debugging
 time. **One PR = one explicitly requested change.**
 
+## ⚠️ WORKOUT PROGRAM EXERCISE RESTRICTIONS ⚠️
+
+### Exercises banned from Hypertrophy programs
+**Never include these in any `hypertrophy-*` program.** They are allowed in `aesthetic-*`, `strength-*`, and `rehab-*`:
+- **Hip Thrust** — Hypertrophy programs only; fine in aesthetic, strength, and rehab
+- **Bulgarian Split Squat** — same restriction as Hip Thrust
+
+### Leg day exercise ordering rules — ALWAYS follow
+1. **Squat ALWAYS comes first** in every leg day, no exceptions
+2. **Deadlift (conventional), when included in a leg day:**
+   - ONE heavy set only
+   - 5–8 reps target
+   - ALWAYS the last exercise of the day
+
+### Scan conversations for rules — extract to CLAUDE.md each session
+After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
+
 ## Git workflow — ALWAYS follow this
 1. Make changes on a feature branch
 2. Before opening the PR, locally extract the `<script>` block from `index.html` and run `node --check` on it

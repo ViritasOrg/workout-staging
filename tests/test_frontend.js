@@ -1903,6 +1903,25 @@ console.log('\n── 48. Program wizard days/sets ─────────�
         const wrapConflict = grps7b[6]!=='other' && grps7b[0]!=='other' && grps7b[6]===grps7b[0];
         check('wizard hypertrophy-upper 7-day: day 7 → day 1 no wrap-around conflict', !wrapConflict,
           `day7=${grps7b[6]}, day1=${grps7b[0]}`);
+        // Legs A (day 3): Squat first, no Bulgarian Split Squat
+        const legsADay = prog7b.days[2];
+        check('wizard hypertrophy-upper 7-day Legs A: first exercise is Squat',
+          legsADay && legsADay.exercises && legsADay.exercises[0] && legsADay.exercises[0].name === 'Squat',
+          `first ex: ${legsADay && legsADay.exercises && legsADay.exercises[0] && legsADay.exercises[0].name}`);
+        check('wizard hypertrophy-upper 7-day Legs A: no Bulgarian Split Squat',
+          legsADay && legsADay.exercises && !legsADay.exercises.some(e => e.name === 'Bulgarian Split Squat'),
+          'Bulgarian Split Squat found in Legs A');
+        // Legs B (day 6): Squat first, no Hip Thrust, Deadlift last
+        const legsBDay = prog7b.days[5];
+        check('wizard hypertrophy-upper 7-day Legs B: first exercise is Squat',
+          legsBDay && legsBDay.exercises && legsBDay.exercises[0] && legsBDay.exercises[0].name === 'Squat',
+          `first ex: ${legsBDay && legsBDay.exercises && legsBDay.exercises[0] && legsBDay.exercises[0].name}`);
+        check('wizard hypertrophy-upper 7-day Legs B: no Hip Thrust',
+          legsBDay && legsBDay.exercises && !legsBDay.exercises.some(e => e.name === 'Hip Thrust'),
+          'Hip Thrust found in Legs B');
+        check('wizard hypertrophy-upper 7-day Legs B: Deadlift is last exercise',
+          legsBDay && legsBDay.exercises && legsBDay.exercises[legsBDay.exercises.length-1].name === 'Deadlift',
+          `last ex: ${legsBDay && legsBDay.exercises && legsBDay.exercises[legsBDay.exercises.length-1].name}`);
       }
     } catch(e) {
       check('wizard hypertrophy-upper 7-day: no error', false, String(e));
