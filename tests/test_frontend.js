@@ -966,13 +966,21 @@ check('isPressEx: "Lateral Raise" → true [PR #41]',       G.isPressEx('Lateral
 check('isPressEx: "Cable Lateral Raise" → true [PR #41]', G.isPressEx('Cable Lateral Raise'));
 check('isPressEx: "Y-Raise" → true [PR #41]',             G.isPressEx('Y-Raise'));
 check('isPressEx: "Front Raise" → true [PR #41]',         G.isPressEx('Front Raise'));
-// Non-press/raise exercises must return false
+// Fly variants — DB button also shown for fly exercises
+check('isPressEx: "Rear Delt Fly" → true',  G.isPressEx('Rear Delt Fly'));
+check('isPressEx: "Cable Fly" → true',       G.isPressEx('Cable Fly'));
+check('isPressEx: "Pec Fly" → true',         G.isPressEx('Pec Fly'));
+// Curl variants — DB button also shown for curl exercises
+check('isPressEx: "Barbell Curl" → true',    G.isPressEx('Barbell Curl'));
+check('isPressEx: "EZ Bar Curl" → true',     G.isPressEx('EZ Bar Curl'));
+check('isPressEx: "Hammer Curl" → true',     G.isPressEx('Hammer Curl'));
+check('isPressEx: "Preacher Curl" → true',   G.isPressEx('Preacher Curl'));
+// Non-press/raise/fly/curl exercises must return false
 check('isPressEx: "Squat" → false',        !G.isPressEx('Squat'));
 check('isPressEx: "Deadlift" → false',     !G.isPressEx('Deadlift'));
 check('isPressEx: "Barbell Row" → false',  !G.isPressEx('Barbell Row'));
 check('isPressEx: "Upright Row" → false',  !G.isPressEx('Upright Row'));
 check('isPressEx: "Pull-ups" → false',     !G.isPressEx('Pull-ups'));
-check('isPressEx: "Barbell Curl" → false', !G.isPressEx('Barbell Curl'));
 check('isPressEx: "Face Pulls" → false',   !G.isPressEx('Face Pulls'));
 // Case-insensitive
 check('isPressEx: case-insensitive "lateral raise"', G.isPressEx('lateral raise'));
@@ -1974,10 +1982,10 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   const ptStart = src.indexOf('function showProgressTab(');
   const ptEnd = ptStart >= 0 ? src.indexOf('function ', ptStart + 30) : -1;
   const ptBody = ptStart >= 0 && ptEnd > ptStart ? src.slice(ptStart, ptEnd) : '';
-  check("showProgressTab weight tab calls syncBodyCompFromAgent (fresh BF% data)",
-    ptBody.includes("name==='weight'") && ptBody.includes('syncBodyCompFromAgent()'));
-  check("showProgressTab weight tab calls syncWeightsFromAgent (fresh weight data)",
-    ptBody.includes("name==='weight'") && ptBody.includes('syncWeightsFromAgent()'));
+  check("showProgressTab overview tab calls syncBodyCompFromAgent (fresh BF% data)",
+    ptBody.includes("name==='overview'") && ptBody.includes('syncBodyCompFromAgent()'));
+  check("showProgressTab overview tab calls syncWeightsFromAgent (fresh weight data)",
+    ptBody.includes("name==='overview'") && ptBody.includes('syncWeightsFromAgent()'));
 }
 
 // ── Section 57: Storage inspector (IS_STAGING only) ──────────────────────────
@@ -2009,7 +2017,7 @@ console.log('\n── Storage inspector ─────────────�
   const ssEnd = ssStart >= 0 ? src.indexOf('async function ', ssStart + 30) : -1;
   const ssBody = ssStart >= 0 && ssEnd > ssStart ? src.slice(ssStart, ssEnd) : '';
   check('syncSettingsFromAgent re-draws BMI chart after fetching profile (timing fix)',
-    ssBody.includes('ppanel-weight') && ssBody.includes('drawBmiChart()'));
+    ssBody.includes('ppanel-overview') && ssBody.includes('drawBmiChart()'));
   check('syncSettingsFromAgent checks panel visibility before redraw',
     ssBody.includes("classList.contains('hidden')") && ssBody.includes('drawBmiChart()'));
 }
