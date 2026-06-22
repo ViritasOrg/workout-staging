@@ -114,6 +114,23 @@ in your reply — do NOT silently change it. Unsolicited "improvements" cause
 confusion, break things Henrik didn't intend to change, and waste debugging
 time. **One PR = one explicitly requested change.**
 
+## ⚠️ WORKOUT PROGRAM EXERCISE RESTRICTIONS ⚠️
+
+### Female-only exercises — NEVER use in any other program type
+These exercises are **exclusively** for `aesthetic-fullbody` and `aesthetic-upperlower` programs (Female Aesthetics). **Never include them in any other goal/sub combination** (strength, hypertrophy, rehab, or any other split):
+- **Hip Thrust** — female aesthetics only (exception: `rehab-hip` and `rehab-knee` programs, where it has a clinical glute-activation rationale)
+- **Bulgarian Split Squat** — female aesthetics only, no exceptions
+
+### Leg day exercise ordering rules — ALWAYS follow
+1. **Squat ALWAYS comes first** in every leg day, no exceptions
+2. **Deadlift (conventional), when included in a leg day:**
+   - ONE heavy set only
+   - 5–8 reps target
+   - ALWAYS the last exercise of the day
+
+### Scan conversations for rules — extract to CLAUDE.md
+After every session in which Henrik gives a rule, constraint, or order, extract it into this file before closing the session. If any extracted rule **contradicts** something already in the codebase or another rule here, **point it out immediately** rather than silently applying one over the other.
+
 ## Git workflow — ALWAYS follow this
 1. Make changes on a feature branch
 2. Before opening the PR, locally extract the `<script>` block from `index.html` and run `node --check` on it

@@ -1826,6 +1826,32 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('5-day circular check (caught)', false, String(e));
     }
 
+    // Regression: strength-pure 7-day had D3 Heavy Deadlift → D4 Squat Volume (both legs)
+    // Fixed by swapping Bench Volume and Squat Volume in the 6-day pool.
+    try {
+      function _mGrpP(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      for (let nd = 3; nd <= 7; nd++) {
+        const p = ctx._generateWorkoutProgram('strength','pure',nd,'SP'+nd,12);
+        const grps = p.days.map(d => _mGrpP(d.name));
+        const hasConsec = grps.some((g,i) => i>0 && g!=='other' && g===grps[i-1]);
+        check(`strength-pure ${nd}-day: no consecutive same muscle group`, !hasConsec,
+          `groups: ${JSON.stringify(grps)}`);
+      }
+    } catch(e) { check('strength-pure consecutive check (caught)', false, String(e)); }
+
+    // Regression: aesthetic-fullbody had D1 Quad&Glute → D2 Hamstring&Glute (both legs)
+    // Fixed by reordering base pool to Quad&Glute, Posterior&Upper, Hamstring&Glute.
+    try {
+      function _mGrpA(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      for (let nd = 3; nd <= 7; nd++) {
+        const p = ctx._generateWorkoutProgram('aesthetic','fullbody',nd,'AF'+nd,12);
+        const grps = p.days.map(d => _mGrpA(d.name));
+        const hasConsec = grps.some((g,i) => i>0 && g!=='other' && g===grps[i-1]);
+        check(`aesthetic-fullbody ${nd}-day: no consecutive same muscle group`, !hasConsec,
+          `groups: ${JSON.stringify(grps)}`);
+      }
+    } catch(e) { check('aesthetic-fullbody consecutive check (caught)', false, String(e)); }
+
     // Test 7-day hypertrophy-upper: base pool is 6 days (PPL×2), while-loop
     // adds a 7th from the base pool to avoid consecutive same-group days.
     // After removing Arms & Delts, the 7th day is chosen by the anti-consecutive
@@ -1851,6 +1877,54 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       }
     } catch(e) {
       check('7-day hypertrophy-upper no-consecutive-muscles (caught)', false, String(e));
+    }
+
+    // 7-day hypertrophy-upper: purpose-built split (Push/Pull/Legs/Upper Horiz/Vertical/Legs B/Light Pull)
+    try {
+      function _mGrpU7(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      const prog7b = ctx._generateWorkoutProgram('hypertrophy','upper',7,'7-Day Split',16);
+      check('wizard hypertrophy-upper 7-day: generates 7 days',
+        prog7b && prog7b.days && prog7b.days.length === 7,
+        `got ${prog7b && prog7b.days ? prog7b.days.length : 'null'} days`);
+      if(prog7b && prog7b.days && prog7b.days.length === 7) {
+        check('wizard hypertrophy-upper 7-day: day 4 is Upper Horizontal',
+          prog7b.days[3].name.includes('Upper Horizontal'),
+          `day 4 = "${prog7b.days[3].name}"`);
+        check('wizard hypertrophy-upper 7-day: day 5 is Vertical Push/Pull',
+          prog7b.days[4].name.includes('Vertical'),
+          `day 5 = "${prog7b.days[4].name}"`);
+        check('wizard hypertrophy-upper 7-day: day 7 is Light Pull',
+          prog7b.days[6].name.includes('Light Pull'),
+          `day 7 = "${prog7b.days[6].name}"`);
+        const grps7b = prog7b.days.map(d => _mGrpU7(d.name));
+        const consec7b = grps7b.some((g,i) => i>0 && g!=='other' && g===grps7b[i-1]);
+        check('wizard hypertrophy-upper 7-day: no consecutive same muscle group', !consec7b,
+          `groups: ${JSON.stringify(grps7b)}`);
+        const wrapConflict = grps7b[6]!=='other' && grps7b[0]!=='other' && grps7b[6]===grps7b[0];
+        check('wizard hypertrophy-upper 7-day: day 7 → day 1 no wrap-around conflict', !wrapConflict,
+          `day7=${grps7b[6]}, day1=${grps7b[0]}`);
+        // Legs A (day 3): Squat first, no Bulgarian Split Squat
+        const legsADay = prog7b.days[2];
+        check('wizard hypertrophy-upper 7-day Legs A: first exercise is Squat',
+          legsADay && legsADay.exercises && legsADay.exercises[0] && legsADay.exercises[0].name === 'Squat',
+          `first ex: ${legsADay && legsADay.exercises && legsADay.exercises[0] && legsADay.exercises[0].name}`);
+        check('wizard hypertrophy-upper 7-day Legs A: no Bulgarian Split Squat',
+          legsADay && legsADay.exercises && !legsADay.exercises.some(e => e.name === 'Bulgarian Split Squat'),
+          'Bulgarian Split Squat found in Legs A');
+        // Legs B (day 6): Squat first, no Hip Thrust, Deadlift last
+        const legsBDay = prog7b.days[5];
+        check('wizard hypertrophy-upper 7-day Legs B: first exercise is Squat',
+          legsBDay && legsBDay.exercises && legsBDay.exercises[0] && legsBDay.exercises[0].name === 'Squat',
+          `first ex: ${legsBDay && legsBDay.exercises && legsBDay.exercises[0] && legsBDay.exercises[0].name}`);
+        check('wizard hypertrophy-upper 7-day Legs B: no Hip Thrust',
+          legsBDay && legsBDay.exercises && !legsBDay.exercises.some(e => e.name === 'Hip Thrust'),
+          'Hip Thrust found in Legs B');
+        check('wizard hypertrophy-upper 7-day Legs B: Deadlift is last exercise',
+          legsBDay && legsBDay.exercises && legsBDay.exercises[legsBDay.exercises.length-1].name === 'Deadlift',
+          `last ex: ${legsBDay && legsBDay.exercises && legsBDay.exercises[legsBDay.exercises.length-1].name}`);
+      }
+    } catch(e) {
+      check('wizard hypertrophy-upper 7-day: no error', false, String(e));
     }
   }
 }
