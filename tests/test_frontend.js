@@ -2089,6 +2089,76 @@ console.log('\n── Storage inspector ─────────────�
     fbBody.includes("'Bird Dog','3") && fbBody.includes("'Plank','3"));
 }
 
+// ── Section 62: prefillLog — WPU, reps, scheme label ─────────────────────────
+console.log('\n── prefillLog — WPU / reps / scheme label ────────────────────');
+{
+  const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const fn = G.prefillLog.toString();
+
+  // 62a. WPU detector: _isWPU excludes WPU from isBodyweight
+  check('prefillLog: _isWPU detector present',
+    fn.includes('_isWPU') && fn.includes("weighted\\s*(pull|chin)"));
+  check('prefillLog: isBodyweight excludes WPU (_isWPU gate)',
+    fn.includes('ex.kg===0&&!_isWPU'));
+
+  // 62b. Reps inputs are always empty (never pre-filled from template)
+  check('prefillLog: repsVal is always empty string',
+    fn.includes("repsVal=''") && !fn.includes("repsVal=r==='max'"));
+
+  // 62c. Scheme label uses accent colour and larger font
+  check('prefillLog: scheme label uses font-size:13px',
+    fn.includes('font-size:13px'));
+  check('prefillLog: scheme label uses var(--accent)',
+    fn.includes('color:var(--accent)') && fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
+  // Regression: must NOT still use the old muted/11px combo for the scheme label
+  check('prefillLog: scheme label no longer uses font-size:11px+var(--muted) combo',
+    !fn.includes('font-size:11px;color:var(--muted)'));
+
+  // 62d. WPU uses saved/history added weight, not bodyweight
+  // Simulate environment: set weights (bodyweight = 90) and logs with WPU
+  {
+    const _savedW62  = G.weights;
+    const _savedL62  = G.logs;
+    const _savedP62  = G._activeProgramIndex;
+    const _savedProg62 = G._programs ? [...G._programs] : [];
+
+    G.weights = [{ date: '2020-01-01', weight: 90 }];
+    // A log where WPU was done with 15 added kg
+    G.logs = [{
+      date: '2020-01-15',
+      exercises: [{ name: 'Weighted Pull-ups', sets: [
+        { kg: 15, reps: 6 }, { kg: 15, reps: 6 }
+      ]}]
+    }];
+
+    // getBestKgFromLogs must return 15 (not 90)
+    check('prefillLog WPU: getBestKgFromLogs returns added weight (15), not bodyweight (90)',
+      G.getBestKgFromLogs('Weighted Pull-ups') === 15,
+      `got ${G.getBestKgFromLogs('Weighted Pull-ups')}`);
+
+    // getBestKgFromLogs for regular pull-ups (kg=0) should return null
+    G.logs = [{
+      date: '2020-01-15',
+      exercises: [{ name: 'Pull-ups', sets: [{ kg: 0, reps: 8 }] }]
+    }];
+    check('prefillLog: regular Pull-ups with kg=0 → getBestKgFromLogs returns null',
+      G.getBestKgFromLogs('Pull-ups') === null);
+
+    G.weights = _savedW62;
+    G.logs    = _savedL62;
+    G._activeProgramIndex = _savedP62;
+  }
+
+  // 62e. Verify WPU is NOT flagged as bodyweight exercise in code path
+  check('prefillLog: isBodyweight check includes !_isWPU exclusion',
+    fn.match(/isBodyweight\s*=\s*ex\.kg===0\s*&&\s*!_isWPU/) !== null ||
+    fn.includes('ex.kg===0&&!_isWPU'));
+
+  // 62f. Regular bodyweight exercises (Pull-ups without "Weighted") still use bodyweight default
+  check('prefillLog: non-WPU bodyweight exercise still hits bwDefault path',
+    fn.includes('isBodyweight?bwDefault'));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
