@@ -1826,6 +1826,32 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('5-day circular check (caught)', false, String(e));
     }
 
+    // Regression: strength-pure 7-day had D3 Heavy Deadlift → D4 Squat Volume (both legs)
+    // Fixed by swapping Bench Volume and Squat Volume in the 6-day pool.
+    try {
+      function _mGrpP(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      for (let nd = 3; nd <= 7; nd++) {
+        const p = ctx._generateWorkoutProgram('strength','pure',nd,'SP'+nd,12);
+        const grps = p.days.map(d => _mGrpP(d.name));
+        const hasConsec = grps.some((g,i) => i>0 && g!=='other' && g===grps[i-1]);
+        check(`strength-pure ${nd}-day: no consecutive same muscle group`, !hasConsec,
+          `groups: ${JSON.stringify(grps)}`);
+      }
+    } catch(e) { check('strength-pure consecutive check (caught)', false, String(e)); }
+
+    // Regression: aesthetic-fullbody had D1 Quad&Glute → D2 Hamstring&Glute (both legs)
+    // Fixed by reordering base pool to Quad&Glute, Posterior&Upper, Hamstring&Glute.
+    try {
+      function _mGrpA(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}
+      for (let nd = 3; nd <= 7; nd++) {
+        const p = ctx._generateWorkoutProgram('aesthetic','fullbody',nd,'AF'+nd,12);
+        const grps = p.days.map(d => _mGrpA(d.name));
+        const hasConsec = grps.some((g,i) => i>0 && g!=='other' && g===grps[i-1]);
+        check(`aesthetic-fullbody ${nd}-day: no consecutive same muscle group`, !hasConsec,
+          `groups: ${JSON.stringify(grps)}`);
+      }
+    } catch(e) { check('aesthetic-fullbody consecutive check (caught)', false, String(e)); }
+
     // Test 7-day hypertrophy-upper: base pool is 6 days (PPL×2), while-loop
     // adds a 7th from the base pool to avoid consecutive same-group days.
     // After removing Arms & Delts, the 7th day is chosen by the anti-consecutive
