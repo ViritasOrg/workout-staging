@@ -765,7 +765,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle){
   if(!setsPerMuscle)setsPerMuscle=12;
   function scaleSets(setsStr){
     var parts=setsStr.split('-');var base=parts.length;
-    var target=Math.max(1,Math.round(base*setsPerMuscle/12));
+    var target=Math.min(5,Math.max(1,Math.round(base*setsPerMuscle/12)));
     var result=[];for(var i=0;i<target;i++)result.push(parts[i%parts.length]);
     return result.join('-');
   }
