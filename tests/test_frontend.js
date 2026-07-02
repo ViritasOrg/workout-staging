@@ -1856,6 +1856,17 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('scaleSets max-sets cap (caught)', false, String(e));
     }
 
+    // Regression: prefillLog must clamp repsArr to 5 at render time so old stored
+    // programs with inflated sets (e.g. "6-6-6-6-6-6-6") are fixed immediately.
+    try {
+      check('prefillLog clamps repsArr to 5 via .slice(0,5)',
+        src.includes("ex.sets.split('-').slice(0,5)"));
+      check('prefillLog label uses repsArr.join not raw ex.sets',
+        src.includes("repsArr.join('-')") && !src.includes("margin-top:2px\">'\" + ex.sets"));
+    } catch(e) {
+      check('prefillLog render-time clamp (caught)', false, String(e));
+    }
+
     // Test circular: last day exercices are not "rest day expected"
     // The program days are cyclic (last%nDays+1 = day1), no rest logic between
     try {
@@ -2253,7 +2264,7 @@ console.log('\n── prefillLog — WPU / reps / scheme label ─────�
   check('prefillLog: scheme label uses var(--accent)',
     fn.includes('color:var(--accent)') && fn.includes("margin-top:2px"));
   check('prefillLog: scheme label shows sets only (no weight)',
-    fn.includes(">\'+ex.sets+\'</div>") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
+    fn.includes("repsArr.join('-')") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
   check('prefillLog: exercise name is heading above scheme label (not same line)',
     fn.includes('margin-bottom:10px') && fn.includes("margin-top:2px"));
   // Regression: must NOT still use the old muted/11px combo for the scheme label
