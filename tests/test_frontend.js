@@ -1096,6 +1096,7 @@ check('saveDraft: writes wkt-draft to localStorage',       _draft30 !== null);
 check('saveDraft: draft has day property',                  _draft30 && 'day' in _draft30);
 check('saveDraft: draft has tmpl object',                   _draft30 && typeof _draft30.tmpl === 'object');
 check('saveDraft: draft has custom array',                  _draft30 && Array.isArray(_draft30.custom));
+check('saveDraft: draft has savedDate (today)',              _draft30 && _draft30.savedDate === new Date().toISOString().split('T')[0]);
 
 // restoreDraft: day mismatch → returns early, no throw
 G.setData('wkt-draft', { day: '3', date: '2026-06-01', weight: '80', tmpl: {}, custom: [] });
@@ -1104,6 +1105,17 @@ try {
   check('restoreDraft: day mismatch → no throw', true);
 } catch(e) {
   check('restoreDraft: day mismatch → no throw', false, e.message);
+}
+
+// restoreDraft: stale savedDate (from a prior calendar day) → skipped, no throw
+// Regression: drafts from previous sessions added extra set rows causing doubled sets
+const _yesterday = (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toISOString().split('T')[0]; })();
+G.setData('wkt-draft', { day: '1', date: '2026-07-01', savedDate: _yesterday, weight: '', tmpl: { '0': { kg: ['100','100','100','100','100','100','100','100'], reps: ['8','8','8','8','8','8','8','8'] } }, custom: [] });
+try {
+  G.restoreDraft('1');
+  check('restoreDraft: stale savedDate → skipped (no throw)', true);
+} catch(e) {
+  check('restoreDraft: stale savedDate → skipped (no throw)', false, e.message);
 }
 
 // restoreDraft: no draft → no throw
