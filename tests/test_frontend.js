@@ -1651,7 +1651,7 @@ console.log('\n── localStorage isolation Proxy ─────────�
   check('localStorage isolation: IS_STAGING proxy present in index.html',
     src.includes("var _S='staging:'") && src.includes('Object.defineProperty(window,\'localStorage\''));
   check('localStorage isolation: google_token passthrough present',
-    src.includes("new Set(['google_token','google_email'])") && src.includes('_pk=function(k)'));
+    src.includes("new Set(['google_token','google_email','session_token'])") && src.includes('_pk=function(k)'));
 }
 
 // ── 46. Backup status in Settings ────────────────────────────────────────────
@@ -2004,17 +2004,34 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     src.includes('pts.forEach(function(p,i){var x=xp(i)'));
 }
 
-// ── Section 50: Auth login_hint + email persistence ──────────────────────────
+// ── Section 50: Auth login_hint + email persistence + session token ───────────
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  check('google_email in staging proxy bypass set',
-    src.includes("new Set(['google_token','google_email'])"));
+  check('staging proxy bypass set includes session_token',
+    src.includes("new Set(['google_token','google_email','session_token'])"));
   check('onGoogleSignIn stores google_email from JWT payload',
     src.includes("localStorage.setItem('google_email',_jp.email)"));
   check('initGoogleAuth uses login_hint when google_email stored',
     src.includes("var _hl=localStorage.getItem('google_email')||'';if(_hl)_ih.login_hint=_hl;"));
   check('logout clears google_email',
     src.includes("localStorage.removeItem('google_email');"));
+  check('_sessionToken loaded from localStorage on startup',
+    src.includes("let _sessionToken=localStorage.getItem('session_token')||'';"));
+  check('authHeaders uses _sessionToken over _googleToken',
+    src.includes("const _t=_sessionToken||_googleToken;"));
+  check('startup verify uses _sessionToken||_googleToken as start token',
+    src.includes("var _startToken=_sessionToken||_googleToken;"));
+  check('onGoogleSignIn saves session_token from verify response',
+    src.includes("if(_vd.session_token){_sessionToken=_vd.session_token;localStorage.setItem('session_token',_vd.session_token);}"));
+  check('logout clears session_token from localStorage',
+    src.includes("localStorage.removeItem('session_token');"));
+  check('wipeLocalCache preserves session_token across cache wipe',
+    src.includes("var _s=window.localStorage.getItem('session_token');") &&
+    src.includes("if(_s)window.localStorage.setItem('session_token',_s);"));
+  check('startup verify refreshes session_token from response',
+    src.includes("if(d&&d.session_token){_sessionToken=d.session_token;localStorage.setItem('session_token',d.session_token);}"));
+  check('_loadGsi called unconditionally after startup verify block',
+    src.includes("unlockApp();});}_loadGsi();"));
 }
 
 // ── Section 52: BF chart shows all entries (no time window filter) ────────────
