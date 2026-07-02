@@ -1822,6 +1822,40 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('sets scaling (caught)', false, String(e));
     }
 
+    // Regression: scaleSets must never produce more than 5 sets regardless of setsPerMuscle
+    try {
+      const goals = [
+        ['hypertrophy','balanced'], ['hypertrophy','upper'], ['hypertrophy','lower'],
+        ['aesthetic','ppl'], ['aesthetic','fullbody'],
+        ['strength','pure']
+      ];
+      const highSpm = [15, 20, 21];
+      let maxSetsFound = 0;
+      let maxSetsWhere = '';
+      for (const [goal, sub] of goals) {
+        for (const spm of highSpm) {
+          for (let nd = 3; nd <= 7; nd++) {
+            let prog;
+            try { prog = ctx._generateWorkoutProgram(goal, sub, nd, 'T', spm); } catch(e) { continue; }
+            if (!prog || !prog.days) continue;
+            for (const day of prog.days) {
+              for (const ex of (day.exercises || [])) {
+                const n = (ex.sets || '').split('-').length;
+                if (n > maxSetsFound) {
+                  maxSetsFound = n;
+                  maxSetsWhere = `${goal}/${sub} ${nd}d spm=${spm} day="${day.name}" ex="${ex.name}" sets="${ex.sets}"`;
+                }
+              }
+            }
+          }
+        }
+      }
+      check('scaleSets never exceeds 5 sets for any exercise at any setsPerMuscle',
+        maxSetsFound <= 5, `max found: ${maxSetsFound} @ ${maxSetsWhere}`);
+    } catch(e) {
+      check('scaleSets max-sets cap (caught)', false, String(e));
+    }
+
     // Test circular: last day exercices are not "rest day expected"
     // The program days are cyclic (last%nDays+1 = day1), no rest logic between
     try {
