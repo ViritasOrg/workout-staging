@@ -1822,7 +1822,7 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('sets scaling (caught)', false, String(e));
     }
 
-    // scaleSets: set count scales with setsPerMuscle (no artificial cap)
+    // scaleSets: higher setsPerMuscle always produces ≥ sets than lower (monotone)
     try {
       const goals = [
         ['hypertrophy','balanced'], ['hypertrophy','upper'], ['hypertrophy','lower'],
@@ -1859,6 +1859,16 @@ console.log('\n── 48. Program wizard days/sets ─────────�
         fn62.includes('flex-wrap:wrap') && !fn62.includes('overflow-x:auto'));
     } catch(e) {
       check('prefillLog sets-row flex-wrap (caught)', false, String(e));
+    }
+
+    // restoreDraft must NOT inflate set count beyond what the program rendered
+    // (the while-addSetToCard loop is the bug — adding session-added sets back permanently)
+    try {
+      const fn = G.restoreDraft.toString();
+      check('restoreDraft: no while-addSetToCard inflation loop',
+        !fn.includes('while(sr.children.length<td.kg.length)addSetToCard'));
+    } catch(e) {
+      check('restoreDraft no-inflation (caught)', false, String(e));
     }
 
     // For each exercise in a generated program, every exercise in a given day
