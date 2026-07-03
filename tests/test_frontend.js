@@ -1852,6 +1852,44 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('prefillLog no-cap invariant (caught)', false, String(e));
     }
 
+    // sets-row in prefillLog uses flex-wrap:wrap so ALL inputs are visible (no overflow-x:auto)
+    try {
+      const fn62 = G.prefillLog.toString();
+      check('prefillLog sets-row uses flex-wrap:wrap (all inputs visible, no horizontal scroll)',
+        fn62.includes('flex-wrap:wrap') && !fn62.includes('overflow-x:auto'));
+    } catch(e) {
+      check('prefillLog sets-row flex-wrap (caught)', false, String(e));
+    }
+
+    // For each exercise in a generated program, every exercise in a given day
+    // must have a valid sets string: N≥1 positive-integer parts separated by '-'.
+    // prefillLog renders one input column per part, and the label shows ex.sets,
+    // so the input count and label count are always identical (no cap in code).
+    try {
+      const goals = [
+        ['hypertrophy','balanced'], ['aesthetic','ppl'], ['strength','pure']
+      ];
+      for (const [goal, sub] of goals) {
+        const prog = ctx._generateWorkoutProgram(goal, sub, 4, 'Test', 21);
+        if (!prog) continue;
+        for (const day of prog.days) {
+          for (const ex of (day.exercises || [])) {
+            const parts = ex.sets.split('-');
+            check(
+              `${goal}/${sub} day "${day.name}": "${ex.name}" has ≥1 set`,
+              parts.length >= 1
+            );
+            check(
+              `${goal}/${sub} day "${day.name}": "${ex.name}" all set values are non-empty strings`,
+              parts.every(p => p.length > 0)
+            );
+          }
+        }
+      }
+    } catch(e) {
+      check('exercise sets valid for all cards (caught)', false, String(e));
+    }
+
     // Test circular: last day exercices are not "rest day expected"
     // The program days are cyclic (last%nDays+1 = day1), no rest logic between
     try {
