@@ -1861,14 +1861,16 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('prefillLog sets-row flex-wrap (caught)', false, String(e));
     }
 
-    // restoreDraft must NOT inflate set count beyond what the program rendered
-    // (the while-addSetToCard loop is the bug — adding session-added sets back permanently)
+    // restoreDraft: today's draft with extra sets (user pressed + set) must be restored
+    // Protection against cross-day pollution is the savedDate check, not removing the while-loop
     try {
       const fn = G.restoreDraft.toString();
-      check('restoreDraft: no while-addSetToCard inflation loop',
-        !fn.includes('while(sr.children.length<td.kg.length)addSetToCard'));
+      check('restoreDraft: has savedDate guard to prevent stale draft restore',
+        fn.includes('savedDate') && fn.includes('_today'));
+      check('restoreDraft: restores extra sets from same-day draft (while-loop present)',
+        fn.includes('while(sr.children.length<td.kg.length)addSetToCard'));
     } catch(e) {
-      check('restoreDraft no-inflation (caught)', false, String(e));
+      check('restoreDraft draft-state (caught)', false, String(e));
     }
 
     // For each exercise in a generated program, every exercise in a given day
