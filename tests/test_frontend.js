@@ -1852,11 +1852,11 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('prefillLog no-cap invariant (caught)', false, String(e));
     }
 
-    // sets-row in prefillLog uses flex-wrap:wrap so ALL inputs are visible (no overflow-x:auto)
+    // sets-row in prefillLog uses flex-wrap:nowrap + overflow-x:auto for single-line 7-set layout
     try {
       const fn62 = G.prefillLog.toString();
-      check('prefillLog sets-row uses flex-wrap:wrap (all inputs visible, no horizontal scroll)',
-        fn62.includes('flex-wrap:wrap') && !fn62.includes('overflow-x:auto'));
+      check('prefillLog sets-row uses flex-wrap:nowrap with overflow-x:auto for single-line 7-set layout',
+        fn62.includes('flex-wrap:nowrap') && fn62.includes('overflow-x:auto'));
     } catch(e) {
       check('prefillLog sets-row flex-wrap (caught)', false, String(e));
     }
