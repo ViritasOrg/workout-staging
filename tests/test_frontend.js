@@ -1822,49 +1822,34 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('sets scaling (caught)', false, String(e));
     }
 
-    // Regression: scaleSets must never produce more than 5 sets regardless of setsPerMuscle
+    // scaleSets: set count scales with setsPerMuscle (no artificial cap)
     try {
       const goals = [
         ['hypertrophy','balanced'], ['hypertrophy','upper'], ['hypertrophy','lower'],
         ['aesthetic','ppl'], ['aesthetic','fullbody'],
         ['strength','pure']
       ];
-      const highSpm = [15, 20, 21];
-      let maxSetsFound = 0;
-      let maxSetsWhere = '';
       for (const [goal, sub] of goals) {
-        for (const spm of highSpm) {
-          for (let nd = 3; nd <= 7; nd++) {
-            let prog;
-            try { prog = ctx._generateWorkoutProgram(goal, sub, nd, 'T', spm); } catch(e) { continue; }
-            if (!prog || !prog.days) continue;
-            for (const day of prog.days) {
-              for (const ex of (day.exercises || [])) {
-                const n = (ex.sets || '').split('-').length;
-                if (n > maxSetsFound) {
-                  maxSetsFound = n;
-                  maxSetsWhere = `${goal}/${sub} ${nd}d spm=${spm} day="${day.name}" ex="${ex.name}" sets="${ex.sets}"`;
-                }
-              }
-            }
-          }
-        }
+        const progLo = ctx._generateWorkoutProgram(goal, sub, 4, 'Lo', 9);
+        const progHi = ctx._generateWorkoutProgram(goal, sub, 4, 'Hi', 21);
+        if (!progLo || !progHi) continue;
+        const loSets = progLo.days[0].exercises[0].sets.split('-').length;
+        const hiSets = progHi.days[0].exercises[0].sets.split('-').length;
+        check(`${goal}/${sub}: high setsPerMuscle produces ≥ sets than low`,
+          hiSets >= loSets, `lo=${loSets} hi=${hiSets}`);
       }
-      check('scaleSets never exceeds 5 sets for any exercise at any setsPerMuscle',
-        maxSetsFound <= 5, `max found: ${maxSetsFound} @ ${maxSetsWhere}`);
     } catch(e) {
-      check('scaleSets max-sets cap (caught)', false, String(e));
+      check('scaleSets monotone with setsPerMuscle (caught)', false, String(e));
     }
 
-    // Regression: prefillLog must clamp repsArr to 5 at render time so old stored
-    // programs with inflated sets (e.g. "6-6-6-6-6-6-6") are fixed immediately.
+    // prefillLog renders exactly the number of sets the program specifies (no cap)
     try {
-      check('prefillLog clamps repsArr to 5 via .slice(0,5)',
-        src.includes("ex.sets.split('-').slice(0,5)"));
-      check('prefillLog label uses repsArr.join not raw ex.sets',
-        src.includes("repsArr.join('-')") && !src.includes("margin-top:2px\">'\" + ex.sets"));
+      check('prefillLog uses ex.sets.split without artificial slice cap',
+        src.includes("ex.sets.split('-')") && !src.includes("ex.sets.split('-').slice(0,5)"));
+      check('prefillLog label shows raw ex.sets (label matches stored program)',
+        src.includes("margin-top:2px\">'+ex.sets+'</div>"));
     } catch(e) {
-      check('prefillLog render-time clamp (caught)', false, String(e));
+      check('prefillLog no-cap invariant (caught)', false, String(e));
     }
 
     // Test circular: last day exercices are not "rest day expected"
@@ -2264,7 +2249,7 @@ console.log('\n── prefillLog — WPU / reps / scheme label ─────�
   check('prefillLog: scheme label uses var(--accent)',
     fn.includes('color:var(--accent)') && fn.includes("margin-top:2px"));
   check('prefillLog: scheme label shows sets only (no weight)',
-    fn.includes("repsArr.join('-')") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
+    fn.includes(">\'+ex.sets+\'</div>") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
   check('prefillLog: exercise name is heading above scheme label (not same line)',
     fn.includes('margin-bottom:10px') && fn.includes("margin-top:2px"));
   // Regression: must NOT still use the old muted/11px combo for the scheme label
