@@ -1861,6 +1861,15 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('prefillLog sets-row flex-wrap (caught)', false, String(e));
     }
 
+    // prefillLog resets log-date to today every time it runs
+    try {
+      const fn63 = G.prefillLog.toString();
+      check('prefillLog resets log-date to today on every open',
+        fn63.includes("getElementById('log-date').value=new Date().toISOString().split('T')[0]"));
+    } catch(e) {
+      check('prefillLog date-reset (caught)', false, String(e));
+    }
+
     // restoreDraft: today's draft with extra sets (user pressed + set) must be restored
     // Protection against cross-day pollution is the savedDate check, not removing the while-loop
     try {
