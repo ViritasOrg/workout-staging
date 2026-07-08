@@ -157,10 +157,11 @@ This is the single most common way the rule above gets bypassed — through inte
 
 ### Leg day exercise ordering rules — ALWAYS follow
 1. **Squat ALWAYS comes first** in every leg day, no exceptions
-2. **Deadlift (conventional), when included in a leg day:**
+2. **Deadlift (conventional) must be INCLUDED in every leg day variation** (rule strengthened 2026-07-08 — previously only "when included"):
    - ONE heavy set only
    - 5–8 reps target
    - ALWAYS the last exercise of the day
+   - Enforced programmatically for generated programs (`_generateWorkoutProgram`) and stored hypertrophy programs (`_ensurePrograms`) on days named `Legs*`
 
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
