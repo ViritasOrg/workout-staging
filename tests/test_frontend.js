@@ -2654,6 +2654,31 @@ console.log('\n── Leg-day rules on stored programs ────────�
   G.initPrograms();
 }
 
+// ── Weighted Pull-ups: BW always included in volume + strength ───────────────
+console.log('\n── WPU body weight inclusion ───────────────────────────────');
+{
+  const _savedW = G.weights, _savedL = G.logs;
+  G.weights = [{ date: '2020-01-01', weight: 80 }];
+  // WPU set with 0 added weight must still count as BW load (was skipped by kg>0 guard)
+  G.logs = [{ date: '2020-01-15', exercises: [{ name: 'Weighted Pull-ups', sets: [{ kg: 0, reps: 10 }] }] }];
+  const v0 = G.buildSessionGroupVol('back', 10000);
+  check('WPU kg=0: volume counts BW (80×10×0.65)', v0.length === 1 && Math.abs(v0[0].vol - 80 * 10 * 0.65) < 0.01, `got ${v0[0]?.vol}`);
+  const s0 = G.buildSessionGroupStrength('back', 10000);
+  const expS0 = 80 * (1 + 10 / 30) * 0.65;
+  check('WPU kg=0: strength counts BW', s0.length === 1 && Math.abs(s0[0].est1rm - expS0) < 0.01, `got ${s0[0]?.est1rm}`);
+  // WPU with added weight: BW + added
+  G.logs = [{ date: '2020-01-15', exercises: [{ name: 'Weighted Pull-ups', sets: [{ kg: 15, reps: 6 }] }] }];
+  const v15 = G.buildSessionGroupVol('back', 10000);
+  check('WPU kg=15: volume = (15+80)×6×0.65', v15.length === 1 && Math.abs(v15[0].vol - 95 * 6 * 0.65) < 0.01, `got ${v15[0]?.vol}`);
+  // Non-WPU with kg=0 stays excluded (no phantom volume)
+  G.logs = [{ date: '2020-01-15', exercises: [{ name: 'Barbell Row', sets: [{ kg: 0, reps: 10 }] }] }];
+  check('non-WPU kg=0 set still excluded', G.buildSessionGroupVol('back', 10000).length === 0);
+  G.weights = _savedW; G.logs = _savedL;
+}
+check('WPU card shows BW chip in title', rawScript.includes('data-bw-chip'));
+check('BW chip refreshed after weight sync', rawScript.includes("querySelectorAll('[data-bw-chip]')"));
+check('custom-card WPU adds BW to session volume', rawScript.includes('_cbw=/weighted'));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
