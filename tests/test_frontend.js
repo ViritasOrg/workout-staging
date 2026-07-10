@@ -2771,6 +2771,25 @@ console.log('\n── Frequency-aware volume allocation ────────
   check('wizard review shows resulting session size', rawScript.includes('Resulting sessions:'));
 }
 
+// ── 5-Day Split no longer auto-seeded ────────────────────────────────────────
+console.log('\n── 5-Day Split deletion sticks ─────────────────────────────');
+{
+  const savedPrograms = G.localStorage.getItem('workout_programs');
+  // A user who deleted the 5-Day Split must not get it back on next load
+  G.localStorage.setItem('workout_programs', JSON.stringify({ programs: [
+    { name: '6-Day Hypertrophy — Upper', goal: 'hypertrophy', days: [
+      { name: 'Day 1 — Push A', warmup: false, exercises: [
+        { name: 'Bench Press', scheme: '4×8-12', tag: 'volume', sets: '8-8-8-8', kg: 70 } ] } ] }
+  ], active_index: 0 }));
+  G.initPrograms();
+  check('deleted 5-Day Split is NOT recreated', !G._programs.some(p => p.name === '5-Day Split'),
+    JSON.stringify(G._programs.map(p => p.name)));
+  check('no _seedDefaultProgram call left in _ensurePrograms', !rawScript.includes('_programs.push(_seedDefaultProgram())'));
+  if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
+  else G.localStorage.setItem('workout_programs', savedPrograms);
+  G.initPrograms();
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
