@@ -743,7 +743,10 @@ function _renderProgWiz(title,body,footer){
     var html='<div style="margin-bottom:20px;"><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;">Program Name</div>';
     html+='<input id="prog-wiz-name" type="text" value="'+_escP(wiz.name||_progWizDefaultName())+'" oninput="_progWiz.name=this.value" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-size:15px;font-weight:600;font-family:DM Sans,sans-serif;outline:none;box-sizing:border-box;"></div>';
     html+='<div style="margin-top:20px;padding:16px;background:rgba(232,255,60,0.05);border:1px solid rgba(232,255,60,0.15);border-radius:10px;"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:10px;">Summary</div>';
-    html+='<div style="font-size:13px;color:var(--muted);line-height:2;">Goal: <span style="color:var(--text);font-weight:600;">'+gn+'</span><br>Focus: <span style="color:var(--text);font-weight:600;">'+sn+'</span><br>Days/week: <span style="color:var(--text);font-weight:600;">'+wiz.nDays+' day'+(wiz.nDays!==1?'s':'')+'</span><br>Sets/muscle/week: <span style="color:var(--text);font-weight:600;">'+(wiz.setsPerMuscle||12)+'</span></div></div>';
+    html+='<div style="font-size:13px;color:var(--muted);line-height:2;">Goal: <span style="color:var(--text);font-weight:600;">'+gn+'</span><br>Focus: <span style="color:var(--text);font-weight:600;">'+sn+'</span><br>Days/week: <span style="color:var(--text);font-weight:600;">'+wiz.nDays+' day'+(wiz.nDays!==1?'s':'')+'</span><br>Sets/muscle/week: <span style="color:var(--text);font-weight:600;">'+(wiz.setsPerMuscle||12)+'</span></div>';
+    var _pv=null;try{_pv=_generateWorkoutProgram(wiz.goal,wiz.sub,wiz.nDays,'preview',wiz.setsPerMuscle||12);}catch(e){}
+    if(_pv&&_pv.days&&_pv.days.length){var _tots=_pv.days.map(function(d){return(d.exercises||[]).reduce(function(s,e){return s+String(e.sets).split('-').length;},0);});var _avg=Math.round(_tots.reduce(function(a,b){return a+b;},0)/_tots.length);var _mx=Math.max.apply(null,_tots);html+='<div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;">Resulting sessions: ≈'+_avg+' sets avg ('+_mx+' max) — roughly '+Math.round(_avg*3.5)+' min per session</div>';}
+    html+='</div>';
     body.innerHTML=html;
     footer.innerHTML='<button onclick="_progWizGenerate()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;margin-bottom:8px;">Generate Program →</button><button onclick="_progWiz.step=2;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">← Back</button>';
   }
@@ -826,10 +829,42 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle){
   else{pool=[_seedDefaultProgram().days[0]];}
   (function(){var _base=pool.length;function _mGroup(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}while(pool.length>0&&pool.length<nDays){var _pg=_mGroup(pool[pool.length-1].name);var _fg=_mGroup(pool[0].name);var _best=null,_bs=Infinity;for(var _ci=0;_ci<_base;_ci++){var _cg=_mGroup(pool[_ci].name);var _sc=(_cg===_pg?2:0)+(_cg===_fg?1:0);if(_best===null||_sc<_bs){_bs=_sc;_best=pool[_ci];}}pool.push(JSON.parse(JSON.stringify(_best)));}})();
   var _isRehabGoal=key.startsWith('rehab-');
-  pool.forEach(function(day){day.exercises=(day.exercises||[]).map(function(ex){var _t=(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag;return Object.assign({},ex,{sets:scaleSets(ex.sets),tag:_t});});});
+  pool.forEach(function(day){day.exercises=(day.exercises||[]).map(function(ex){var _t=(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag;return Object.assign({},ex,{tag:_t});});});
   // Leg-day rules: Squat is always the first exercise, Deadlift (1 heavy set, 5-8 reps) always the last
-  pool.forEach(function(day){if(!/legs/i.test(day.name))return;var exs=day.exercises;var si=-1;for(var _i2=0;_i2<exs.length;_i2++){if(/squat/i.test(exs[_i2].name)&&!/split/i.test(exs[_i2].name)){si=_i2;break;}}if(si>0){exs.unshift(exs.splice(si,1)[0]);}else if(si<0){exs.unshift(pw('Squat','4×8-12','strength',scaleSets('8-8-8-8'),80));}var dli=-1;for(var _j2=0;_j2<exs.length;_j2++){if(exs[_j2].name==='Deadlift'){dli=_j2;break;}}var dlx;if(dli>=0){dlx=exs.splice(dli,1)[0];}else{dlx=pw('Deadlift','1×5-8','strength','6',Math.round((exs[0].kg||80)*1.5));}dlx.scheme='1×5-8';dlx.sets='6';dlx.tag='strength';exs.push(dlx);});
+  pool.forEach(function(day){if(!/legs/i.test(day.name))return;var exs=day.exercises;var si=-1;for(var _i2=0;_i2<exs.length;_i2++){if(/squat/i.test(exs[_i2].name)&&!/split/i.test(exs[_i2].name)){si=_i2;break;}}if(si>0){exs.unshift(exs.splice(si,1)[0]);}else if(si<0){exs.unshift(pw('Squat','4×8-12','strength','8-8-8-8',80));}var dli=-1;for(var _j2=0;_j2<exs.length;_j2++){if(exs[_j2].name==='Deadlift'){dli=_j2;break;}}var dlx;if(dli>=0){dlx=exs.splice(dli,1)[0];}else{dlx=pw('Deadlift','1×5-8','strength','6',Math.round((exs[0].kg||80)*1.5));}dlx.scheme='1×5-8';dlx.sets='6';dlx.tag='strength';exs.push(dlx);});
   var days=pool.slice(0,nDays).map(function(day,i){return Object.assign({},day,{name:'Day '+(i+1)+' — '+day.name.replace(/^Day \d+ — /,'')});});
+  // Volume: hypertrophy/aesthetic get frequency-aware allocation (weekly sets-per-muscle target
+  // split across the days that train each muscle, capped at 10 hard sets per muscle per session,
+  // 25-set session ceiling trimming isolation first). Strength/rehab keep their fixed schemes
+  // scaled linearly. The enforced 1×5-8 Deadlift is never resized.
+  var GROUPS=['legs','back','chest','shoulders','arms'];
+  function _isFixedDL(ex){return ex.name==='Deadlift'&&ex.scheme==='1×5-8';}
+  function _nSets(ex){return String(ex.sets).split('-').length;}
+  function _resizeEx(ex,n){var parts=String(ex.sets).split('-');var out=[];for(var i=0;i<n;i++)out.push(parts[i%parts.length]);ex.sets=out.join('-');ex.scheme=String(ex.scheme||'').replace(/^\d+×/,n+'×');}
+  if(/^(hypertrophy|aesthetic)-/.test(key)){
+    var SESSION_MUSCLE_CAP=10,SESSION_CEILING=25;
+    var freq={};GROUPS.forEach(function(g){freq[g]=0;});
+    days.forEach(function(day){var fs={};(day.exercises||[]).forEach(function(ex){if(_isFixedDL(ex))return;var sp=getExSplits(ex.name);GROUPS.forEach(function(g){if(sp[g])fs[g]=(fs[g]||0)+_nSets(ex)*sp[g];});});day._fs=fs;GROUPS.forEach(function(g){if((fs[g]||0)>=1)freq[g]++;});});
+    days.forEach(function(day){
+      (day.exercises||[]).forEach(function(ex){
+        if(_isFixedDL(ex))return;
+        var sp=getExSplits(ex.name);var acc=0,wsum=0;
+        GROUPS.forEach(function(g){var f=sp[g]||0;if(!f)return;var base=day._fs[g]||0;if(!base||!freq[g])return;var target=Math.min(setsPerMuscle/freq[g],SESSION_MUSCLE_CAP);acc+=f*(target/base);wsum+=f;});
+        if(wsum>0)_resizeEx(ex,Math.max(2,Math.min(5,Math.round(_nSets(ex)*(acc/wsum)))));
+      });
+      var _guard=100;
+      while(_guard-->0){
+        var _tot=(day.exercises||[]).reduce(function(s,ex){return s+_nSets(ex);},0);
+        if(_tot<=SESSION_CEILING)break;
+        var _trimmed=false;
+        for(var _ti=day.exercises.length-1;_ti>=0;_ti--){var _tx=day.exercises[_ti];if(_isFixedDL(_tx))continue;if(_nSets(_tx)>2){_resizeEx(_tx,_nSets(_tx)-1);_trimmed=true;break;}}
+        if(!_trimmed)break;
+      }
+      delete day._fs;
+    });
+  }else{
+    days.forEach(function(day){(day.exercises||[]).forEach(function(ex){if(!_isFixedDL(ex))ex.sets=scaleSets(ex.sets);});});
+  }
   return{name:name,days:days,goal:goal,setsPerMuscle:setsPerMuscle};
 }
 
