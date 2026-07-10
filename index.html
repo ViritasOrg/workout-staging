@@ -509,8 +509,20 @@ function _ensurePrograms(){
   // 5-Day Split is no longer auto-seeded (Henrik 2026-07-10) — deleting it must stick
   // Normalize: non-rehab programs must not show 'rehab' tag on exercises
   _programs.forEach(function(p){if((p.goal||'')!=='rehab'){(p.days||[]).forEach(function(d){(d.exercises||[]).forEach(function(e){if(e.tag==='rehab'){e.tag='volume';changed=true;}});});}});
-  // Leg-day rules (hypertrophy programs): Squat always first, Deadlift (1 heavy set, 5-8 reps) always last
-  _programs.forEach(function(p){if((p.goal||'')!=='hypertrophy')return;(p.days||[]).forEach(function(d){if(!/legs/i.test(d.name||''))return;var exs=d.exercises||[];if(!exs.length)return;var si=-1;for(var i=0;i<exs.length;i++){if(/squat/i.test(exs[i].name)&&!/split/i.test(exs[i].name)){si=i;break;}}if(si>0){exs.unshift(exs.splice(si,1)[0]);changed=true;}else if(si<0){exs.unshift({name:'Squat',scheme:'4×8-12',tag:'strength',sets:'8-8-8-8',kg:80});changed=true;}var dli=-1;for(var j=0;j<exs.length;j++){if(exs[j].name==='Deadlift'){dli=j;break;}}if(dli<0){exs.push({name:'Deadlift',scheme:'1×5-8',tag:'strength',sets:'6',kg:Math.round((exs[0].kg||80)*1.5)});changed=true;}else if(dli!==exs.length-1){var dlx=exs.splice(dli,1)[0];dlx.tag='strength';exs.push(dlx);changed=true;}});});
+  // Leg-day rules (2026-07-10, stored hypertrophy programs): each Legs* day is EITHER a Squat
+  // day (Squat first, no conventional Deadlift) OR a Deadlift day (Deadlift last, no squat
+  // variants) — alternating, starting with a Squat day.
+  _programs.forEach(function(p){if((p.goal||'')!=='hypertrophy')return;var li=0;(p.days||[]).forEach(function(d){if(!/legs/i.test(d.name||''))return;var exs=d.exercises||[];if(!exs.length)return;var isSq=function(ex){return /squat/i.test(ex.name)&&!/split/i.test(ex.name);};
+    if(li++%2===0){
+      for(var r1=exs.length-1;r1>=0;r1--){if(exs[r1].name==='Deadlift'){exs.splice(r1,1);changed=true;}}
+      var si=-1;for(var i=0;i<exs.length;i++){if(isSq(exs[i])){si=i;break;}}
+      if(si>0){exs.unshift(exs.splice(si,1)[0]);changed=true;}else if(si<0){exs.unshift({name:'Squat',scheme:'4×8-12',tag:'strength',sets:'8-8-8-8',kg:80});changed=true;}
+    }else{
+      for(var r2=exs.length-1;r2>=0;r2--){if(isSq(exs[r2])){exs.splice(r2,1);changed=true;}}
+      var dli=-1;for(var j=0;j<exs.length;j++){if(exs[j].name==='Deadlift'){dli=j;break;}}
+      if(dli<0){exs.push({name:'Deadlift',scheme:'1×5-8',tag:'strength',sets:'6',kg:Math.round(((exs[0]||{}).kg||80)*1.5)});changed=true;}
+      else if(dli!==exs.length-1){var dlx=exs.splice(dli,1)[0];dlx.tag='strength';exs.push(dlx);changed=true;}
+    }});});
   return changed;
 }
 function initPrograms(){
@@ -829,8 +841,21 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle){
   (function(){var _base=pool.length;function _mGroup(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}while(pool.length>0&&pool.length<nDays){var _pg=_mGroup(pool[pool.length-1].name);var _fg=_mGroup(pool[0].name);var _best=null,_bs=Infinity;for(var _ci=0;_ci<_base;_ci++){var _cg=_mGroup(pool[_ci].name);var _sc=(_cg===_pg?2:0)+(_cg===_fg?1:0);if(_best===null||_sc<_bs){_bs=_sc;_best=pool[_ci];}}pool.push(JSON.parse(JSON.stringify(_best)));}})();
   var _isRehabGoal=key.startsWith('rehab-');
   pool.forEach(function(day){day.exercises=(day.exercises||[]).map(function(ex){var _t=(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag;return Object.assign({},ex,{tag:_t});});});
-  // Leg-day rules: Squat is always the first exercise, Deadlift (1 heavy set, 5-8 reps) always the last
-  pool.forEach(function(day){if(!/legs/i.test(day.name))return;var exs=day.exercises;var si=-1;for(var _i2=0;_i2<exs.length;_i2++){if(/squat/i.test(exs[_i2].name)&&!/split/i.test(exs[_i2].name)){si=_i2;break;}}if(si>0){exs.unshift(exs.splice(si,1)[0]);}else if(si<0){exs.unshift(pw('Squat','4×8-12','strength','8-8-8-8',80));}var dli=-1;for(var _j2=0;_j2<exs.length;_j2++){if(exs[_j2].name==='Deadlift'){dli=_j2;break;}}var dlx;if(dli>=0){dlx=exs.splice(dli,1)[0];}else{dlx=pw('Deadlift','1×5-8','strength','6',Math.round((exs[0].kg||80)*1.5));}dlx.tag='strength';dlx.scheme=String(dlx.sets).split('-').length+'×5-8';exs.push(dlx);});
+  // Leg-day rules (2026-07-10): each Legs* day is EITHER a Squat day (Squat first, no
+  // conventional Deadlift) OR a Deadlift day (Deadlift last, 5-8 reps, no squat variants) —
+  // never both in one session (systemic load). Alternates, starting with a Squat day.
+  var _legIdx=0;
+  pool.forEach(function(day){if(!/legs/i.test(day.name))return;var exs=day.exercises;var _isSq=function(ex){return /squat/i.test(ex.name)&&!/split/i.test(ex.name);};
+    if(_legIdx++%2===0){
+      for(var _r1=exs.length-1;_r1>=0;_r1--){if(exs[_r1].name==='Deadlift')exs.splice(_r1,1);}
+      var si=-1;for(var _i2=0;_i2<exs.length;_i2++){if(_isSq(exs[_i2])){si=_i2;break;}}
+      if(si>0){exs.unshift(exs.splice(si,1)[0]);}else if(si<0){exs.unshift(pw('Squat','4×8-12','strength','8-8-8-8',80));}
+    }else{
+      for(var _r2=exs.length-1;_r2>=0;_r2--){if(_isSq(exs[_r2]))exs.splice(_r2,1);}
+      var dli=-1;for(var _j2=0;_j2<exs.length;_j2++){if(exs[_j2].name==='Deadlift'){dli=_j2;break;}}
+      var dlx;if(dli>=0){dlx=exs.splice(dli,1)[0];}else{dlx=pw('Deadlift','1×5-8','strength','6',Math.round(((exs[0]||{}).kg||80)*1.5));}
+      dlx.tag='strength';dlx.scheme=String(dlx.sets).split('-').length+'×5-8';exs.push(dlx);
+    }});
   var days=pool.slice(0,nDays).map(function(day,i){return Object.assign({},day,{name:'Day '+(i+1)+' — '+day.name.replace(/^Day \d+ — /,'')});});
   // Volume: hypertrophy/aesthetic get frequency-aware allocation (weekly sets-per-muscle target
   // split across the days that train each muscle, capped at 10 hard sets per muscle per session,
