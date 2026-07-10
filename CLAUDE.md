@@ -158,9 +158,9 @@ This is the single most common way the rule above gets bypassed — through inte
 ### Leg day exercise ordering rules — ALWAYS follow
 1. **Squat ALWAYS comes first** in every leg day, no exceptions
 2. **Deadlift (conventional) must be INCLUDED in every leg day variation** (rule strengthened 2026-07-08 — previously only "when included"):
-   - ONE heavy set only
    - 5–8 reps target
    - ALWAYS the last exercise of the day
+   - **Set count is NOT hardcoded** (rule changed 2026-07-10 — previously "ONE heavy set only"): in generated hypertrophy/aesthetic programs the frequency-aware volume allocator sizes Squat and Deadlift like any other exercise. Stored-program normalization (`_ensurePrograms`) only enforces presence + last position; a missing Deadlift is appended as 1×5-8.
    - Enforced programmatically for generated programs (`_generateWorkoutProgram`) and stored hypertrophy programs (`_ensurePrograms`) on days named `Legs*`
 
 ### Scan conversations for rules — extract to CLAUDE.md each session

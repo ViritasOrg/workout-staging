@@ -1805,7 +1805,7 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   check('frequency-aware allocation present (session ceiling const)',
     src.includes('SESSION_MUSCLE_CAP=10,SESSION_CEILING=25'));
   check('strength/rehab keep linear scaleSets path',
-    src.includes('if(!_isFixedDL(ex))ex.sets=scaleSets(ex.sets)'));
+    src.includes('ex.sets=scaleSets(ex.sets)'));
   check('setsPerMuscle stored in generated program object',
     src.includes('setsPerMuscle:setsPerMuscle'));
   check('poolN clamped to min 3 max 6 for pool template selection',
@@ -2626,24 +2626,25 @@ console.log('\n── Leg-day rules in generated programs ───────�
       if (!/squat/i.test(exs[0].name)) { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: first is ${exs[0].name}`); }
       const last = exs[exs.length - 1];
       if (last.name !== 'Deadlift') { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: last is ${last.name}`); }
-      else if (last.sets !== '6' || last.scheme !== '1×5-8') { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: deadlift ${last.scheme}/${last.sets}`); }
+      else if (!/×5-8$/.test(last.scheme)) { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: deadlift ${last.scheme}/${last.sets}`); }
     }
   }
   check('leg days found across hypertrophy programs', checkedDays >= 6, `got ${checkedDays}`);
-  check('every Legs day: Squat first, Deadlift 1×5-8 last', allOk, details.join('; '));
+  check('every Legs day: Squat first, Deadlift (5-8 reps) last', allOk, details.join('; '));
   // 7-day hypertrophy-upper specifically (the reported bug): Legs A must end with Deadlift
   const p7 = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T7', 12);
   const legsA = p7.days.find(d => /legs a/i.test(d.name));
   check('7-day hyp-upper Legs A exists', !!legsA);
-  check('7-day hyp-upper Legs A ends with Deadlift 1×5-8 single set',
+  check('7-day hyp-upper Legs A ends with Deadlift, 5-8 rep scheme',
     !!legsA && legsA.exercises[legsA.exercises.length - 1].name === 'Deadlift'
-            && legsA.exercises[legsA.exercises.length - 1].sets === '6',
+            && /×5-8$/.test(legsA.exercises[legsA.exercises.length - 1].scheme),
     legsA ? JSON.stringify(legsA.exercises[legsA.exercises.length - 1]) : 'no Legs A');
-  // Deadlift stays a single set even at higher sets-per-muscle settings
+  // Deadlift is allocator-sized like any other exercise (rule 2026-07-10): 2-5 sets, scheme in sync
   const p16 = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T16', 16);
   const legs16 = p16.days.filter(d => /legs/i.test(d.name));
-  check('setsPerMuscle=16: Deadlift still exactly 1 set',
-    legs16.every(d => d.exercises[d.exercises.length - 1].sets === '6'),
+  check('setsPerMuscle=16: Deadlift allocator-sized (2-5 sets, scheme matches)',
+    legs16.every(d => { const l = d.exercises[d.exercises.length - 1]; const n = String(l.sets).split('-').length;
+      return l.name === 'Deadlift' && n >= 2 && n <= 5 && String(l.scheme).startsWith(n + '×5-8'); }),
     JSON.stringify(legs16.map(d => d.exercises[d.exercises.length - 1].sets)));
   // Rehab programs are untouched (no heavy deadlift forced into rehab days)
   const pk = G._generateWorkoutProgram('rehab', 'knee', 6, 'TK', 12);
@@ -2738,7 +2739,11 @@ console.log('\n── Frequency-aware volume allocation ────────
   // Leg-day rules survive allocation
   const legs=hi.p.days.filter(d=>/legs/i.test(d.name));
   check('allocation keeps Squat first on legs days', legs.every(d=>/squat/i.test(d.exercises[0].name)));
-  check('allocation keeps Deadlift 1×5-8 single set last', legs.every(d=>{const l=d.exercises[d.exercises.length-1];return l.name==='Deadlift'&&l.sets==='6'&&l.scheme==='1×5-8';}));
+  check('allocation keeps Deadlift last with 5-8 reps, allocator-sized 2-5 sets', legs.every(d=>{const l=d.exercises[d.exercises.length-1];const n=String(l.sets).split('-').length;return l.name==='Deadlift'&&/×5-8$/.test(l.scheme)&&n>=2&&n<=5;}));
+  // Ratio-blend clamp regression: the Deadlift's small back fraction must not balloon it past the day's compounds
+  check('Deadlift not inflated by cross-group ratio blowup (≤3 sets @21)',
+    legs.every(d=>String(d.exercises[d.exercises.length-1].sets).split('-').length<=3),
+    JSON.stringify(legs.map(d=>d.exercises[d.exercises.length-1].sets)));
   // Scheme prefix stays in sync with the resized set count
   let schemeOk=true;
   for(const d of hi.p.days)for(const ex of d.exercises){const n=String(ex.sets).split('-').length;const m=String(ex.scheme).match(/^(\d+)×/);if(m&&parseInt(m[1])!==n)schemeOk=false;}
