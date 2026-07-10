@@ -1792,8 +1792,8 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     src.includes('[9,15,21]') && src.includes('[10,16,20]'));
   check('_progWizGenerate passes setsPerMuscle to _generateWorkoutProgram',
     src.includes('wiz.setsPerMuscle||12'));
-  check('_generateWorkoutProgram accepts setsPerMuscle param',
-    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle)'));
+  check('_generateWorkoutProgram accepts setsPerMuscle + injuries params',
+    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries)'));
   check('scaleSets helper scales exercise set counts',
     src.includes('function scaleSets(setsStr)'));
   check('pool padding loop fills short pools up to nDays',
@@ -2796,6 +2796,35 @@ console.log('\n── 5-Day Split deletion sticks ──────────
   if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
   else G.localStorage.setItem('workout_programs', savedPrograms);
   G.initPrograms();
+}
+
+// ── Injury substitutions baked into generated programs ───────────────────────
+console.log('\n── Injury substitutions (baked) ────────────────────────────');
+{
+  const allNames = (p) => p.days.flatMap(d => d.exercises.map(e => e.name));
+  // Shoulders: no barbell/DB/smith presses anywhere; machine/landmine alternatives present
+  const ps = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10, ['shoulders']);
+  const shoulderBad = allNames(ps).filter(n => /^(Bench Press|Incline Bench Press|Overhead Press|Push Press)$/i.test(n) || (/\b(barbell|dumbbell|\bdb\b|smith)\b/i.test(n) && /\bpress\b/i.test(n)));
+  check('shoulders injury: no aggravating presses in program', shoulderBad.length === 0, shoulderBad.join(', '));
+  check('shoulders injury: machine/landmine subs present', allNames(ps).some(n => /Machine Press|Landmine Press/.test(n)));
+  // Knees: no squats/lunges
+  const pk = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10, ['knees']);
+  const kneeBad = allNames(pk).filter(n => (/\bsquat\b|\blunge\b/i.test(n)) && !/\b(leg press|leg curl|leg extension|machine)\b/i.test(n));
+  check('knees injury: no squats/lunges in program', kneeBad.length === 0, kneeBad.join(', '));
+  // Lower back: no deadlifts/RDL
+  const pb = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T', 15, ['lower_back']);
+  const backBad = allNames(pb).filter(n => /romanian|\brdl\b|deadlift|good morning/i.test(n));
+  check('lower-back injury: no deadlifts/RDL in program', backBad.length === 0, backBad.join(', '));
+  // No duplicate exercises within a day after substitution
+  const dupDays = ps.days.concat(pk.days, pb.days).filter(d => new Set(d.exercises.map(e => e.name)).size !== d.exercises.length);
+  check('no duplicate exercises within a day after subs', dupDays.length === 0, dupDays.map(d => d.name).join(', '));
+  // No injuries selected → nothing substituted (Bench Press survives)
+  const p0 = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10);
+  check('no injuries: Bench Press untouched', allNames(p0).includes('Bench Press'));
+  // Wizard wiring
+  check('wizard has Injuries step', rawScript.includes('Injuries (optional)') && rawScript.includes('_progWizToggleInjury'));
+  check('wizard passes injuries into generation', rawScript.includes("wiz.setsPerMuscle||12,wiz.injuries"));
+  check('editor condition chips bake substitutions (no rehabSubs map writes)', !rawScript.includes('subs[ex.name]=cond.suggest(ex.name)'));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
