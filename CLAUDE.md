@@ -155,6 +155,11 @@ This is the single most common way the rule above gets bypassed — through inte
 - **Hip Thrust** — Hypertrophy programs only; fine in aesthetic, strength, and rehab
 - **Bulgarian Split Squat** — same restriction as Hip Thrust
 
+### Volume allocation (hypertrophy/aesthetic program generation)
+- Weekly sets-per-muscle target ÷ days training that muscle = per-session target, capped at 10 hard sets/muscle/session; 25-set session ceiling
+- **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10): `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust; Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×, and the session-ceiling trim takes sets from non-compounds first
+- Squat and Deadlift are allocator-sized like any other exercise — no hardcoded set counts
+
 ### Leg day exercise ordering rules — ALWAYS follow
 1. **Squat ALWAYS comes first** in every leg day, no exceptions
 2. **Deadlift (conventional) must be INCLUDED in every leg day variation** (rule strengthened 2026-07-08 — previously only "when included"):
