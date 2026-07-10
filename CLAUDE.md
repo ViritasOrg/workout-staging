@@ -160,6 +160,16 @@ This is the single most common way the rule above gets bypassed — through inte
 - **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10): `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust; Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×, and the session-ceiling trim takes sets from non-compounds first
 - Squat and Deadlift are allocator-sized like any other exercise — no hardcoded set counts
 
+### Shoulder-injury programs include active cuff work (rule 2026-07-10)
+Rehab is active, not just avoidance. When `shoulders` is selected in the wizard Injuries
+step, the generator injects a rotator-cuff/scapular block — **Cable External Rotation
+(2×15) + Face Pulls (3×15), tag `rehab`** — at the end of up to 3 pressing days/week.
+- Injected exercises carry `prehab: true`: they keep the `rehab` tag inside non-rehab
+  programs (exempt from the rehab→volume normalization) and are exempt from allocator
+  resizing (fixed prescription)
+- `Cable External Rotation` is a first-class catalogue exercise (`EXERCISE_SPLITS`
+  shoulders:1); the dedicated rehab-shoulder pool opens its shoulder days with it
+
 ### Leg day rules — ALWAYS follow (rule replaced 2026-07-10)
 Every `Legs*` day is **EITHER** a Squat day **OR** a Deadlift day — never both in one
 session (systemic/CNS load management). Supersedes the earlier "Squat always first AND
