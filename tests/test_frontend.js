@@ -1802,8 +1802,10 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     src.includes('var _base=pool.length'));
   check('pool extension uses muscle-group conflict scoring to avoid consecutive same-group days',
     src.includes('function _mGroup(nm)') && src.includes('_cg===_pg?2:0'));
-  check('scaleSets applied to all exercises before slice',
-    src.includes('sets:scaleSets(ex.sets)'));
+  check('frequency-aware allocation present (session ceiling const)',
+    src.includes('SESSION_MUSCLE_CAP=10,SESSION_CEILING=25'));
+  check('strength/rehab keep linear scaleSets path',
+    src.includes('if(!_isFixedDL(ex))ex.sets=scaleSets(ex.sets)'));
   check('setsPerMuscle stored in generated program object',
     src.includes('setsPerMuscle:setsPerMuscle'));
   check('poolN clamped to min 3 max 6 for pool template selection',
@@ -1814,16 +1816,24 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   // Test _generateWorkoutProgram at runtime
   const m = src.match(/<script>([\s\S]*?)<\/script>/);
   if(m) {
-    const scriptSrc = m[1];
+    let scriptSrc = m[1];
+    // same const->var patches as the main sandbox so a partial load still defines the data consts
+    for (const c of ['EXERCISE_SPLITS','GROUP_COLORS','DAY_TEMPLATES','THEMES',"VERSION='",'AGENT_URL=','GOOGLE_CLIENT_ID='])
+      scriptSrc = scriptSrc.replace('const '+c, 'var '+c);
     const vm = require('vm');
+    const _mls = {_s:{},getItem(k){return this._s[k]!==undefined?this._s[k]:null;},setItem(k,v){this._s[k]=String(v);},removeItem(k){delete this._s[k];},key:()=>null,length:0};
+    const _mkEl = () => ({style:{},dataset:{},classList:{add:()=>{},remove:()=>{},contains:()=>false},appendChild:()=>{},children:[],querySelector:()=>null,querySelectorAll:()=>[],addEventListener:()=>{},value:'',textContent:'',innerHTML:''});
     const localSandbox = {
       console,
-      window:{},
-      document:{getElementById:()=>null,querySelector:()=>null,querySelectorAll:()=>[],body:{classList:{add:()=>{},remove:()=>{}}}},
-      localStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},
+      window:{localStorage:_mls,location:{pathname:'/workout-staging/'},addEventListener:()=>{},matchMedia:()=>({matches:false,addEventListener:()=>{}})},
+      document:{getElementById:()=>null,querySelector:()=>null,querySelectorAll:()=>[],createElement:_mkEl,addEventListener:()=>{},body:{classList:{add:()=>{},remove:()=>{}}},head:{appendChild:()=>{}},documentElement:{style:{setProperty:()=>{},getPropertyValue:()=>''}}},
+      localStorage:_mls,
       navigator:{},
-      fetch:()=>Promise.resolve(),
-      setTimeout:()=>{},clearTimeout:()=>{},
+      fetch:()=>Promise.resolve({ok:false,json:async()=>({})}),
+      setTimeout:()=>{},clearTimeout:()=>{},setInterval:()=>{},clearInterval:()=>{},
+      atob:(b)=>Buffer.from(b,'base64').toString('binary'),
+      AbortController: class { constructor(){this.signal={};} abort(){} },
+      Date, Math, JSON, Promise, Set, Map, Array, Object, Number, String, Boolean, Error, parseInt, parseFloat, isNaN,
       google:undefined
     };
     const ctx = vm.createContext(localSandbox);
@@ -2690,6 +2700,57 @@ console.log('\n── WPU body weight inclusion ──────────�
 check('WPU card shows BW chip in title', rawScript.includes('data-bw-chip'));
 check('BW chip refreshed after weight sync', rawScript.includes("querySelectorAll('[data-bw-chip]')"));
 check('custom-card WPU adds BW to session volume', rawScript.includes('_cbw=/weighted'));
+
+// ── Frequency-aware volume allocation ────────────────────────────────────────
+console.log('\n── Frequency-aware volume allocation ───────────────────────');
+{
+  const AG=['legs','back','chest','shoulders','arms'];
+  function allocStats(goal,sub,nd,spm){
+    const p=G._generateWorkoutProgram(goal,sub,nd,'T',spm);
+    const weekly={};AG.forEach(g=>weekly[g]=0);
+    const tots=[];let perSessionMax=0;
+    for(const d of p.days){
+      let t=0;const fs={};
+      for(const ex of d.exercises){const n=String(ex.sets).split('-').length;t+=n;const sp=G.getExSplits(ex.name);
+        AG.forEach(g=>{if(sp[g]){weekly[g]+=n*sp[g];fs[g]=(fs[g]||0)+n*sp[g];}});}
+      tots.push(t);AG.forEach(g=>{if((fs[g]||0)>perSessionMax)perSessionMax=fs[g];});
+    }
+    return {p,tots,weekly,perSessionMax};
+  }
+  // The reported bug: 7-day hypertrophy-upper at 21 sets/muscle produced 34-set sessions
+  const hi=allocStats('hypertrophy','upper',7,21);
+  check('hyp-upper 7d @21: every session ≤ 25 sets', hi.tots.every(t=>t<=25), JSON.stringify(hi.tots));
+  check('hyp-upper 7d @21: sessions not gutted (≥ 8 sets each)', hi.tots.every(t=>t>=8), JSON.stringify(hi.tots));
+  check('hyp-upper 7d @21: push/pull muscles near weekly target (0.6–1.35×)',
+    ['chest','shoulders','arms','back'].every(g=>hi.weekly[g]>=21*0.6&&hi.weekly[g]<=21*1.35),
+    JSON.stringify(hi.weekly));
+  check('per-session per-muscle load bounded (≤13 fractional sets)', hi.perSessionMax<=13, String(hi.perSessionMax));
+  // Volume responds monotonically to the setting
+  const lo=allocStats('hypertrophy','upper',7,9), mid=allocStats('hypertrophy','upper',7,15);
+  check('weekly volume monotone in setting (9 ≤ 15 ≤ 21 per group)',
+    AG.every(g=>lo.weekly[g]<=mid.weekly[g]+0.5&&mid.weekly[g]<=hi.weekly[g]+0.5),
+    JSON.stringify({lo:lo.weekly,mid:mid.weekly,hi:hi.weekly}));
+  // Session ceiling holds across hypertrophy/aesthetic configs
+  for(const [g2,s2,n2,v2] of [['hypertrophy','balanced',6,20],['hypertrophy','lower',5,15],['aesthetic','fullbody',5,15],['aesthetic','upperlower',4,16]]){
+    const st=allocStats(g2,s2,n2,v2);
+    check(`${g2}-${s2} ${n2}d @${v2}: sessions ≤ 25`, st.tots.every(t=>t<=25), JSON.stringify(st.tots));
+  }
+  // Leg-day rules survive allocation
+  const legs=hi.p.days.filter(d=>/legs/i.test(d.name));
+  check('allocation keeps Squat first on legs days', legs.every(d=>/squat/i.test(d.exercises[0].name)));
+  check('allocation keeps Deadlift 1×5-8 single set last', legs.every(d=>{const l=d.exercises[d.exercises.length-1];return l.name==='Deadlift'&&l.sets==='6'&&l.scheme==='1×5-8';}));
+  // Scheme prefix stays in sync with the resized set count
+  let schemeOk=true;
+  for(const d of hi.p.days)for(const ex of d.exercises){const n=String(ex.sets).split('-').length;const m=String(ex.scheme).match(/^(\d+)×/);if(m&&parseInt(m[1])!==n)schemeOk=false;}
+  check('scheme N× prefix matches resized set count', schemeOk);
+  // Strength and rehab keep their fixed schemes (linear scaling path)
+  const sp12=G._generateWorkoutProgram('strength','pure',3,'T',12);
+  check('strength-pure @12: Squat keeps its 5×5 scheme', sp12.days[0].exercises[0].sets==='5-5-5-5-5', sp12.days[0].exercises[0].sets);
+  const rk12=allocStats('rehab','knee',6,12), rk24=allocStats('rehab','knee',6,24);
+  check('rehab scales linearly (24 = 2× the sets of 12)', rk24.tots[0]===rk12.tots[0]*2, `${rk12.tots[0]} vs ${rk24.tots[0]}`);
+  // Wizard review shows the computed outcome
+  check('wizard review shows resulting session size', rawScript.includes('Resulting sessions:'));
+}
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
