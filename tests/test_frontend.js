@@ -2804,8 +2804,12 @@ console.log('\n── Injury substitutions (baked) ─────────�
   const allNames = (p) => p.days.flatMap(d => d.exercises.map(e => e.name));
   // Shoulders: no barbell/DB/smith presses anywhere; machine/landmine alternatives present
   const ps = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10, ['shoulders']);
-  const shoulderBad = allNames(ps).filter(n => /^(Bench Press|Incline Bench Press|Overhead Press|Push Press)$/i.test(n) || (/\b(barbell|dumbbell|\bdb\b|smith)\b/i.test(n) && /\bpress\b/i.test(n)));
+  const shoulderBad = allNames(ps).filter(n => /^(Bench Press|Incline Bench Press|Overhead Press|Push Press|Arnold Press)$/i.test(n) || (/\b(barbell|dumbbell|\bdb\b|smith)\b/i.test(n) && /\bpress\b/i.test(n)));
   check('shoulders injury: no aggravating presses in program', shoulderBad.length === 0, shoulderBad.join(', '));
+  // Arnold Press specifically (loaded internal rotation + elevation = impingement position)
+  const pArn = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T', 15, ['shoulders']);
+  check('shoulders injury: Arnold Press substituted out', !allNames(pArn).includes('Arnold Press'),
+    allNames(pArn).filter(n => /arnold/i.test(n)).join(', ') || 'clean');
   check('shoulders injury: machine/landmine subs present', allNames(ps).some(n => /Machine Press|Landmine Press/.test(n)));
   // Knees: no squats/lunges
   const pk = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10, ['knees']);
