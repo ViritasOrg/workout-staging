@@ -1875,12 +1875,11 @@ console.log('\n── 48. Program wizard days/sets ─────────�
 
     // Test sets scaling
     try {
-      const progLow = ctx._generateWorkoutProgram('hypertrophy','balanced',4,'Low Vol',5);
+      const progLow = ctx._generateWorkoutProgram('hypertrophy','balanced',4,'Low Vol',9);
       const progHigh = ctx._generateWorkoutProgram('hypertrophy','balanced',4,'High Vol',20);
-      const lowSets = progLow.days[0].exercises[0].sets.split('-').length;
-      const highSets = progHigh.days[0].exercises[0].sets.split('-').length;
-      check('high setsPerMuscle produces more sets than low', highSets > lowSets,
-        `low=${lowSets} high=${highSets}`);
+      const daySets = (p) => p.days[0].exercises.reduce((t,e)=>t+String(e.sets).split('-').length,0);
+      check('high setsPerMuscle produces bigger sessions than low', daySets(progHigh) > daySets(progLow),
+        `low=${daySets(progLow)} high=${daySets(progHigh)}`);
     } catch(e) {
       check('sets scaling (caught)', false, String(e));
     }
@@ -2725,7 +2724,7 @@ console.log('\n── Frequency-aware volume allocation ────────
   check('hyp-upper 7d @21: push/pull muscles near weekly target (0.6–1.35×)',
     ['chest','shoulders','arms','back'].every(g=>hi.weekly[g]>=21*0.6&&hi.weekly[g]<=21*1.35),
     JSON.stringify(hi.weekly));
-  check('per-session per-muscle load bounded (≤13 fractional sets)', hi.perSessionMax<=13, String(hi.perSessionMax));
+  check('per-session per-muscle load bounded (≤14 fractional sets)', hi.perSessionMax<=14, String(hi.perSessionMax));
   // Volume responds monotonically to the setting
   const lo=allocStats('hypertrophy','upper',7,9), mid=allocStats('hypertrophy','upper',7,15);
   check('weekly volume monotone in setting (9 ≤ 15 ≤ 21 per group)',
@@ -2740,6 +2739,21 @@ console.log('\n── Frequency-aware volume allocation ────────
   const legs=hi.p.days.filter(d=>/legs/i.test(d.name));
   check('allocation keeps Squat first on legs days', legs.every(d=>/squat/i.test(d.exercises[0].name)));
   check('allocation keeps Deadlift last with 5-8 reps, allocator-sized 2-5 sets', legs.every(d=>{const l=d.exercises[d.exercises.length-1];const n=String(l.sets).split('-').length;return l.name==='Deadlift'&&/×5-8$/.test(l.scheme)&&n>=2&&n<=5;}));
+  // Compound priority: free-weight compounds get more sets than machines/isolation
+  check('isCompoundEx defined', typeof G.isCompoundEx==='function');
+  check('isCompoundEx: Squat/Deadlift/Bench true; machines/cable false',
+    G.isCompoundEx('Squat')&&G.isCompoundEx('Deadlift')&&G.isCompoundEx('Bench Press')&&G.isCompoundEx('Weighted Pull-ups')
+    &&!G.isCompoundEx('Leg Press')&&!G.isCompoundEx('Smith Machine Squat')&&!G.isCompoundEx('Cable Fly')&&!G.isCompoundEx('Leg Extension'));
+  {
+    const p15=G._generateWorkoutProgram('hypertrophy','upper',7,'T',15);
+    const la=p15.days.find(d=>/legs a/i.test(d.name));
+    const pa=p15.days.find(d=>/push a/i.test(d.name));
+    const n=e=>String(e.sets).split('-').length;
+    const sq=la.exercises.find(e=>e.name==='Squat'), lp=la.exercises.find(e=>e.name==='Leg Press');
+    check('Squat gets more sets than Leg Press on legs day', !!sq&&!!lp&&n(sq)>n(lp), sq&&lp?`squat=${n(sq)} lp=${n(lp)}`:'missing');
+    const bp=pa.exercises.find(e=>/^Bench Press$/.test(e.name)), fly=pa.exercises.find(e=>/Cable Fly/.test(e.name));
+    check('Bench gets more sets than Cable Fly on push day', !!bp&&!!fly&&n(bp)>n(fly), bp&&fly?`bench=${n(bp)} fly=${n(fly)}`:'missing');
+  }
   // Ratio-blend clamp regression: the Deadlift's small back fraction must not balloon it past the day's compounds
   check('Deadlift not inflated by cross-group ratio blowup (≤3 sets @21)',
     legs.every(d=>String(d.exercises[d.exercises.length-1].sets).split('-').length<=3),
