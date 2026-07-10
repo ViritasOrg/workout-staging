@@ -2074,11 +2074,11 @@ console.log('\n── 48. Program wizard days/sets ─────────�
         check('wizard hypertrophy-upper 7-day Legs A: no Bulgarian Split Squat',
           legsADay && legsADay.exercises && !legsADay.exercises.some(e => e.name === 'Bulgarian Split Squat'),
           'Bulgarian Split Squat found in Legs A');
-        // Legs B (day 6): Squat first, no Hip Thrust, Deadlift last
+        // Legs B (day 6): Deadlift day — no squat variants, Deadlift last (rule 2026-07-10)
         const legsBDay = prog7b.days[5];
-        check('wizard hypertrophy-upper 7-day Legs B: first exercise is Squat',
-          legsBDay && legsBDay.exercises && legsBDay.exercises[0] && legsBDay.exercises[0].name === 'Squat',
-          `first ex: ${legsBDay && legsBDay.exercises && legsBDay.exercises[0] && legsBDay.exercises[0].name}`);
+        check('wizard hypertrophy-upper 7-day Legs B: Deadlift day (no squats)',
+          legsBDay && legsBDay.exercises && !legsBDay.exercises.some(e => /squat/i.test(e.name) && !/split/i.test(e.name)),
+          `exs: ${legsBDay && legsBDay.exercises && legsBDay.exercises.map(e=>e.name).join(',')}`);
         check('wizard hypertrophy-upper 7-day Legs B: no Hip Thrust',
           legsBDay && legsBDay.exercises && !legsBDay.exercises.some(e => e.name === 'Hip Thrust'),
           'Hip Thrust found in Legs B');
@@ -2622,29 +2622,35 @@ console.log('\n── Leg-day rules in generated programs ───────�
       if (!/legs/i.test(day.name)) continue;
       checkedDays++;
       const exs = day.exercises;
-      if (!/squat/i.test(exs[0].name)) { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: first is ${exs[0].name}`); }
-      const last = exs[exs.length - 1];
-      if (last.name !== 'Deadlift') { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: last is ${last.name}`); }
-      else if (!/×5-8$/.test(last.scheme)) { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: deadlift ${last.scheme}/${last.sets}`); }
+      const isSq = (e) => /squat/i.test(e.name) && !/split/i.test(e.name);
+      const hasSq = exs.some(isSq), hasDL = exs.some(e => e.name === 'Deadlift');
+      const squatDay = hasSq && !hasDL && isSq(exs[0]);
+      const dlDay = hasDL && !hasSq && exs[exs.length - 1].name === 'Deadlift' && /×5-8$/.test(exs[exs.length - 1].scheme);
+      if (!(squatDay || dlDay)) { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: sq=${hasSq} dl=${hasDL} first=${exs[0].name} last=${exs[exs.length-1].name}`); }
     }
   }
   check('leg days found across hypertrophy programs', checkedDays >= 6, `got ${checkedDays}`);
-  check('every Legs day: Squat first, Deadlift (5-8 reps) last', allOk, details.join('; '));
+  check('every Legs day is EITHER a Squat day OR a Deadlift day', allOk, details.join('; '));
   // 7-day hypertrophy-upper specifically (the reported bug): Legs A must end with Deadlift
   const p7 = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T7', 12);
   const legsA = p7.days.find(d => /legs a/i.test(d.name));
   check('7-day hyp-upper Legs A exists', !!legsA);
-  check('7-day hyp-upper Legs A ends with Deadlift, 5-8 rep scheme',
-    !!legsA && legsA.exercises[legsA.exercises.length - 1].name === 'Deadlift'
-            && /×5-8$/.test(legsA.exercises[legsA.exercises.length - 1].scheme),
-    legsA ? JSON.stringify(legsA.exercises[legsA.exercises.length - 1]) : 'no Legs A');
-  // Deadlift is allocator-sized like any other exercise (rule 2026-07-10): 2-5 sets, scheme in sync
+  check('7-day hyp-upper Legs A is a Squat day (squat first, no Deadlift)',
+    !!legsA && /squat/i.test(legsA.exercises[0].name)
+            && !legsA.exercises.some(e => e.name === 'Deadlift'),
+    legsA ? JSON.stringify(legsA.exercises.map(e => e.name)) : 'no Legs A');
+  const legsB7 = p7.days.find(d => /legs b/i.test(d.name));
+  check('7-day hyp-upper Legs B is a Deadlift day (deadlift last, no squats)',
+    !!legsB7 && legsB7.exercises[legsB7.exercises.length - 1].name === 'Deadlift'
+             && !legsB7.exercises.some(e => /squat/i.test(e.name) && !/split/i.test(e.name)),
+    legsB7 ? JSON.stringify(legsB7.exercises.map(e => e.name)) : 'no Legs B');
+  // Deadlift is allocator-sized (2-5 sets, scheme in sync) on Deadlift days
   const p16 = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T16', 16);
-  const legs16 = p16.days.filter(d => /legs/i.test(d.name));
+  const dlDays16 = p16.days.filter(d => /legs/i.test(d.name) && d.exercises.some(e => e.name === 'Deadlift'));
   check('setsPerMuscle=16: Deadlift allocator-sized (2-5 sets, scheme matches)',
-    legs16.every(d => { const l = d.exercises[d.exercises.length - 1]; const n = String(l.sets).split('-').length;
+    dlDays16.length > 0 && dlDays16.every(d => { const l = d.exercises[d.exercises.length - 1]; const n = String(l.sets).split('-').length;
       return l.name === 'Deadlift' && n >= 2 && n <= 5 && String(l.scheme).startsWith(n + '×5-8'); }),
-    JSON.stringify(legs16.map(d => d.exercises[d.exercises.length - 1].sets)));
+    JSON.stringify(dlDays16.map(d => d.exercises[d.exercises.length - 1].sets)));
   // Rehab programs are untouched (no heavy deadlift forced into rehab days)
   const pk = G._generateWorkoutProgram('rehab', 'knee', 6, 'TK', 12);
   check('rehab-knee program has no forced Deadlift finishers',
@@ -2665,11 +2671,9 @@ console.log('\n── Leg-day rules on stored programs ────────�
   G.initPrograms();
   const p = G.getActiveProgram();
   const day = p.days.find(d => /legs/i.test(d.name));
-  check('stored program: Squat moved to first',   !!day && day.exercises[0].name === 'Squat', day ? day.exercises[0].name : 'no legs day');
-  check('stored program: Deadlift appended last', !!day && day.exercises[day.exercises.length - 1].name === 'Deadlift');
-  check('stored program: appended Deadlift is 1×5-8 single set',
-    !!day && day.exercises[day.exercises.length - 1].sets === '6'
-          && day.exercises[day.exercises.length - 1].scheme === '1×5-8');
+  check('stored program: first legs day is a Squat day (Squat moved first)', !!day && day.exercises[0].name === 'Squat', day ? day.exercises[0].name : 'no legs day');
+  check('stored program: Squat day has NO Deadlift', !!day && !day.exercises.some(e => e.name === 'Deadlift'),
+    day ? JSON.stringify(day.exercises.map(e => e.name)) : 'no legs day');
   // restore prior state
   if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
   else G.localStorage.setItem('workout_programs', savedPrograms);
@@ -2737,8 +2741,12 @@ console.log('\n── Frequency-aware volume allocation ────────
   }
   // Leg-day rules survive allocation
   const legs=hi.p.days.filter(d=>/legs/i.test(d.name));
-  check('allocation keeps Squat first on legs days', legs.every(d=>/squat/i.test(d.exercises[0].name)));
-  check('allocation keeps Deadlift last with 5-8 reps, allocator-sized 2-5 sets', legs.every(d=>{const l=d.exercises[d.exercises.length-1];const n=String(l.sets).split('-').length;return l.name==='Deadlift'&&/×5-8$/.test(l.scheme)&&n>=2&&n<=5;}));
+  const isSqA=(e)=>/squat/i.test(e.name)&&!/split/i.test(e.name);
+  check('allocation keeps every legs day either Squat day or Deadlift day',
+    legs.every(d=>{const hasSq=d.exercises.some(isSqA);const hasDL=d.exercises.some(e=>e.name==='Deadlift');
+      return (hasSq&&!hasDL&&isSqA(d.exercises[0]))||(hasDL&&!hasSq&&d.exercises[d.exercises.length-1].name==='Deadlift');}));
+  check('program with 2+ legs days has BOTH a Squat day and a Deadlift day',
+    legs.length<2||(legs.some(d=>d.exercises.some(isSqA))&&legs.some(d=>d.exercises.some(e=>e.name==='Deadlift'))));
   // Compound priority: free-weight compounds get more sets than machines/isolation
   check('isCompoundEx defined', typeof G.isCompoundEx==='function');
   check('isCompoundEx: Squat/Deadlift/Bench true; machines/cable false',
@@ -2756,7 +2764,7 @@ console.log('\n── Frequency-aware volume allocation ────────
   }
   // Ratio-blend clamp regression: the Deadlift's small back fraction must not balloon it past the day's compounds
   check('Deadlift not inflated by cross-group ratio blowup (≤3 sets @21)',
-    legs.every(d=>String(d.exercises[d.exercises.length-1].sets).split('-').length<=3),
+    legs.filter(d=>d.exercises.some(e=>e.name==='Deadlift')).every(d=>String(d.exercises[d.exercises.length-1].sets).split('-').length<=3),
     JSON.stringify(legs.map(d=>d.exercises[d.exercises.length-1].sets)));
   // Scheme prefix stays in sync with the resized set count
   let schemeOk=true;

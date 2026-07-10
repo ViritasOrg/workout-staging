@@ -160,13 +160,17 @@ This is the single most common way the rule above gets bypassed — through inte
 - **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10): `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust; Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×, and the session-ceiling trim takes sets from non-compounds first
 - Squat and Deadlift are allocator-sized like any other exercise — no hardcoded set counts
 
-### Leg day exercise ordering rules — ALWAYS follow
-1. **Squat ALWAYS comes first** in every leg day, no exceptions
-2. **Deadlift (conventional) must be INCLUDED in every leg day variation** (rule strengthened 2026-07-08 — previously only "when included"):
-   - 5–8 reps target
-   - ALWAYS the last exercise of the day
-   - **Set count is NOT hardcoded** (rule changed 2026-07-10 — previously "ONE heavy set only"): in generated hypertrophy/aesthetic programs the frequency-aware volume allocator sizes Squat and Deadlift like any other exercise. Stored-program normalization (`_ensurePrograms`) only enforces presence + last position; a missing Deadlift is appended as 1×5-8.
-   - Enforced programmatically for generated programs (`_generateWorkoutProgram`) and stored hypertrophy programs (`_ensurePrograms`) on days named `Legs*`
+### Leg day rules — ALWAYS follow (rule replaced 2026-07-10)
+Every `Legs*` day is **EITHER** a Squat day **OR** a Deadlift day — never both in one
+session (systemic/CNS load management). Supersedes the earlier "Squat always first AND
+Deadlift always last in every leg day" rule.
+- **Squat day**: Squat is the first exercise; contains NO conventional Deadlift
+- **Deadlift day**: Deadlift is the last exercise (5–8 reps); contains NO squat variants
+  (matcher: `/squat/i` excluding `split`)
+- Leg days alternate between the two types, starting with a Squat day
+- Set counts come from the volume allocator — never hardcoded (2026-07-10)
+- Enforced programmatically for generated programs (`_generateWorkoutProgram`) and stored
+  hypertrophy programs (`_ensurePrograms`) on days named `Legs*`
 
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
