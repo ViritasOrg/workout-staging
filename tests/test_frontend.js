@@ -1909,9 +1909,9 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     // prefillLog renders exactly the number of sets the program specifies (no cap)
     try {
       check('prefillLog uses ex.sets.split without artificial slice cap',
-        src.includes("ex.sets.split('-')") && !src.includes("ex.sets.split('-').slice(0,5)"));
-      check('prefillLog label shows raw ex.sets (label matches stored program)',
-        src.includes("margin-top:2px\">'+ex.sets+'</div>"));
+        src.includes("(_deloadActive?_deloadSets(ex.sets):ex.sets).split('-')") && !src.includes("ex.sets.split('-').slice(0,5)"));
+      check('prefillLog label shows program sets (deloaded when active, else raw ex.sets)',
+        src.includes("margin-top:2px\">'+(_deloadActive?_deloadSets(ex.sets):ex.sets)+'</div>"));
     } catch(e) {
       check('prefillLog no-cap invariant (caught)', false, String(e));
     }
@@ -2372,7 +2372,7 @@ console.log('\n── prefillLog — WPU / reps / scheme label ─────�
   check('prefillLog: scheme label uses var(--accent)',
     fn.includes('color:var(--accent)') && fn.includes("margin-top:2px"));
   check('prefillLog: scheme label shows sets only (no weight)',
-    fn.includes(">\'+ex.sets+\'</div>") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
+    fn.includes(">'+(_deloadActive?_deloadSets(ex.sets):ex.sets)+'</div>") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
   check('prefillLog: exercise name is heading above scheme label (not same line)',
     fn.includes('margin-bottom:10px') && fn.includes("margin-top:2px"));
   // Regression: must NOT still use the old muted/11px combo for the scheme label
@@ -2934,6 +2934,33 @@ check('editing preserves original timing (no wipe)',
 check('start time captured when first set logged', /_hasReps&&!_logStartedAt\)_logStartedAt=new Date/.test(rawScript));
 check('duration shown in History list', /l\.duration_min!=null\?' · ⏱ '\+_fmtDur\(l\.duration_min\)/.test(rawScript));
 check('duration shown in session detail', /log\.duration_min!=null\)parts\.push\('⏱ '\+_fmtDur\(log\.duration_min\)\)/.test(rawScript));
+
+// ── Deload toggle ─────────────────────────────────────────────────────────────
+console.log('\n── Deload toggle ──────────────────────────────────────────');
+check('_deloadSets halves set count', G._deloadSets('8-8-8-8') === '8-8', `got "${G._deloadSets('8-8-8-8')}"`);
+check('_deloadSets rounds up odd counts', G._deloadSets('5-5-5-5-5') === '5-5-5', `got "${G._deloadSets('5-5-5-5-5')}"`);
+check('_deloadSets keeps a single set', G._deloadSets('12') === '12', `got "${G._deloadSets('12')}"`);
+check('_deloadScheme "5×5" → "3×5"',    G._deloadScheme('5×5') === '3×5', `got "${G._deloadScheme('5×5')}"`);
+check('_deloadScheme "4×8-12" → "2×8-12"', G._deloadScheme('4×8-12') === '2×8-12', `got "${G._deloadScheme('4×8-12')}"`);
+check('_deloadScheme "3×max" → "2×max"', G._deloadScheme('3×max') === '2×max', `got "${G._deloadScheme('3×max')}"`);
+check('_deloadKg scales to ~65% (100→65)', G._deloadKg(100) === 65, `got ${G._deloadKg(100)}`);
+check('_deloadKg scales to ~65% (80→52)',  G._deloadKg(80) === 52, `got ${G._deloadKg(80)}`);
+check('_deloadKg leaves 0 alone (bodyweight)', G._deloadKg(0) === 0, `got ${G._deloadKg(0)}`);
+{
+  const _savedD = G._deloadActive;
+  G._deloadActive = false;
+  G.toggleDeload();
+  check('toggleDeload turns deload on', G._deloadActive === true);
+  G.toggleDeload();
+  check('toggleDeload turns deload off', G._deloadActive === false);
+  G._deloadActive = _savedD;
+}
+check('deload persisted via settings push', /pushSettingsToAgent\(\{'wkt-deload':_deloadActive\}\)/.test(rawScript));
+check('deload restored from backend settings', /s\['wkt-deload'\]!==undefined/.test(rawScript));
+check('log form uses deloaded set count', /_deloadActive\?_deloadSets\(ex\.sets\):ex\.sets/.test(rawScript));
+check('log form scales prefilled load', /_deloadActive&&!isBodyweight&&lastKg>0\)lastKg=_deloadKg/.test(rawScript));
+check('program view shows deload banner + scaled scheme',
+  /_deloadBannerHtml\(\)/.test(rawScript) && /_deloadActive\?_deloadScheme\(ex\.scheme\)/.test(rawScript));
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
