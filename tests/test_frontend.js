@@ -61,6 +61,8 @@ check('pin-screen markup removed',          !html.includes('id="pin-screen"'));
 const patched = rawScript
   .replace('const EXERCISE_SPLITS=', 'var EXERCISE_SPLITS=')
   .replace('const GROUP_COLORS=',    'var GROUP_COLORS=')
+  .replace('const EX_OPTS_HTML=',    'var EX_OPTS_HTML=')
+  .replace('const DAYS=',            'var DAYS=')
   .replace('const DAY_TEMPLATES=',   'var DAY_TEMPLATES=')
   .replace('const THEMES=',          'var THEMES=')
   .replace("const VERSION='",        "var VERSION='")
@@ -2873,6 +2875,46 @@ console.log('\n── Rotator cuff prehab (shoulders injury) ──────�
   if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
   else G.localStorage.setItem('workout_programs', savedPrograms);
   G.initPrograms();
+}
+
+// ── Low-to-high Cable Fly (PR: chest-day addition) ────────────────────────────
+console.log('\n── Low-to-high Cable Fly ──────────────────────────────────');
+check('catalogue EX_OPTS_HTML lists Low-to-high Cable Fly',
+  typeof G.EX_OPTS_HTML === 'string' && G.EX_OPTS_HTML.includes('Low-to-high Cable Fly'));
+const _lfSplits = G.getExSplits('Low-to-high Cable Fly');
+check('Low-to-high Cable Fly is chest-dominant (chest=0.85)', _lfSplits.chest === 0.85, `got ${_lfSplits.chest}`);
+check('Low-to-high Cable Fly counts as a cable exercise', G.isCableEx('Low-to-high Cable Fly'));
+const _hypSeed = G._seedHypertrophyProgram();
+check('hypertrophy seed has Low-to-high Cable Fly on a push day',
+  _hypSeed.days.some(d => /push/i.test(d.name) && d.exercises.some(e => e.name === 'Low-to-high Cable Fly')));
+check('5-Day Split seed Day 3 (Push) has Low-to-high Cable Fly',
+  G.DAYS[3].exercises.some(e => e.name === 'Low-to-high Cable Fly'));
+{
+  const _savedProgs = G._programs, _savedIdx = G._activeProgramIndex, _savedMig = G._lowflyMigrated;
+  // Existing program with a chest (Push) day and a non-chest (Pull) day
+  G._programs = [{ name: 'TestAes', goal: 'aesthetic', days: [
+    { name: 'Day 1 — Push', warmup: false, exercises: [{ name: 'Bench Press', scheme: '4×8', tag: 'volume', sets: '8-8-8-8', kg: 80 }] },
+    { name: 'Day 2 — Pull', warmup: false, exercises: [{ name: 'Barbell Row', scheme: '4×8', tag: 'volume', sets: '8-8-8-8', kg: 80 }] } ] }];
+  G._activeProgramIndex = 0;
+  G._lowflyMigrated = false;
+  G._ensurePrograms();
+  const _aes = G._programs.find(p => p.name === 'TestAes');
+  const _push = _aes.days.find(d => d.name === 'Day 1 — Push');
+  const _pull = _aes.days.find(d => d.name === 'Day 2 — Pull');
+  check('migration adds Low-to-high Cable Fly to a chest (Push) day',
+    _push.exercises.some(e => e.name === 'Low-to-high Cable Fly'));
+  check('migration inserts it after the chest exercise',
+    _push.exercises[_push.exercises.length - 1].name === 'Low-to-high Cable Fly');
+  check('migration does NOT add it to a non-chest (Pull) day',
+    !_pull.exercises.some(e => e.name === 'Low-to-high Cable Fly'));
+  check('migration sets the one-time flag', G._lowflyMigrated === true);
+  // Idempotent: re-running with the flag cleared must not duplicate on a day that already has it
+  G._lowflyMigrated = false;
+  G._ensurePrograms();
+  const _push2 = G._programs.find(p => p.name === 'TestAes').days.find(d => d.name === 'Day 1 — Push');
+  check('migration is idempotent (no duplicate Low-to-high Cable Fly)',
+    _push2.exercises.filter(e => e.name === 'Low-to-high Cable Fly').length === 1);
+  G._programs = _savedProgs; G._activeProgramIndex = _savedIdx; G._lowflyMigrated = _savedMig;
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
