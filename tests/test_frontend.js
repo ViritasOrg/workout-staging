@@ -2917,6 +2917,24 @@ check('5-Day Split seed Day 3 (Push) has Low-to-high Cable Fly',
   G._programs = _savedProgs; G._activeProgramIndex = _savedIdx; G._lowflyMigrated = _savedMig;
 }
 
+// ── Workout duration (start on first set, end on save) ────────────────────────
+console.log('\n── Workout duration ───────────────────────────────────────');
+check('_fmtDur defined', typeof G._fmtDur === 'function');
+check('_fmtDur(42) → "0:42"',  G._fmtDur(42) === '0:42',  `got "${G._fmtDur(42)}"`);
+check('_fmtDur(65) → "1:05"',  G._fmtDur(65) === '1:05',  `got "${G._fmtDur(65)}"`);
+check('_fmtDur(125) → "2:05"', G._fmtDur(125) === '2:05', `got "${G._fmtDur(125)}"`);
+check('_fmtDur(0) → "0:00"',   G._fmtDur(0) === '0:00',   `got "${G._fmtDur(0)}"`);
+check('_fmtDur(null) → ""',    G._fmtDur(null) === '',    `got "${G._fmtDur(null)}"`);
+check('saveLog records started_at/ended_at/duration_min',
+  /_timing\.started_at=_logStartedAt/.test(rawScript) &&
+  /_timing\.duration_min=Math\.max\(0,Math\.round\(/.test(rawScript));
+check('duration_min spread into the saved log', /id:editId\|\|Date\.now\(\),\.\.\._timing\}/.test(rawScript));
+check('editing preserves original timing (no wipe)',
+  /if\(editId\)\{var _origT=logs\.find/.test(rawScript));
+check('start time captured when first set logged', /_hasReps&&!_logStartedAt\)_logStartedAt=new Date/.test(rawScript));
+check('duration shown in History list', /l\.duration_min!=null\?' · ⏱ '\+_fmtDur\(l\.duration_min\)/.test(rawScript));
+check('duration shown in session detail', /log\.duration_min!=null\)parts\.push\('⏱ '\+_fmtDur\(log\.duration_min\)\)/.test(rawScript));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
