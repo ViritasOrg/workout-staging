@@ -2877,45 +2877,32 @@ console.log('\n── Rotator cuff prehab (shoulders injury) ──────�
   G.initPrograms();
 }
 
-// ── Low-to-high Cable Fly (PR: chest-day addition) ────────────────────────────
+// ── Low-to-high Cable Fly (6-day hypertrophy generator only) ──────────────────
 console.log('\n── Low-to-high Cable Fly ──────────────────────────────────');
 check('catalogue EX_OPTS_HTML lists Low-to-high Cable Fly',
   typeof G.EX_OPTS_HTML === 'string' && G.EX_OPTS_HTML.includes('Low-to-high Cable Fly'));
 const _lfSplits = G.getExSplits('Low-to-high Cable Fly');
 check('Low-to-high Cable Fly is chest-dominant (chest=0.85)', _lfSplits.chest === 0.85, `got ${_lfSplits.chest}`);
 check('Low-to-high Cable Fly counts as a cable exercise', G.isCableEx('Low-to-high Cable Fly'));
-const _hypSeed = G._seedHypertrophyProgram();
-check('hypertrophy seed has Low-to-high Cable Fly on a push day',
-  _hypSeed.days.some(d => /push/i.test(d.name) && d.exercises.some(e => e.name === 'Low-to-high Cable Fly')));
-check('5-Day Split seed Day 3 (Push) has Low-to-high Cable Fly',
-  G.DAYS[3].exercises.some(e => e.name === 'Low-to-high Cable Fly'));
-{
-  const _savedProgs = G._programs, _savedIdx = G._activeProgramIndex, _savedMig = G._lowflyMigrated;
-  // Existing program with a chest (Push) day and a non-chest (Pull) day
-  G._programs = [{ name: 'TestAes', goal: 'aesthetic', days: [
-    { name: 'Day 1 — Push', warmup: false, exercises: [{ name: 'Bench Press', scheme: '4×8', tag: 'volume', sets: '8-8-8-8', kg: 80 }] },
-    { name: 'Day 2 — Pull', warmup: false, exercises: [{ name: 'Barbell Row', scheme: '4×8', tag: 'volume', sets: '8-8-8-8', kg: 80 }] } ] }];
-  G._activeProgramIndex = 0;
-  G._lowflyMigrated = false;
-  G._ensurePrograms();
-  const _aes = G._programs.find(p => p.name === 'TestAes');
-  const _push = _aes.days.find(d => d.name === 'Day 1 — Push');
-  const _pull = _aes.days.find(d => d.name === 'Day 2 — Pull');
-  check('migration adds Low-to-high Cable Fly to a chest (Push) day',
-    _push.exercises.some(e => e.name === 'Low-to-high Cable Fly'));
-  check('migration inserts it after the chest exercise',
-    _push.exercises[_push.exercises.length - 1].name === 'Low-to-high Cable Fly');
-  check('migration does NOT add it to a non-chest (Pull) day',
-    !_pull.exercises.some(e => e.name === 'Low-to-high Cable Fly'));
-  check('migration sets the one-time flag', G._lowflyMigrated === true);
-  // Idempotent: re-running with the flag cleared must not duplicate on a day that already has it
-  G._lowflyMigrated = false;
-  G._ensurePrograms();
-  const _push2 = G._programs.find(p => p.name === 'TestAes').days.find(d => d.name === 'Day 1 — Push');
-  check('migration is idempotent (no duplicate Low-to-high Cable Fly)',
-    _push2.exercises.filter(e => e.name === 'Low-to-high Cable Fly').length === 1);
-  G._programs = _savedProgs; G._activeProgramIndex = _savedIdx; G._lowflyMigrated = _savedMig;
-}
+const _flyDays = p => p.days.filter(d => d.exercises.some(e => e.name === 'Low-to-high Cable Fly')).length;
+// 6-day hypertrophy generator — fly on exactly one day in each hypertrophy sub-goal
+const _gbal6 = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'X', 12, []);
+check('hypertrophy-balanced 6-day: Low-to-high Cable Fly on exactly one day', _flyDays(_gbal6) === 1, `got ${_flyDays(_gbal6)}`);
+const _gup6 = G._generateWorkoutProgram('hypertrophy', 'upper', 6, 'X', 12, []);
+check('hypertrophy-upper 6-day: Low-to-high Cable Fly on exactly one day', _flyDays(_gup6) === 1, `got ${_flyDays(_gup6)}`);
+// It's the Push day it lands on
+check('hypertrophy-balanced 6-day: fly is on a Push day',
+  _gbal6.days.some(d => /push/i.test(d.name) && d.exercises.some(e => e.name === 'Low-to-high Cable Fly')));
+// Not in the 5-day generator (6-day only)
+const _gbal5 = G._generateWorkoutProgram('hypertrophy', 'balanced', 5, 'X', 12, []);
+check('hypertrophy 5-day generator does NOT include the fly', _flyDays(_gbal5) === 0, `got ${_flyDays(_gbal5)}`);
+// Reverted: never edits existing programs, and not scattered into seeds
+check('_ensurePrograms does NOT add the fly to existing programs',
+  !/Low-to-high Cable Fly/.test(G._ensurePrograms.toString()));
+check('hypertrophy seed does NOT contain the fly',
+  !G._seedHypertrophyProgram().days.some(d => d.exercises.some(e => e.name === 'Low-to-high Cable Fly')));
+check('5-Day Split seed Day 3 does NOT contain the fly',
+  !G.DAYS[3].exercises.some(e => e.name === 'Low-to-high Cable Fly'));
 
 // ── Workout duration (start on first set, end on save) ────────────────────────
 console.log('\n── Workout duration ───────────────────────────────────────');

@@ -182,6 +182,23 @@ Deadlift always last in every leg day" rule.
 - Enforced programmatically for generated programs (`_generateWorkoutProgram`) and stored
   hypertrophy programs (`_ensurePrograms`) on days named `Legs*`
 
+### NEVER edit existing (stored) programs unless Henrik explicitly asks (rule 2026-07-15)
+Henrik's saved programs are his own. **Do NOT mutate existing stored programs** — no
+migrations in `_ensurePrograms`, no "repair" helpers, no bulk edits — unless Henrik
+asks for that specific change in that conversation turn.
+- Adding/removing an exercise, changing sets/schemes, reordering, etc. on **already-saved
+  programs** requires an explicit request.
+- New exercises or template changes go into the **seed templates and/or the
+  `_generateWorkoutProgram` generator** (which only affect newly created/generated
+  programs), never into a migration that rewrites existing `_programs`.
+- **What triggered this (2026-07-15):** a one-time `_ensurePrograms` migration added
+  "Low-to-high Cable Fly" to every chest day of every existing program. Henrik had not
+  asked for existing programs to change — he wanted the exercise in one day of the 6-day
+  generator only. The migration was reverted.
+- Note: once such a migration has already run on live data, removing the migration code
+  does **not** undo what it added to stored programs — and undoing that is itself an edit
+  to existing programs, so it also requires an explicit ask.
+
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 
