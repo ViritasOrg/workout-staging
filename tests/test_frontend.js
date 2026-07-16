@@ -2996,6 +2996,51 @@ console.log('\n── Barbell rounding & units ───────────
   check('drafts record unit; restore guarded',   rawScript.includes('unit:unitLabel()') && rawScript.includes("(d.unit||'kg')!==unitLabel())return;"));
 }
 
+// ── Injury interplay regressions (Legs A shoulder work / squat re-added) ─────
+console.log('\n── Injury interplay regressions ────────────────────────────');
+{
+  const isSqN = (n) => /squat/i.test(n) && !/split/i.test(n);
+  // Bug A: knee injury turns squats into Leg Press, which matched the /press/i "pressing day"
+  // check and pulled the shoulder cuff block onto leg days
+  const p = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10, ['knees', 'shoulders']);
+  const legDays = p.days.filter(d => /legs/i.test(d.name));
+  check('knee+shoulder program: leg days exist', legDays.length >= 1);
+  check('leg days get NO shoulder cuff block', legDays.every(d => !d.exercises.some(e => /external rotation|face pull/i.test(e.name))),
+    JSON.stringify(legDays.map(d => d.exercises.map(e => e.name))));
+  check('cuff block still lands on upper pressing days',
+    p.days.some(d => !/legs/i.test(d.name) && d.exercises.some(e => e.name === 'Cable External Rotation')));
+  check('knee injury: no squats anywhere', p.days.every(d => !d.exercises.some(e => isSqN(e.name))));
+  check('generated program records its injuries', JSON.stringify(p.injuries) === JSON.stringify(['knees', 'shoulders']));
+  // Bug B: _ensurePrograms re-added Squat to knee-safe stored programs on every load
+  const savedPrograms = G.localStorage.getItem('workout_programs');
+  p.name = '6-Day Hypertrophy — Upper';
+  G.localStorage.setItem('workout_programs', JSON.stringify({ programs: [p], active_index: 0 }));
+  G.initPrograms();
+  const stored = G.getActiveProgram();
+  check('stored knee-safe program: Squat NOT re-added on load',
+    stored.days.every(d => !d.exercises.some(e => isSqN(e.name))),
+    JSON.stringify(stored.days.filter(d => /legs/i.test(d.name)).map(d => d.exercises.map(e => e.name))));
+  // lower_back analog: Deadlift not re-appended
+  const pb = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10, ['lower_back']);
+  pb.name = '6-Day Hypertrophy — Upper';
+  G.localStorage.setItem('workout_programs', JSON.stringify({ programs: [pb], active_index: 0 }));
+  G.initPrograms();
+  check('stored lower-back-safe program: Deadlift NOT re-appended on load',
+    G.getActiveProgram().days.every(d => !d.exercises.some(e => e.name === 'Deadlift')));
+  // programs WITHOUT injuries still get the leg-day rules on load (regression)
+  G.localStorage.setItem('workout_programs', JSON.stringify({ programs: [
+    { name: '6-Day Hypertrophy — Upper', goal: 'hypertrophy', days: [
+      { name: 'Day 1 — Legs A', warmup: false, exercises: [
+        { name: 'Leg Press', scheme: '3×12', tag: 'volume', sets: '12-12-12', kg: 100 } ] } ] }
+  ], active_index: 0 }));
+  G.initPrograms();
+  check('no-injury stored program still gets Squat added to its Squat day',
+    G.getActiveProgram().days[0].exercises.some(e => isSqN(e.name)));
+  if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
+  else G.localStorage.setItem('workout_programs', savedPrograms);
+  G.initPrograms();
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);

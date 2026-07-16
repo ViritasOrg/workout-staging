@@ -536,11 +536,11 @@ function _ensurePrograms(){
     if(li++%2===0){
       for(var r1=exs.length-1;r1>=0;r1--){if(exs[r1].name==='Deadlift'){exs.splice(r1,1);changed=true;}}
       var si=-1;for(var i=0;i<exs.length;i++){if(isSq(exs[i])){si=i;break;}}
-      if(si>0){exs.unshift(exs.splice(si,1)[0]);changed=true;}else if(si<0){exs.unshift({name:'Squat',scheme:'4×8-12',tag:'strength',sets:'8-8-8-8',kg:80});changed=true;}
+      if(si>0){exs.unshift(exs.splice(si,1)[0]);changed=true;}else if(si<0&&(p.injuries||[]).indexOf('knees')<0){exs.unshift({name:'Squat',scheme:'4×8-12',tag:'strength',sets:'8-8-8-8',kg:80});changed=true;}
     }else{
       for(var r2=exs.length-1;r2>=0;r2--){if(isSq(exs[r2])){exs.splice(r2,1);changed=true;}}
       var dli=-1;for(var j=0;j<exs.length;j++){if(exs[j].name==='Deadlift'){dli=j;break;}}
-      if(dli<0){exs.push({name:'Deadlift',scheme:'1×5-8',tag:'strength',sets:'6',kg:Math.round(((exs[0]||{}).kg||80)*1.5)});changed=true;}
+      if(dli<0&&(p.injuries||[]).indexOf('lower_back')<0){exs.push({name:'Deadlift',scheme:'1×5-8',tag:'strength',sets:'6',kg:Math.round(((exs[0]||{}).kg||80)*1.5)});changed=true;}
       else if(dli!==exs.length-1){var dlx=exs.splice(dli,1)[0];dlx.tag='strength';exs.push(dlx);changed=true;}
     }});});
   return changed;
@@ -893,7 +893,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
     var _cuffDays=0;
     days.forEach(function(day){
       if(_cuffDays>=3)return;
-      if(!(day.exercises||[]).some(function(ex){return /press/i.test(ex.name);}))return;
+      if(!(day.exercises||[]).some(function(ex){var sp=getExSplits(ex.name);return ((sp.chest||0)+(sp.shoulders||0))>=0.5;}))return;
       _cuffDays++;
       var _names=day.exercises.map(function(e){return e.name;});
       if(_names.indexOf('Cable External Rotation')<0)day.exercises.push({name:'Cable External Rotation',scheme:'2×15',tag:'rehab',sets:'15-15',kg:5,prehab:true});
@@ -932,7 +932,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   }else{
     days.forEach(function(day){(day.exercises||[]).forEach(function(ex){ex.sets=scaleSets(ex.sets);});});
   }
-  return{name:name,days:days,goal:goal,setsPerMuscle:setsPerMuscle};
+  return{name:name,days:days,goal:goal,setsPerMuscle:setsPerMuscle,injuries:injuries||[]};
 }
 
 function logout(){_googleToken='';_sessionToken='';localStorage.removeItem('google_token');localStorage.removeItem('google_email');localStorage.removeItem('session_token');if(window.google&&google.accounts)google.accounts.id.disableAutoSelect();document.getElementById('login-screen').classList.remove('hidden');document.body.classList.add('login-locked');}
