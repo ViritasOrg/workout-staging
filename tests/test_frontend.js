@@ -2575,8 +2575,8 @@ check('parseDec(null) → NaN',        Number.isNaN(G.parseDec(null)));
 check('parseDec(5) → 5 (number passthrough)', G.parseDec(5) === 5);
 check('parseDec("0,25") → 0.25',     G.parseDec('0,25') === 0.25);
 check('kg inputs use inputmode="decimal"', (rawScript.match(/inputmode="decimal"/g) || []).length >= 4);
-check('saveLog parses kg with parseDec',   rawScript.includes('parseDec(kgInputs[i]'));
-check('saveWeight parses with parseDec',   rawScript.includes("parseDec(document.getElementById('weight-input')"));
+check('saveLog parses kg in the selected unit', rawScript.includes('unitToKg(kgInputs[i]'));
+check('saveWeight parses in the selected unit', rawScript.includes("unitToKg(document.getElementById('weight-input')"));
 check('saveBf parses with parseDec',       rawScript.includes("parseDec(document.getElementById('bf-input')"));
 
 // ── ewmaSmooth (strength trend smoothing) ────────────────────────────────────
@@ -2945,7 +2945,7 @@ check('_deloadKg leaves 0 alone (bodyweight)', G._deloadKg(0) === 0, `got ${G._d
 check('deload persisted via settings push', /pushSettingsToAgent\(\{'wkt-deload':_deloadActive\}\)/.test(rawScript));
 check('deload restored from backend settings', /s\['wkt-deload'\]!==undefined/.test(rawScript));
 check('log form uses deloaded set count', /_deloadActive\?_deloadSets\(ex\.sets\):ex\.sets/.test(rawScript));
-check('log form scales prefilled load', /_deloadActive&&!isBodyweight&&lastKg>0\)lastKg=_deloadKg/.test(rawScript));
+check('log form scales prefilled load', /_deloadActive&&!isBodyweight&&lastKg>0\)\{lastKg=_deloadKg/.test(rawScript));
 check('program view shows deload banner + scaled scheme',
   /_deloadBannerHtml\(\)/.test(rawScript) && /_deloadActive\?_deloadScheme\(ex\.scheme\)/.test(rawScript));
 
@@ -2967,6 +2967,34 @@ check('settings sync refreshes Log page when deload state changes',
   rawScript.includes('_dlPrev!==!!_deloadActive') && rawScript.includes('prefillLog(_ldD.value)'));
 check('prefillLog applies deload to prefilled kg',     rawScript.includes('lastKg=_deloadKg(lastKg)'));
 check('prefillLog applies deload to set counts',       rawScript.includes('_deloadActive?_deloadSets(ex.sets):ex.sets'));
+
+// ── Barbell plate rounding + kg/lb unit switch ───────────────────────────────
+console.log('\n── Barbell rounding & units ────────────────────────────────');
+{
+  G.localStorage.setItem('wkt-unit','kg');
+  check('isBarbellEx: barbell lifts true', ['Squat','Deadlift','Bench Press','Overhead Press','Barbell Row','Romanian Deadlift','Hip Thrust'].every(n=>G.isBarbellEx(n)));
+  check('isBarbellEx: machines/DB/cable/landmine false', ['Leg Press','Smith Machine Squat','Cable Fly','Incline DB Press','Landmine Press','Chest Machine Press','Lateral Raise'].every(n=>!G.isBarbellEx(n)));
+  check('roundBarbellKg: 59 → 60 (2.5 kg steps)',   G.roundBarbellKg(59) === 60);
+  check('roundBarbellKg: 58 → 57.5',                G.roundBarbellKg(58) === 57.5);
+  check('roundBarbellKg: floor is the empty 20 kg bar', G.roundBarbellKg(12) === 20);
+  check('roundBarbellKg: already loadable stays',   G.roundBarbellKg(100) === 100);
+  check('kg mode: kgToUnit passthrough',            G.kgToUnit(92.4) === 92.4);
+  check('kg mode: unitToKg passthrough',            G.unitToKg('82,5') === 82.5);
+  G.localStorage.setItem('wkt-unit','lb');
+  check('lb mode: kgToUnit converts (100 kg → 220.5 lb)', G.kgToUnit(100) === 220.5);
+  check('lb mode: unitToKg converts (225 lb → ~102 kg)',  Math.abs(G.unitToKg('225') - 102.06) < 0.01);
+  check('lb mode: roundBarbellKg uses 45 lb bar + 5 lb steps',
+    Math.abs(G.roundBarbellKg(59) * 2.20462 - 130) < 0.05); // 59 kg = 130.1 lb → 130 lb
+  check('lb mode: floor is the empty 45 lb bar', Math.abs(G.roundBarbellKg(10) * 2.20462 - 45) < 0.05);
+  G.localStorage.setItem('wkt-unit','kg');
+  // wiring
+  check('deload prefill rounds barbell weights', rawScript.includes('if(isBarbellEx(ex.name))lastKg=roundBarbellKg(lastKg);'));
+  check('unit setting synced to backend',        rawScript.includes("pushSettingsToAgent({'wkt-unit':u})"));
+  check('unit setting restored from backend',    rawScript.includes("if(s['wkt-unit'])"));
+  check('Settings has unit toggle',              html.includes('unit-btn-kg') && html.includes('unit-btn-lb'));
+  check('onboarding has unit chips',             rawScript.includes("['kg','lb'].map(function(u)"));
+  check('drafts record unit; restore guarded',   rawScript.includes('unit:unitLabel()') && rawScript.includes("(d.unit||'kg')!==unitLabel())return;"));
+}
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
