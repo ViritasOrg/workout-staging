@@ -224,18 +224,31 @@ Use them. Every time. No exceptions. Asking Henrik to touch GitHub is a failure.
    - `mcp__github__actions_list` (method: list_workflow_runs, resource_id: pages-build-deployment) → confirm the latest run has `conclusion: success` and its `head_sha` matches the bump commit SHA
    Only once pages-build-deployment is complete say "live as vX.XXX — test now". DO NOT say "live" after just the version-bump — that only commits the bump, it does not deploy. DO NOT attempt to curl or WebFetch `henrikschaub.github.io` — outbound network access to that host is always blocked in this remote environment and will always fail.
 
-## Promotion to prod — Claude must NOT do this directly
+## Promotion to prod — Claude must NOT trigger this
 Promotion happens via **Henrik clicking "Push to Prod"** in the staging app's
 Settings UI, which fires a `repository_dispatch` event that runs
 `.github/workflows/promote-to-prod.yml`. That workflow diffs staging against
-`workout` and opens a PR there. Claude must **never** merge that PR, or make
-any other change directly to `workout`, without Henrik's explicit go-ahead in
-that specific moment.
+`workout`, opens a PR on `workout`, **and then auto-merges it once CI passes**
+(step 6, "Wait for CI and merge prod PR") — so a single Push to Prod goes all
+the way to a live prod deploy. It does **not** leave a PR waiting for review.
 
-**PROMOTE_TOKEN secret required:** The promotion workflow needs a repo secret
-named `PROMOTE_TOKEN` — a GitHub PAT with write access to `henrikschaub/workout`.
-Add it under Settings → Secrets and variables → Actions on this repo.
-Claude cannot create or edit repo secrets.
+**What this means for Claude (corrected 2026-07-17):** the merge is the
+workflow's own built-in behavior — Claude never hand-merges the prod PR, and
+must never make any other change directly to `workout`, or **initiate** a new
+promotion, without Henrik's explicit go-ahead in that specific moment. Re-running
+a promotion run **Henrik already triggered** (e.g. after fixing the token) is
+completing an action he authorized, not starting a new one — that is allowed;
+firing a fresh `repository_dispatch`/Push to Prod yourself is not.
+*(Earlier versions of this note wrongly said the workflow only opens a PR that
+must never be auto-merged. The workflow has always auto-merged; the note was
+out of date.)*
+
+**PROMOTE_TOKEN secret (working as of 2026-07-17):** The promotion workflow needs
+a repo secret named `PROMOTE_TOKEN` — a GitHub PAT with write access to
+`henrikschaub/workout` — under Settings → Secrets and variables → Actions. It was
+briefly stale (causing `Bad credentials` on the prod checkout step); Henrik has
+since refreshed it and promotion now runs green. Claude cannot create or edit repo
+secrets, so if it breaks again Henrik must update it.
 
 ## ⚠️ NEVER HARDCODE PERSONAL USER DATA — GDPR / DATA ISOLATION ⚠️
 Personal data belonging to a specific real user must **NEVER** be hardcoded anywhere in the codebase.
