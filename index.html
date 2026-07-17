@@ -35,9 +35,9 @@
   .header{padding:22px 20px 0;display:flex;align-items:flex-start;justify-content:space-between;}
   .header-title{font-family:var(--font-display);font-size:34px;letter-spacing:3px;color:var(--accent);line-height:1;}
   .header-sub{font-size:13px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:5px;margin-top:3px;}
-  .weight-badge{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:right;cursor:pointer;}
-  .weight-badge .val{font-family:var(--font-display);font-size:22px;color:var(--accent);line-height:1;}
-  .weight-badge .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+  .weight-badge{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;text-align:right;cursor:pointer;flex-shrink:0;margin-left:12px;}
+  .weight-badge .val{font-family:var(--font-display);font-size:22px;color:var(--accent);line-height:1;white-space:nowrap;}
+  .weight-badge .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;white-space:nowrap;}
   .agent-status{display:inline-flex;align-items:center;margin-left:4px;}
   .agent-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background 0.3s;flex-shrink:0;cursor:pointer;display:inline-block;}
   .agent-dot.up{background:#3cffa0;box-shadow:0 0 6px rgba(60,255,160,0.7);}
@@ -93,6 +93,9 @@
   .form-label{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
   .form-group{flex:1;}
   input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-ui);font-size:14px;outline:none;transition:border-color 0.2s;}
+  /* iOS date inputs have an intrinsic width that ignores width:100% and overflows the card
+     (same fix as pep tab-tcalc.js Injection Schedule) */
+  input[type="date"]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;display:block;}
   input:focus,select:focus,textarea:focus{border-color:var(--accent);}
   textarea{resize:vertical;min-height:160px;}
   .btn{padding:12px 20px;border-radius:8px;border:none;font-family:var(--font-ui);font-size:16px;font-weight:600;cursor:pointer;transition:all 0.2s;}

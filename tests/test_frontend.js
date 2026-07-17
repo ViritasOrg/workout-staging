@@ -3115,6 +3115,12 @@ console.log('\n── Bottom navbar / PLASMA GUI port ────────�
     !src.includes("getElementById('nav-btn-'") && src.includes("localStorage.getItem('wkt-last-page')"));
   check('header restyled to pep hdr (34px display title, non-sticky)',
     src.includes('.header-title{font-family:var(--font-display);font-size:34px') && !src.includes('.header{position:sticky'));
+  check('weight badge label cannot wrap (KG TODAY on one line)',
+    /\.weight-badge \.lbl\{[^}]*white-space:nowrap/.test(src) && /\.weight-badge \.val\{[^}]*white-space:nowrap/.test(src));
+  check('weight badge does not shrink against the header title',
+    /\.weight-badge\{[^}]*flex-shrink:0/.test(src));
+  check('iOS date inputs constrained to their container (no card overflow)',
+    /input\[type="date"\]\{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none/.test(src));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
