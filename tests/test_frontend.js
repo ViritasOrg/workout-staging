@@ -1924,6 +1924,8 @@ console.log('\n── 48. Program wizard days/sets ─────────�
         src.includes('deload:!!_deloadActive'));
       check('renderHistory highlights deload entries with orange 50% fill',
         src.includes("l.deload?';background:rgba(255,165,0,0.5)':''"));
+      check('renderHistory labels deload entries with a "Deload" tag',
+        src.includes('l.deload?\' · <span style="color:#ff9800;font-weight:700">Deload</span>\':\'\''));
     } catch(e) {
       check('deload-in-history invariant (caught)', false, String(e));
     }
