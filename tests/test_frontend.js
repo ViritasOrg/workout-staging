@@ -1918,6 +1918,16 @@ console.log('\n── 48. Program wizard days/sets ─────────�
       check('prefillLog no-cap invariant (caught)', false, String(e));
     }
 
+    // saveLog records the deload flag on the saved log, and history highlights it
+    try {
+      check('saveLog stores deload flag on the log object',
+        src.includes('deload:!!_deloadActive'));
+      check('renderHistory highlights deload entries with orange 50% fill',
+        src.includes("l.deload?';background:rgba(255,165,0,0.5)':''"));
+    } catch(e) {
+      check('deload-in-history invariant (caught)', false, String(e));
+    }
+
     // sets-row in prefillLog uses flex-wrap:nowrap + overflow-x:auto for single-line 7-set layout
     try {
       const fn62 = G.prefillLog.toString();
@@ -2917,7 +2927,7 @@ check('_fmtDur(null) → ""',    G._fmtDur(null) === '',    `got "${G._fmtDur(nu
 check('saveLog records started_at/ended_at/duration_min',
   /_timing\.started_at=_logStartedAt/.test(rawScript) &&
   /_timing\.duration_min=Math\.max\(0,Math\.round\(/.test(rawScript));
-check('duration_min spread into the saved log', /id:editId\|\|Date\.now\(\),\.\.\._timing\}/.test(rawScript));
+check('duration_min spread into the saved log', /id:editId\|\|Date\.now\(\),deload:!!_deloadActive,\.\.\._timing\}/.test(rawScript));
 check('editing preserves original timing (no wipe)',
   /if\(editId\)\{var _origT=logs\.find/.test(rawScript));
 check('start time captured when first set logged', /_hasReps&&!_logStartedAt\)_logStartedAt=new Date/.test(rawScript));
