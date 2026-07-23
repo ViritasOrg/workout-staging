@@ -1029,7 +1029,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
       (day.exercises||[]).forEach(function(ex){
         if(ex.prehab)return;
         var sp=getExSplits(ex.name);var acc=0,wsum=0;
-        GROUPS.forEach(function(g){var f=sp[g]||0;if(!f)return;var base=day._fs[g]||0;if(!base||!freq[g])return;var target=Math.min(setsPerMuscle/freq[g],SESSION_MUSCLE_CAP);acc+=f*Math.max(0.4,Math.min(2,target/base));wsum+=f;});
+        GROUPS.forEach(function(g){var f=sp[g]||0;if(!f)return;var base=day._fs[g]||0;if(base<1||!freq[g])return;var target=Math.min(setsPerMuscle/freq[g],SESSION_MUSCLE_CAP);acc+=f*Math.max(0.4,Math.min(2,target/base));wsum+=f;});
         if(wsum>0)_resizeEx(ex,Math.max(2,Math.min(5,Math.round(_nSets(ex)*(acc/wsum)*(isCompoundEx(ex.name)?1.5:0.85)))));
       });
       var _guard=100;
