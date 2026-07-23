@@ -3187,6 +3187,17 @@ console.log('\n── Draft resume requires reps ──────────�
   }
 }
 
+// ── Session/auth diagnostic readout (Settings → Account) ────────────────────────
+if (typeof G._fmtTokExp === 'function') {
+  if (typeof G.atob !== 'function') G.atob = (s) => Buffer.from(s, 'base64').toString('binary');
+  const _futTok = 'h.' + Buffer.from(JSON.stringify({ exp: Math.floor(Date.now()/1000) + 3600 }))
+    .toString('base64').replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_') + '.s';
+  const _fe = G._fmtTokExp(_futTok);
+  check('_fmtTokExp decodes JWT exp → ~60m left', !!_fe && _fe.leftMin >= 59 && _fe.leftMin <= 61, _fe ? String(_fe.leftMin) : 'null');
+  check('_fmtTokExp returns null for junk', G._fmtTokExp('not-a-jwt') === null);
+  check('_renderAuthDebug defined; Session row present', typeof G._renderAuthDebug === 'function' && html.includes('id="s-session"'));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
