@@ -3213,6 +3213,36 @@ if (typeof G._hasValidSession === 'function') {
   check('One-Tap refresh interval gated behind !_hasValidSession()', html.includes('<300000&&!_hasValidSession()&&window.google'));
 }
 
+// ── Volume allocator — leg-day leakage regression ──────────────────────────────
+// Bug (reported 2026-07-23): on a hypertrophy leg day the allocator scaled Romanian
+// Deadlift (split legs:0.7, back:0.3) using the day's tiny incidental "back" volume as
+// the denominator (target/base with base≈0.9), which maxed the ratio clamp and boosted
+// RDL ABOVE the primary Squat (e.g. RDL 5 sets vs Squat 4, isolation floored at 2). Fix:
+// a muscle group only scales an exercise on days it actually trains that muscle (base>=1,
+// mirroring the freq threshold), so incidental secondary muscles no longer inflate an
+// accessory past the day's main compound.
+if (typeof G._generateWorkoutProgram === 'function') {
+  console.log('\n── Volume allocator — leg-day leakage ─────────────────────');
+  const _ns = (ex) => String(ex.sets).split('-').length;
+  const _prog = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 20, []);
+  const _legA = (_prog.days || []).find(d => /Legs A/.test(d.name));
+  check('6-day balanced program has a "Legs A" day', !!_legA);
+  if (_legA) {
+    const _sq  = _legA.exercises.find(e => /^Squat/.test(e.name));
+    const _rdl = _legA.exercises.find(e => /Romanian Deadlift/.test(e.name));
+    check('Legs A opens with Squat', _legA.exercises[0] && /^Squat/.test(_legA.exercises[0].name),
+      _legA.exercises[0] && _legA.exercises[0].name);
+    check('Squat present on Legs A', !!_sq);
+    check('Romanian Deadlift present on Legs A', !!_rdl);
+    if (_sq && _rdl) {
+      check('RDL does not out-rank the primary Squat (leakage fixed)',
+        _ns(_rdl) <= _ns(_sq), `Squat ${_ns(_sq)} vs RDL ${_ns(_rdl)}`);
+      check('Squat gets meaningful volume at 20 sets/muscle (leads the day)',
+        _ns(_sq) >= 4, `Squat ${_ns(_sq)}`);
+    }
+  }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
