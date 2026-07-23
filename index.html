@@ -858,6 +858,8 @@ function _renderProgWiz(title,body,footer){
     [['strength','⚡','Strength','Build max force with compound lifts'],['hypertrophy','💪','Hypertrophy','Build muscle size and definition'],['aesthetic','🌸','Feminine Aesthetic','Glutes, curves and upper body tone'],['rehab','🩹','Rehab','Recover from injury, move better']].forEach(function(g){
       html+='<div class="wiz-goal-card" onclick="_progWiz.goal=\''+g[0]+'\';_progWiz.step=1;_renderProgOverlay()"><div style="font-size:28px;flex-shrink:0;">'+g[1]+'</div><div><div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:2px;">'+g[2]+'</div><div style="font-size:12px;color:var(--muted);">'+g[3]+'</div></div></div>';
     });
+    html+='<div style="margin:14px 0 8px;text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">or</div>';
+    html+='<div class="wiz-goal-card" onclick="_progBuildManual()"><div style="font-size:28px;flex-shrink:0;">✎</div><div><div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:2px;">Build manually</div><div style="font-size:12px;color:var(--muted);">Start blank and add your own days &amp; exercises</div></div></div>';
     body.innerHTML=html;
   }else if(wiz.step===1){
     if(title)title.textContent='NEW PROGRAM';
@@ -913,6 +915,15 @@ function _progWizDefaultName(){
 function _progWizGenerate(){
   var wiz=_progWiz;var name=(wiz.name&&wiz.name.trim())||_progWizDefaultName();
   var prog=_generateWorkoutProgram(wiz.goal,wiz.sub,wiz.nDays,name,wiz.setsPerMuscle||12,wiz.injuries);
+  _programs.push(prog);buildProgramSettingsCard();
+  _progWiz=null;_progReadOnly=false;_progEditIdx=_programs.length-1;_progEditBuf=JSON.parse(JSON.stringify(_programs[_progEditIdx]));_progIsNew=true;_renderProgOverlay();
+}
+// Build manually (2026-07-23): skip the generator wizard entirely — create a blank
+// 1-day program and drop straight into the existing editor (add days/exercises, set
+// schemes/sets/weights/tags). _progIsNew=true means closing without Save discards it.
+function _progBuildManual(){
+  if(_programs.length>=4){alert('Maximum 4 programs');return;}
+  var prog={name:'My Program',goal:'hypertrophy',days:[{name:'Day 1',warmup:false,exercises:[{name:'',scheme:'3×10',tag:'volume',sets:'10-10-10',kg:0}]}]};
   _programs.push(prog);buildProgramSettingsCard();
   _progWiz=null;_progReadOnly=false;_progEditIdx=_programs.length-1;_progEditBuf=JSON.parse(JSON.stringify(_programs[_progEditIdx]));_progIsNew=true;_renderProgOverlay();
 }
@@ -1031,6 +1042,20 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
       if(_names.indexOf('Face Pulls')<0)day.exercises.push({name:'Face Pulls',scheme:'3×15',tag:'rehab',sets:'15-15-15',kg:15,prehab:true});
     });
   }
+  // Face Pulls: base templates schedule it on at most ONE day per program (rule 2026-07-23).
+  // It reads as a pull / rear-delt movement, so keep it on the first non-push day it appears on
+  // (else the first occurrence) and drop the rest. prehab-injected cuff Face Pulls (shoulder
+  // rehab, prehab:true) are intentional active-rehab work and are exempt.
+  (function(){
+    var _fpDays=[];
+    days.forEach(function(day,di){if((day.exercises||[]).some(function(e){return e.name==='Face Pulls'&&!e.prehab;}))_fpDays.push(di);});
+    if(_fpDays.length>1){
+      var _isPushDay=function(nm){return /push|chest|bench|shoulder|press|overhead/i.test(nm||'');};
+      var _keep=_fpDays.filter(function(di){return !_isPushDay(days[di].name);})[0];
+      if(_keep===undefined)_keep=_fpDays[0];
+      _fpDays.forEach(function(di){if(di===_keep)return;days[di].exercises=days[di].exercises.filter(function(e){return !(e.name==='Face Pulls'&&!e.prehab);});});
+    }
+  })();
   // Volume: hypertrophy/aesthetic get frequency-aware allocation (weekly sets-per-muscle target
   // split across the days that train each muscle, capped at 10 hard sets per muscle per session,
   // 25-set session ceiling trimming isolation first). Strength/rehab keep their fixed schemes

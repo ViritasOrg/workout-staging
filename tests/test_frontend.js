@@ -3272,6 +3272,30 @@ if (typeof G._generateWorkoutProgram === 'function') {
     _hasHT(G._generateWorkoutProgram('rehab','knee',6,'T',16,[])));
 }
 
+// ── Face Pulls: at most one day per generated program ──────────────────────────
+// Rule (2026-07-23): base templates must not schedule Face Pulls on two days at once.
+// The prehab cuff block (shoulder injury) is the intentional exception.
+if (typeof G._generateWorkoutProgram === 'function') {
+  console.log('\n── Face Pulls: ≤1 day per program ─────────────────────────');
+  const _fpDayCount = (p) => (p.days || []).filter(d => (d.exercises || []).some(e => e.name === 'Face Pulls')).length;
+  const _combos = [
+    ['strength','pure',5], ['strength','hybrid',6],
+    ['hypertrophy','balanced',6], ['hypertrophy','upper',5], ['hypertrophy','upper',7], ['hypertrophy','lower',6],
+  ];
+  const _over = _combos.filter(([g,s,n]) => _fpDayCount(G._generateWorkoutProgram(g,s,n,'T',16,[])) > 1);
+  check('No non-injury program schedules Face Pulls on more than one day',
+    _over.length === 0, _over.map(c => c.join('-')).join(', '));
+  // Shoulder-injury cuff work is preserved (prehab Face Pulls injected on pressing days)
+  const _shoulder = G._generateWorkoutProgram('hypertrophy','balanced',6,'T',16,['shoulders']);
+  const _hasPrehabFP = (_shoulder.days || []).some(d => (d.exercises || []).some(e => e.name === 'Face Pulls' && e.prehab));
+  check('Shoulder-injury program still injects prehab cuff Face Pulls', _hasPrehabFP);
+}
+
+// ── Manual program builder (blank, no wizard) ──────────────────────────────────
+console.log('\n── Manual program builder ─────────────────────────────────');
+check('_progBuildManual defined', typeof G._progBuildManual === 'function');
+check('New-program wizard offers a "Build manually" option', html.includes('_progBuildManual()') && html.includes('Build manually'));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
