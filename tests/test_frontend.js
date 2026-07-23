@@ -3243,6 +3243,32 @@ if (typeof G._generateWorkoutProgram === 'function') {
   }
 }
 
+// ── Hip Thrust is a Feminine Aesthetic exercise only ───────────────────────────
+// Rule (2026-07-23): Hip Thrust may appear ONLY in aesthetic-* (Feminine Aesthetic)
+// programs. A generator guard swaps it out of every strength/hypertrophy/rehab program.
+if (typeof G._generateWorkoutProgram === 'function') {
+  console.log('\n── Hip Thrust: Feminine Aesthetic only ────────────────────');
+  const _hasHT = (p) => (p.days || []).some(d => (d.exercises || []).some(e => e.name === 'Hip Thrust'));
+  const _combos = [
+    ['strength','pure',5], ['strength','hybrid',6],
+    ['hypertrophy','balanced',6], ['hypertrophy','upper',6], ['hypertrophy','lower',6],
+    ['rehab','knee',6], ['rehab','back',6], ['rehab','shoulder',6],
+  ];
+  let _leak = _combos.filter(([g,s,n]) => _hasHT(G._generateWorkoutProgram(g, s, n, 'T', 16, [])));
+  check('No Hip Thrust in any strength / hypertrophy / rehab program',
+    _leak.length === 0, _leak.map(c => c.join('-')).join(', '));
+  // No duplicate exercise names introduced by the swap (e.g. Legs C already had Leg Curl)
+  const _lowerC = G._generateWorkoutProgram('hypertrophy','lower',6,'T',16,[]);
+  const _dupFree = (_lowerC.days || []).every(d => {
+    const ns = (d.exercises || []).map(e => e.name);
+    return ns.length === new Set(ns).size;
+  });
+  check('Hip Thrust swap leaves no duplicate exercises in a day', _dupFree);
+  // Feminine Aesthetic keeps Hip Thrust
+  check('Feminine Aesthetic (aesthetic-*) retains Hip Thrust',
+    _hasHT(G._generateWorkoutProgram('aesthetic','upperlower',5,'T',16,[])));
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);

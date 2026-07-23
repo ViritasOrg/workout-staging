@@ -173,10 +173,18 @@ This is the single most common way the rule above gets bypassed — through inte
 
 ## ⚠️ WORKOUT PROGRAM EXERCISE RESTRICTIONS ⚠️
 
-### Exercises banned from Hypertrophy programs
-**Never include these in any `hypertrophy-*` program.** They are allowed in `aesthetic-*`, `strength-*`, and `rehab-*`:
-- **Hip Thrust** — Hypertrophy programs only; fine in aesthetic, strength, and rehab
-- **Bulgarian Split Squat** — same restriction as Hip Thrust
+### Exercise placement restrictions
+- **Hip Thrust — Feminine Aesthetic (`aesthetic-*`) templates ONLY (rule 2026-07-23).**
+  It must never appear in `hypertrophy-*`, `strength-*`, or `rehab-*` programs.
+  Enforced programmatically in `_generateWorkoutProgram`: for any non-`aesthetic`
+  goal, a generator guard swaps any Hip Thrust for the first hypertrophy-legal
+  posterior/leg movement not already in that day (Leg Curl → Leg Extension →
+  Romanian Deadlift), then de-dupes. *(Supersedes the earlier rule that allowed
+  Hip Thrust in strength and rehab — Henrik confirmed it is a Feminine-Aesthetic-only
+  movement. Only affects newly generated programs; already-saved programs are never
+  mutated.)*
+- **Bulgarian Split Squat — banned from `hypertrophy-*` programs only.** Allowed in
+  `aesthetic-*`, `strength-*`, and `rehab-*`.
 
 ### Volume allocation (hypertrophy/aesthetic program generation)
 - Weekly sets-per-muscle target ÷ days training that muscle = per-session target, capped at 10 hard sets/muscle/session; 25-set session ceiling

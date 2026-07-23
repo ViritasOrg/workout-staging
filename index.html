@@ -980,6 +980,22 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   (function(){var _base=pool.length;function _mGroup(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}while(pool.length>0&&pool.length<nDays){var _pg=_mGroup(pool[pool.length-1].name);var _fg=_mGroup(pool[0].name);var _best=null,_bs=Infinity;for(var _ci=0;_ci<_base;_ci++){var _cg=_mGroup(pool[_ci].name);var _sc=(_cg===_pg?2:0)+(_cg===_fg?1:0);if(_best===null||_sc<_bs){_bs=_sc;_best=pool[_ci];}}pool.push(JSON.parse(JSON.stringify(_best)));}})();
   var _isRehabGoal=key.startsWith('rehab-');
   pool.forEach(function(day){day.exercises=(day.exercises||[]).map(function(ex){var _t=(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag;return Object.assign({},ex,{tag:_t});});});
+  // Hip Thrust is a Feminine Aesthetic exercise ONLY (rule 2026-07-23): outside the
+  // 'aesthetic' goal, swap any Hip Thrust for a hypertrophy-legal posterior/leg movement
+  // (Leg Curl → Leg Extension → Romanian Deadlift, first one not already in the day to
+  // avoid duplicates), then de-dupe. Only touches newly generated programs.
+  if(goal!=='aesthetic'){
+    var _htSub={'Leg Curl':40,'Leg Extension':40,'Romanian Deadlift':60};
+    pool.forEach(function(day){
+      var names=(day.exercises||[]).map(function(e){return e.name;});
+      (day.exercises||[]).forEach(function(ex){
+        if(ex.name!=='Hip Thrust')return;
+        var alt=['Leg Curl','Leg Extension','Romanian Deadlift'].filter(function(a){return names.indexOf(a)<0;})[0]||'Leg Curl';
+        ex.name=alt;ex.kg=_htSub[alt];names.push(alt);
+      });
+      var _seen={};day.exercises=(day.exercises||[]).filter(function(ex){if(_seen[ex.name])return false;_seen[ex.name]=1;return true;});
+    });
+  }
   // Leg-day rules (2026-07-10): each Legs* day is EITHER a Squat day (Squat first, no
   // conventional Deadlift) OR a Deadlift day (Deadlift last, 5-8 reps, no squat variants) —
   // never both in one session (systemic load). Alternates, starting with a Squat day.
