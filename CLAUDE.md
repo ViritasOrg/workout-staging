@@ -174,15 +174,16 @@ This is the single most common way the rule above gets bypassed — through inte
 ## ⚠️ WORKOUT PROGRAM EXERCISE RESTRICTIONS ⚠️
 
 ### Exercise placement restrictions
-- **Hip Thrust — Feminine Aesthetic (`aesthetic-*`) templates ONLY (rule 2026-07-23).**
-  It must never appear in `hypertrophy-*`, `strength-*`, or `rehab-*` programs.
-  Enforced programmatically in `_generateWorkoutProgram`: for any non-`aesthetic`
-  goal, a generator guard swaps any Hip Thrust for the first hypertrophy-legal
+- **Hip Thrust — Feminine Aesthetic (`aesthetic-*`) and Knee Rehab (`rehab-knee`)
+  templates ONLY (rule 2026-07-23).** It must never appear in `hypertrophy-*`,
+  `strength-*`, `rehab-back`, or `rehab-shoulder` programs. Enforced programmatically
+  in `_generateWorkoutProgram`: unless the goal is `aesthetic` or the key is
+  `rehab-knee`, a generator guard swaps any Hip Thrust for the first hypertrophy-legal
   posterior/leg movement not already in that day (Leg Curl → Leg Extension →
-  Romanian Deadlift), then de-dupes. *(Supersedes the earlier rule that allowed
-  Hip Thrust in strength and rehab — Henrik confirmed it is a Feminine-Aesthetic-only
-  movement. Only affects newly generated programs; already-saved programs are never
-  mutated.)*
+  Romanian Deadlift), then de-dupes. *(Supersedes the earlier rule that allowed Hip
+  Thrust in all of strength/rehab — Henrik confirmed it is Feminine-Aesthetic plus
+  knee-rehab glute-activation only. Only affects newly generated programs; already-saved
+  programs are never mutated.)*
 - **Bulgarian Split Squat — banned from `hypertrophy-*` programs only.** Allowed in
   `aesthetic-*`, `strength-*`, and `rehab-*`.
 

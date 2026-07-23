@@ -3243,19 +3243,20 @@ if (typeof G._generateWorkoutProgram === 'function') {
   }
 }
 
-// ── Hip Thrust is a Feminine Aesthetic exercise only ───────────────────────────
+// ── Hip Thrust: Feminine Aesthetic + Knee Rehab only ───────────────────────────
 // Rule (2026-07-23): Hip Thrust may appear ONLY in aesthetic-* (Feminine Aesthetic)
-// programs. A generator guard swaps it out of every strength/hypertrophy/rehab program.
+// and rehab-knee (glute activation) programs. A generator guard swaps it out of every
+// strength / hypertrophy / back-rehab / shoulder-rehab program.
 if (typeof G._generateWorkoutProgram === 'function') {
-  console.log('\n── Hip Thrust: Feminine Aesthetic only ────────────────────');
+  console.log('\n── Hip Thrust: Feminine Aesthetic + Knee Rehab only ───────');
   const _hasHT = (p) => (p.days || []).some(d => (d.exercises || []).some(e => e.name === 'Hip Thrust'));
-  const _combos = [
+  const _stripped = [
     ['strength','pure',5], ['strength','hybrid',6],
     ['hypertrophy','balanced',6], ['hypertrophy','upper',6], ['hypertrophy','lower',6],
-    ['rehab','knee',6], ['rehab','back',6], ['rehab','shoulder',6],
+    ['rehab','back',6], ['rehab','shoulder',6],
   ];
-  let _leak = _combos.filter(([g,s,n]) => _hasHT(G._generateWorkoutProgram(g, s, n, 'T', 16, [])));
-  check('No Hip Thrust in any strength / hypertrophy / rehab program',
+  let _leak = _stripped.filter(([g,s,n]) => _hasHT(G._generateWorkoutProgram(g, s, n, 'T', 16, [])));
+  check('No Hip Thrust in strength / hypertrophy / back- or shoulder-rehab programs',
     _leak.length === 0, _leak.map(c => c.join('-')).join(', '));
   // No duplicate exercise names introduced by the swap (e.g. Legs C already had Leg Curl)
   const _lowerC = G._generateWorkoutProgram('hypertrophy','lower',6,'T',16,[]);
@@ -3264,9 +3265,11 @@ if (typeof G._generateWorkoutProgram === 'function') {
     return ns.length === new Set(ns).size;
   });
   check('Hip Thrust swap leaves no duplicate exercises in a day', _dupFree);
-  // Feminine Aesthetic keeps Hip Thrust
+  // Feminine Aesthetic and Knee Rehab keep Hip Thrust
   check('Feminine Aesthetic (aesthetic-*) retains Hip Thrust',
     _hasHT(G._generateWorkoutProgram('aesthetic','upperlower',5,'T',16,[])));
+  check('Knee Rehab (rehab-knee) retains Hip Thrust',
+    _hasHT(G._generateWorkoutProgram('rehab','knee',6,'T',16,[])));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
