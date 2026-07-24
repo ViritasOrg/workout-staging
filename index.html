@@ -1042,18 +1042,30 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
       if(_names.indexOf('Face Pulls')<0)day.exercises.push({name:'Face Pulls',scheme:'3×15',tag:'rehab',sets:'15-15-15',kg:15,prehab:true});
     });
   }
-  // Face Pulls: base templates schedule it on at most ONE day per program (rule 2026-07-23).
-  // It reads as a pull / rear-delt movement, so keep it on the first non-push day it appears on
-  // (else the first occurrence) and drop the rest. prehab-injected cuff Face Pulls (shoulder
-  // rehab, prehab:true) are intentional active-rehab work and are exempt.
+  // Face Pulls belong on a PULL (back-dominant) day, and on at most one day per program
+  // (rule 2026-07-23). Classify each day by back vs chest+shoulder set-volume (computed from
+  // getExSplits, excluding Face Pulls itself). Keep non-prehab Face Pulls on the single most
+  // back-dominant day that already has them; if every day carrying them is push-dominant
+  // (e.g. a Shoulders day), relocate the entry to the program's most back-dominant day. prehab
+  // cuff Face Pulls (shoulder rehab, prehab:true) are intentional and exempt.
   (function(){
-    var _fpDays=[];
-    days.forEach(function(day,di){if((day.exercises||[]).some(function(e){return e.name==='Face Pulls'&&!e.prehab;}))_fpDays.push(di);});
-    if(_fpDays.length>1){
-      var _isPushDay=function(nm){return /push|chest|bench|shoulder|press|overhead/i.test(nm||'');};
-      var _keep=_fpDays.filter(function(di){return !_isPushDay(days[di].name);})[0];
-      if(_keep===undefined)_keep=_fpDays[0];
-      _fpDays.forEach(function(di){if(di===_keep)return;days[di].exercises=days[di].exercises.filter(function(e){return !(e.name==='Face Pulls'&&!e.prehab);});});
+    function _hasFP(day){return (day.exercises||[]).some(function(e){return e.name==='Face Pulls'&&!e.prehab;});}
+    function _rmFP(day){day.exercises=(day.exercises||[]).filter(function(e){return !(e.name==='Face Pulls'&&!e.prehab);});}
+    function _score(day){var bk=0,pp=0;(day.exercises||[]).forEach(function(e){if(e.name==='Face Pulls')return;var sp=getExSplits(e.name);var n=String(e.sets).split('-').length;bk+=(sp.back||0)*n;pp+=((sp.chest||0)+(sp.shoulders||0))*n;});return{bk:bk,pp:pp};}
+    function _ok(di){var s=_score(days[di]);return s.bk>=s.pp;} // day is NOT push-dominant
+    var _fpDays=[];days.forEach(function(day,di){if(_hasFP(day))_fpDays.push(di);});
+    if(!_fpDays.length)return;
+    var _okFp=_fpDays.filter(_ok);
+    if(_okFp.length){
+      var _keep=_okFp.reduce(function(a,b){return _score(days[b]).bk>_score(days[a]).bk?b:a;});
+      days.forEach(function(day,di){if(di!==_keep)_rmFP(day);});
+    }else{
+      // every day carrying Face Pulls is push-dominant: relocate to the best non-push day
+      // that has real back work, else drop it rather than force it onto a push day.
+      var _fpEntry=null;days.forEach(function(day){(day.exercises||[]).forEach(function(e){if(e.name==='Face Pulls'&&!e.prehab&&!_fpEntry)_fpEntry=e;});});
+      days.forEach(_rmFP);
+      var _best=-1,_bs=-1;days.forEach(function(day,di){var s=_score(day);if(s.bk>=s.pp&&s.bk>0&&s.bk>_bs){_bs=s.bk;_best=di;}});
+      if(_best>=0&&_fpEntry&&!days[_best].exercises.some(function(e){return e.name==='Face Pulls';}))days[_best].exercises.push(_fpEntry);
     }
   })();
   // Volume: hypertrophy/aesthetic get frequency-aware allocation (weekly sets-per-muscle target

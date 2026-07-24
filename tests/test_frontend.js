@@ -3285,6 +3285,33 @@ if (typeof G._generateWorkoutProgram === 'function') {
   const _over = _combos.filter(([g,s,n]) => _fpDayCount(G._generateWorkoutProgram(g,s,n,'T',16,[])) > 1);
   check('No non-injury program schedules Face Pulls on more than one day',
     _over.length === 0, _over.map(c => c.join('-')).join(', '));
+  // Face Pulls must never sit on a push-dominant day (back < chest+shoulder set-volume),
+  // across every goal/sub/day-count and with/without shoulder injury. prehab cuff Face Pulls
+  // (injected on pressing days for active rehab) are the intentional exception.
+  const _dayScore = (day) => {
+    let bk = 0, pp = 0;
+    (day.exercises || []).forEach(e => {
+      if (e.name === 'Face Pulls') return;
+      const sp = G.getExSplits(e.name); const n = String(e.sets).split('-').length;
+      bk += (sp.back || 0) * n; pp += ((sp.chest || 0) + (sp.shoulders || 0)) * n;
+    });
+    return { bk, pp };
+  };
+  const _allCombos = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],
+    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower']];
+  const _nd = { strength:[3,4,5,6], hypertrophy:[3,4,5,6,7], aesthetic:[3,5] };
+  let _pushFP = [];
+  _allCombos.forEach(([g,s]) => _nd[g].forEach(n => [[],['shoulders']].forEach(inj => {
+    const p = G._generateWorkoutProgram(g, s, n, 'T', 16, inj);
+    (p.days || []).forEach(d => {
+      if ((d.exercises || []).some(e => e.name === 'Face Pulls' && !e.prehab)) {
+        const sc = _dayScore(d);
+        if (sc.pp > sc.bk) _pushFP.push(`${g}-${s}-${n}/${inj.join('')}: ${d.name}`);
+      }
+    });
+  })));
+  check('Face Pulls never placed on a push-dominant day (any program)',
+    _pushFP.length === 0, _pushFP.slice(0, 4).join(' | '));
   // Shoulder-injury cuff work is preserved (prehab Face Pulls injected on pressing days)
   const _shoulder = G._generateWorkoutProgram('hypertrophy','balanced',6,'T',16,['shoulders']);
   const _hasPrehabFP = (_shoulder.days || []).some(d => (d.exercises || []).some(e => e.name === 'Face Pulls' && e.prehab));
