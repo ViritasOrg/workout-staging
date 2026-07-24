@@ -192,6 +192,19 @@ This is the single most common way the rule above gets bypassed — through inte
 - **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10): `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust; Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×, and the session-ceiling trim takes sets from non-compounds first
 - Squat and Deadlift are allocator-sized like any other exercise — no hardcoded set counts
 
+### Full-body at low frequency — ≤4 days/week (rule 2026-07-24)
+When a generated program is **4 days/week or fewer**, it must be **full-body** (each session
+trains legs + a push + a pull + accessories), **not** a push/pull/legs or upper/lower split.
+Enforced in `_generateWorkoutProgram` via `_fullBodyPool(goal,sub)` for **hypertrophy and
+strength** goals (aesthetic already runs glute-emphasis full-body; rehab stays injury-specific).
+- One main lower lift per day, rotating so **no session pairs Squat with a conventional
+  Deadlift** (CNS load).
+- The wizard focus (Balanced / Upper / Lower Heavy) biases *emphasis*, not the split.
+- Full-body programs (including strength) run through the **frequency-aware volume allocator**
+  (not the linear strength-scaling path), so training every muscle 3–4×/week stays within the
+  per-session ceiling.
+- **5+ day programs keep their splits** (PPL / upper-lower) unchanged.
+
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
 day containing a pressing movement (bench/incline/OHP/dips/chest-or-landmine press) — **even in
