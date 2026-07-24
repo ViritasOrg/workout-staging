@@ -1027,16 +1027,22 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   // Injuries (2026-07-10): substitutions are baked into the program permanently — the
   // aggravating exercise is replaced before allocation so volume redistributes correctly
   if(injuries&&injuries.length){days.forEach(function(day){(day.exercises||[]).forEach(function(ex){injuries.forEach(function(cid){var c=REHAB_CONDITIONS.find(function(x){return x.id===cid;});if(c&&ex.name&&c.detect(ex.name))ex.name=c.suggest(ex.name);});});var _seen={};day.exercises=(day.exercises||[]).filter(function(ex){if(_seen[ex.name])return false;_seen[ex.name]=1;return true;});});}
+  // A "press day" = any day containing an actual pressing movement (bench/incline/OHP/dips/
+  // chest-or-landmine press). Used both to place the shoulder cuff work and to keep Face Pulls
+  // off press days (rules 2026-07-24).
+  var _isPress=function(nm){nm=(nm||'').toLowerCase();return /bench|incline|overhead press|\bohp\b|shoulder press|arnold press|chest press|chest machine|landmine press|\bdips?\b|push-?up|close grip/.test(nm)&&!/leg press/.test(nm);};
   // Shoulders injury (2026-07-10, revised 2026-07-24): rehab is active, not just avoidance —
   // inject a rotator-cuff block (Cable External Rotation, rehab tag) at the end of up to 3
-  // pressing days per week. Face Pulls are NOT injected here: a Face Pull is a pulling movement
-  // and must never sit on a push/press day, even in shoulder rehab (rule 2026-07-24). prehab:true
-  // keeps the rehab tag through normalization and exempts these from allocator resizing.
+  // PRESSING days per week (days with an actual press — not merely any chest/shoulder set, which
+  // would also catch pull days that carry Face Pulls or lateral raises). Face Pulls are NOT
+  // injected here: a Face Pull is a pulling movement and must never sit on a push/press day, even
+  // in shoulder rehab. prehab:true keeps the rehab tag through normalization and exempts these
+  // from allocator resizing.
   if(injuries&&injuries.indexOf('shoulders')>=0){
     var _cuffDays=0;
     days.forEach(function(day){
       if(_cuffDays>=3)return;
-      if(!(day.exercises||[]).some(function(ex){var sp=getExSplits(ex.name);return ((sp.chest||0)+(sp.shoulders||0))>=0.5;}))return;
+      if(!(day.exercises||[]).some(function(ex){return _isPress(ex.name);}))return;
       _cuffDays++;
       var _names=day.exercises.map(function(e){return e.name;});
       if(_names.indexOf('Cable External Rotation')<0)day.exercises.push({name:'Cable External Rotation',scheme:'2×15',tag:'rehab',sets:'15-15',kg:5,prehab:true});
@@ -1049,7 +1055,6 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   // relocate the entry to the best press-free day that has back work, else drop it. At most one
   // day per program.
   (function(){
-    function _isPress(nm){nm=(nm||'').toLowerCase();return /bench|incline|overhead press|\bohp\b|shoulder press|arnold press|chest press|chest machine|landmine press|\bdips?\b|push-?up|close grip/.test(nm)&&!/leg press/.test(nm);}
     function _hasFP(day){return (day.exercises||[]).some(function(e){return e.name==='Face Pulls';});}
     function _rmFP(day){day.exercises=(day.exercises||[]).filter(function(e){return e.name!=='Face Pulls';});}
     function _press(day){return (day.exercises||[]).some(function(e){return _isPress(e.name);});}

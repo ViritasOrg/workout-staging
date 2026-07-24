@@ -2845,6 +2845,11 @@ console.log('\n── Rotator cuff prehab (shoulders injury) ──────�
       return e.tag === 'rehab' && e.prehab === true && String(e.sets).split('-').every(r => r === '15'); }));
   check('cuff block injects no Face Pulls (only External Rotation; rule 2026-07-24)',
     !ps.days.some(d => d.exercises.some(e => e.name === 'Face Pulls' && e.prehab)));
+  // ER lands only on actual PRESS days, never on a pull day that merely carries a shoulder set
+  const _isPressER = (nm) => /bench|incline|overhead press|\bohp\b|shoulder press|arnold press|chest press|chest machine|landmine press|\bdips?\b|push-?up|close grip/i.test(nm) && !/leg press/i.test(nm);
+  check('External Rotation injected only on press days (not pull days)',
+    cuffDays.every(d => d.exercises.some(e => _isPressER(e.name))),
+    cuffDays.filter(d => !d.exercises.some(e => _isPressER(e.name))).map(d => d.name).join(', '));
   check('prehab exempt from allocator resize (ER stays 2 sets)',
     cuffDays.every(d => String(d.exercises.find(x => x.name === 'Cable External Rotation').sets).split('-').length === 2));
   check('sessions still ≤ 25 with cuff block',
