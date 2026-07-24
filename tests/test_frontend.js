@@ -2660,23 +2660,37 @@ console.log('\n── Leg-day rules in generated programs ───────�
     pk.days.every(d => { const l = d.exercises[d.exercises.length - 1]; return !(l.name === 'Deadlift' && l.sets === '6'); }));
 }
 
-// ── Leg-day rules applied to stored hypertrophy programs (_ensurePrograms) ───
-console.log('\n── Leg-day rules on stored programs ────────────────────────');
+// ── Stored programs are NEVER mutated by _ensurePrograms (user edits stick) ──
+// Rule (2026-07-24): leg-day rules apply only to newly generated programs. A stored program's
+// exercises must survive reload exactly as saved — _ensurePrograms must not reorder/inject
+// Squat or Deadlift on a stored Legs day (that silently reverted the user's own edits).
+console.log('\n── Stored programs untouched on load ───────────────────────');
 {
   const savedPrograms = G.localStorage.getItem('workout_programs');
   const testProg = { programs: [{ name: '6-Day Hypertrophy — Upper', goal: 'hypertrophy', days: [
     { name: 'Day 3 — Legs A', warmup: false, exercises: [
       { name: 'Leg Press', scheme: '3×12', tag: 'volume', sets: '12-12-12', kg: 100 },
-      { name: 'Squat',     scheme: '4×10', tag: 'volume', sets: '10-10-10-10', kg: 80 },
       { name: 'Leg Curl',  scheme: '3×12', tag: 'volume', sets: '12-12-12', kg: 40 } ] },
   ] }], active_index: 0 };
   G.localStorage.setItem('workout_programs', JSON.stringify(testProg));
   G.initPrograms();
   const p = G.getActiveProgram();
   const day = p.days.find(d => /legs/i.test(d.name));
-  check('stored program: first legs day is a Squat day (Squat moved first)', !!day && day.exercises[0].name === 'Squat', day ? day.exercises[0].name : 'no legs day');
-  check('stored program: Squat day has NO Deadlift', !!day && !day.exercises.some(e => e.name === 'Deadlift'),
+  // The user removed Squat from this leg day — it must stay removed on load (not re-injected)
+  check('stored Legs day is left exactly as saved (Squat NOT re-injected)',
+    !!day && JSON.stringify(day.exercises.map(e => e.name)) === JSON.stringify(['Leg Press', 'Leg Curl']),
     day ? JSON.stringify(day.exercises.map(e => e.name)) : 'no legs day');
+  // Regression for the reported bug: replace Squat → Leg Press on a stored leg day, reload, edit sticks
+  const edited = { programs: [{ name: '6-Day Hypertrophy — Upper', goal: 'hypertrophy', days: [
+    { name: 'Day 1 — Legs A', warmup: false, exercises: [
+      { name: 'Leg Press', scheme: '4×10', tag: 'volume', sets: '10-10-10-10', kg: 100 },
+      { name: 'Leg Curl',  scheme: '3×12', tag: 'volume', sets: '12-12-12', kg: 40 } ] } ] }], active_index: 0 };
+  G.localStorage.setItem('workout_programs', JSON.stringify(edited));
+  G.initPrograms();
+  const ed = G.getActiveProgram().days[0];
+  check('replacing Squat→Leg Press on a stored leg day survives reload',
+    !ed.exercises.some(e => /squat/i.test(e.name) && !/split/i.test(e.name)),
+    JSON.stringify(ed.exercises.map(e => e.name)));
   // restore prior state
   if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
   else G.localStorage.setItem('workout_programs', savedPrograms);
@@ -3048,15 +3062,16 @@ console.log('\n── Injury interplay regressions ─────────�
   G.initPrograms();
   check('stored lower-back-safe program: Deadlift NOT re-appended on load',
     G.getActiveProgram().days.every(d => !d.exercises.some(e => e.name === 'Deadlift')));
-  // programs WITHOUT injuries still get the leg-day rules on load (regression)
+  // A stored program without injuries is ALSO left untouched (Squat not auto-added on load)
   G.localStorage.setItem('workout_programs', JSON.stringify({ programs: [
     { name: '6-Day Hypertrophy — Upper', goal: 'hypertrophy', days: [
       { name: 'Day 1 — Legs A', warmup: false, exercises: [
         { name: 'Leg Press', scheme: '3×12', tag: 'volume', sets: '12-12-12', kg: 100 } ] } ] }
   ], active_index: 0 }));
   G.initPrograms();
-  check('no-injury stored program still gets Squat added to its Squat day',
-    G.getActiveProgram().days[0].exercises.some(e => isSqN(e.name)));
+  check('no-injury stored program is left as saved (Squat NOT auto-added)',
+    !G.getActiveProgram().days[0].exercises.some(e => isSqN(e.name)),
+    JSON.stringify(G.getActiveProgram().days[0].exercises.map(e => e.name)));
   if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
   else G.localStorage.setItem('workout_programs', savedPrograms);
   G.initPrograms();
@@ -3069,15 +3084,14 @@ console.log('\n── Name-keyed drafts / leg-day prehab strip ─────�
   check('drafts saved as v2 keyed by name',   rawScript.includes("var _dk=card.dataset.tplName||String(ei);"));
   check('v2 restore matches cards by name',   rawScript.includes("_cs[_ci].dataset.tplName===_base"));
   check('legacy drafts still restore by index', rawScript.includes("card=c.querySelector('[data-ex-idx=\"'+ei+'\"]');"));
-  // Stored leg days lose previously injected prehab (cuff work never belongs on leg days)
+  // Stored programs are left exactly as saved on load (no mutation of a stored leg day)
   const savedPrograms = G.localStorage.getItem('workout_programs');
   G.localStorage.setItem('workout_programs', JSON.stringify({ programs: [
     { name: '6-Day Hypertrophy — Upper', goal: 'hypertrophy', days: [
       { name: 'Day 3 — Legs A', warmup: false, exercises: [
         { name: 'Squat', scheme: '4×10', tag: 'strength', sets: '10-10-10-10', kg: 80 },
         { name: 'Leg Press', scheme: '3×12', tag: 'volume', sets: '12-12-12', kg: 100 },
-        { name: 'Cable External Rotation', scheme: '2×15', tag: 'rehab', sets: '15-15', kg: 5, prehab: true },
-        { name: 'Face Pulls', scheme: '3×15', tag: 'rehab', sets: '15-15-15', kg: 15, prehab: true } ] },
+        { name: 'Leg Curl', scheme: '3×12', tag: 'volume', sets: '12-12-12', kg: 40 } ] },
       { name: 'Day 1 — Push A', warmup: false, exercises: [
         { name: 'Chest Machine Press', scheme: '4×10', tag: 'volume', sets: '10-10-10-10', kg: 57 },
         { name: 'Cable External Rotation', scheme: '2×15', tag: 'rehab', sets: '15-15', kg: 5, prehab: true } ] }
@@ -3086,8 +3100,8 @@ console.log('\n── Name-keyed drafts / leg-day prehab strip ─────�
   const prog = G.getActiveProgram();
   const legs = prog.days.find(d => /legs/i.test(d.name));
   const push = prog.days.find(d => /push/i.test(d.name));
-  check('stored leg day: injected prehab stripped on load',
-    !legs.exercises.some(e => /external rotation|face pull/i.test(e.name)),
+  check('stored leg day left exactly as saved on load',
+    JSON.stringify(legs.exercises.map(e => e.name)) === JSON.stringify(['Squat', 'Leg Press', 'Leg Curl']),
     JSON.stringify(legs.exercises.map(e => e.name)));
   check('stored push day: prehab kept',
     push.exercises.some(e => e.name === 'Cable External Rotation'));
