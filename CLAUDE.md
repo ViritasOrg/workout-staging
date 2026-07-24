@@ -235,8 +235,11 @@ Deadlift always last in every leg day" rule.
   (matcher: `/squat/i` excluding `split`)
 - Leg days alternate between the two types, starting with a Squat day
 - Set counts come from the volume allocator — never hardcoded (2026-07-10)
-- Enforced programmatically for generated programs (`_generateWorkoutProgram`) and stored
-  hypertrophy programs (`_ensurePrograms`) on days named `Legs*`
+- Enforced **only on newly generated programs** (`_generateWorkoutProgram`) on days named
+  `Legs*`. **`_ensurePrograms` must NOT re-enforce leg-day rules on stored programs** (rule
+  2026-07-24): re-injecting/reordering Squat & Deadlift on every load silently reverted the
+  user's own exercise edits (e.g. swapping Squat → Leg Press). Stored programs are the user's
+  own and are left exactly as saved — consistent with "never mutate stored programs" (2026-07-15).
 
 ### NEVER edit existing (stored) programs unless Henrik explicitly asks (rule 2026-07-15)
 Henrik's saved programs are his own. **Do NOT mutate existing stored programs** — no
