@@ -1027,10 +1027,11 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   // Injuries (2026-07-10): substitutions are baked into the program permanently — the
   // aggravating exercise is replaced before allocation so volume redistributes correctly
   if(injuries&&injuries.length){days.forEach(function(day){(day.exercises||[]).forEach(function(ex){injuries.forEach(function(cid){var c=REHAB_CONDITIONS.find(function(x){return x.id===cid;});if(c&&ex.name&&c.detect(ex.name))ex.name=c.suggest(ex.name);});});var _seen={};day.exercises=(day.exercises||[]).filter(function(ex){if(_seen[ex.name])return false;_seen[ex.name]=1;return true;});});}
-  // Shoulders injury (2026-07-10): rehab is active, not just avoidance — inject a rotator-cuff/
-  // scapular block (Cable External Rotation + Face Pulls, rehab tag, 15 reps) at the end of up
-  // to 3 pressing days per week. prehab:true keeps the rehab tag through normalization and
-  // exempts these from allocator resizing.
+  // Shoulders injury (2026-07-10, revised 2026-07-24): rehab is active, not just avoidance —
+  // inject a rotator-cuff block (Cable External Rotation, rehab tag) at the end of up to 3
+  // pressing days per week. Face Pulls are NOT injected here: a Face Pull is a pulling movement
+  // and must never sit on a push/press day, even in shoulder rehab (rule 2026-07-24). prehab:true
+  // keeps the rehab tag through normalization and exempts these from allocator resizing.
   if(injuries&&injuries.indexOf('shoulders')>=0){
     var _cuffDays=0;
     days.forEach(function(day){
@@ -1039,33 +1040,34 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
       _cuffDays++;
       var _names=day.exercises.map(function(e){return e.name;});
       if(_names.indexOf('Cable External Rotation')<0)day.exercises.push({name:'Cable External Rotation',scheme:'2×15',tag:'rehab',sets:'15-15',kg:5,prehab:true});
-      if(_names.indexOf('Face Pulls')<0)day.exercises.push({name:'Face Pulls',scheme:'3×15',tag:'rehab',sets:'15-15-15',kg:15,prehab:true});
     });
   }
-  // Face Pulls belong on a PULL (back-dominant) day, and on at most one day per program
-  // (rule 2026-07-23). Classify each day by back vs chest+shoulder set-volume (computed from
-  // getExSplits, excluding Face Pulls itself). Keep non-prehab Face Pulls on the single most
-  // back-dominant day that already has them; if every day carrying them is push-dominant
-  // (e.g. a Shoulders day), relocate the entry to the program's most back-dominant day. prehab
-  // cuff Face Pulls (shoulder rehab, prehab:true) are intentional and exempt.
+  // Face Pulls must NEVER sit on a push/press day — any day containing a pressing movement
+  // (bench/incline/OHP/dips/chest-or-landmine press) — even in a shoulder-rehab context
+  // (rule 2026-07-24, supersedes the earlier cuff-on-press-days behaviour). Keep Face Pulls on
+  // the press-free day with the most back work; if every day carrying them contains a press,
+  // relocate the entry to the best press-free day that has back work, else drop it. At most one
+  // day per program.
   (function(){
-    function _hasFP(day){return (day.exercises||[]).some(function(e){return e.name==='Face Pulls'&&!e.prehab;});}
-    function _rmFP(day){day.exercises=(day.exercises||[]).filter(function(e){return !(e.name==='Face Pulls'&&!e.prehab);});}
-    function _score(day){var bk=0,pp=0;(day.exercises||[]).forEach(function(e){if(e.name==='Face Pulls')return;var sp=getExSplits(e.name);var n=String(e.sets).split('-').length;bk+=(sp.back||0)*n;pp+=((sp.chest||0)+(sp.shoulders||0))*n;});return{bk:bk,pp:pp};}
-    function _ok(di){var s=_score(days[di]);return s.bk>=s.pp;} // day is NOT push-dominant
+    function _isPress(nm){nm=(nm||'').toLowerCase();return /bench|incline|overhead press|\bohp\b|shoulder press|arnold press|chest press|chest machine|landmine press|\bdips?\b|push-?up|close grip/.test(nm)&&!/leg press/.test(nm);}
+    function _hasFP(day){return (day.exercises||[]).some(function(e){return e.name==='Face Pulls';});}
+    function _rmFP(day){day.exercises=(day.exercises||[]).filter(function(e){return e.name!=='Face Pulls';});}
+    function _press(day){return (day.exercises||[]).some(function(e){return _isPress(e.name);});}
+    function _back(day){var bk=0;(day.exercises||[]).forEach(function(e){if(e.name==='Face Pulls')return;var sp=getExSplits(e.name);bk+=(sp.back||0)*String(e.sets).split('-').length;});return bk;}
+    function _eligible(di){return !_press(days[di])&&_back(days[di])>0;} // press-free day with back work
     var _fpDays=[];days.forEach(function(day,di){if(_hasFP(day))_fpDays.push(di);});
     if(!_fpDays.length)return;
-    var _okFp=_fpDays.filter(_ok);
+    var _fpEntry=null;days.forEach(function(day){(day.exercises||[]).forEach(function(e){if(e.name==='Face Pulls'&&!_fpEntry)_fpEntry=e;});});
+    var _okFp=_fpDays.filter(_eligible);
     if(_okFp.length){
-      var _keep=_okFp.reduce(function(a,b){return _score(days[b]).bk>_score(days[a]).bk?b:a;});
+      var _keep=_okFp.reduce(function(a,b){return _back(days[b])>_back(days[a])?b:a;});
       days.forEach(function(day,di){if(di!==_keep)_rmFP(day);});
     }else{
-      // every day carrying Face Pulls is push-dominant: relocate to the best non-push day
-      // that has real back work, else drop it rather than force it onto a push day.
-      var _fpEntry=null;days.forEach(function(day){(day.exercises||[]).forEach(function(e){if(e.name==='Face Pulls'&&!e.prehab&&!_fpEntry)_fpEntry=e;});});
+      // every day carrying Face Pulls has a pressing movement: relocate to the best press-free
+      // day with back work, else drop rather than leave it on a press day.
       days.forEach(_rmFP);
-      var _best=-1,_bs=-1;days.forEach(function(day,di){var s=_score(day);if(s.bk>=s.pp&&s.bk>0&&s.bk>_bs){_bs=s.bk;_best=di;}});
-      if(_best>=0&&_fpEntry&&!days[_best].exercises.some(function(e){return e.name==='Face Pulls';}))days[_best].exercises.push(_fpEntry);
+      var _best=-1,_bs=0;days.forEach(function(day,di){if(_eligible(di)&&_back(days[di])>_bs){_bs=_back(days[di]);_best=di;}});
+      if(_best>=0&&_fpEntry&&!_hasFP(days[_best]))days[_best].exercises.push(_fpEntry);
     }
   })();
   // Volume: hypertrophy/aesthetic get frequency-aware allocation (weekly sets-per-muscle target
