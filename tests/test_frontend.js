@@ -2773,9 +2773,10 @@ console.log('\n── Frequency-aware volume allocation ────────
   let schemeOk=true;
   for(const d of hi.p.days)for(const ex of d.exercises){const n=String(ex.sets).split('-').length;const m=String(ex.scheme).match(/^(\d+)×/);if(m&&parseInt(m[1])!==n)schemeOk=false;}
   check('scheme N× prefix matches resized set count', schemeOk);
-  // Strength and rehab keep their fixed schemes (linear scaling path)
-  const sp12=G._generateWorkoutProgram('strength','pure',3,'T',12);
-  check('strength-pure @12: Squat keeps its 5×5 scheme', sp12.days[0].exercises[0].sets==='5-5-5-5-5', sp12.days[0].exercises[0].sets);
+  // Strength SPLITS (5+ days) and rehab keep their fixed schemes (linear scaling path).
+  // (≤4-day strength is now full-body and uses the frequency-aware allocator — see below.)
+  const sp12=G._generateWorkoutProgram('strength','pure',5,'T',12);
+  check('strength-pure 5-day @12: Squat keeps its 5×5 scheme', sp12.days[0].exercises[0].sets==='5-5-5-5-5', sp12.days[0].exercises[0].sets);
   const rk12=allocStats('rehab','knee',6,12), rk24=allocStats('rehab','knee',6,24);
   check('rehab scales linearly (24 = 2× the sets of 12)', rk24.tots[0]===rk12.tots[0]*2, `${rk12.tots[0]} vs ${rk24.tots[0]}`);
   // Wizard review shows the computed outcome
@@ -3321,6 +3322,37 @@ if (typeof G._generateWorkoutProgram === 'function') {
 console.log('\n── Manual program builder ─────────────────────────────────');
 check('_progBuildManual defined', typeof G._progBuildManual === 'function');
 check('New-program wizard offers a "Build manually" option', html.includes('_progBuildManual()') && html.includes('Build manually'));
+
+// ── Full-body at ≤4 days/week ──────────────────────────────────────────────────
+// Rule (2026-07-24): 4 days/week or fewer → full-body sessions (not a push/pull/legs or
+// upper/lower split) for hypertrophy & strength. 5+ days keep their splits.
+if (typeof G._generateWorkoutProgram === 'function') {
+  console.log('\n── Full-body at ≤4 days/week ──────────────────────────────');
+  const _dayNames = (p) => (p.days || []).map(d => d.name.replace(/^Day \d+ — /, ''));
+  const _allFB = (p) => (p.days || []).every(d => /Full Body/.test(d.name));
+  const _noSplit = (p) => !(p.days || []).some(d => /^(Push|Pull|Legs|Upper|Lower)\b/.test(d.name.replace(/^Day \d+ — /, '')));
+  [['hypertrophy','upper'],['hypertrophy','lower'],['hypertrophy','balanced'],['strength','pure'],['strength','hybrid']]
+    .forEach(([g,s]) => [3,4].forEach(n => {
+      const p = G._generateWorkoutProgram(g, s, n, 'T', 16, []);
+      check(`${g}-${s} ${n}-day is full-body (no split days)`, _allFB(p) && _noSplit(p), _dayNames(p).join('/'));
+    }));
+  // 5+ days keep splits (not full-body)
+  const _five = G._generateWorkoutProgram('hypertrophy', 'upper', 5, 'T', 16, []);
+  check('hypertrophy-upper 5-day keeps its split (not full-body)', !_allFB(_five));
+  // Full-body sessions stay within the 25-set ceiling even at high volume (strength path too)
+  const _fbHeavy = G._generateWorkoutProgram('strength', 'pure', 4, 'T', 20, []);
+  const _tots = (_fbHeavy.days || []).map(d => d.exercises.reduce((t,e)=>t+String(e.sets).split('-').length,0));
+  check('strength full-body sessions respect the 25-set ceiling @20', _tots.every(t => t <= 25), JSON.stringify(_tots));
+  // No full-body day contains both Squat and a conventional Deadlift (CNS load)
+  const _noSqDl = (p) => (p.days || []).every(d => {
+    const ns = d.exercises.map(e => e.name);
+    const hasSq = ns.some(n => /squat/i.test(n) && !/split/i.test(n));
+    const hasDl = ns.some(n => n === 'Deadlift');
+    return !(hasSq && hasDl);
+  });
+  check('no full-body day pairs Squat with Deadlift',
+    [['hypertrophy','balanced',4],['strength','pure',4],['hypertrophy','lower',3]].every(([g,s,n]) => _noSqDl(G._generateWorkoutProgram(g,s,n,'T',16,[]))));
+}
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);

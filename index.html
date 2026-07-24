@@ -938,7 +938,49 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   function pw(n,s,t,r,k){return{name:n,scheme:s,tag:t,sets:r,kg:k};}
   function d(nm,warm,exs){return{name:nm,warmup:warm,exercises:exs};}
   var poolN=Math.max(3,Math.min(nDays,6));var key=goal+'-'+sub;var pool=[];
-  if(key==='strength-pure'){
+  // Full-body at low frequency (rule 2026-07-24): 4 days/week or fewer → full-body sessions
+  // (A–D), not an upper/lower or push/pull/legs split. Each day trains legs + a push + a pull +
+  // accessories, rotating ONE main lower lift per day (never squat + deadlift in the same
+  // session). The wizard's focus (Balanced/Upper/Lower Heavy) biases emphasis, not the split.
+  // Applies to hypertrophy & strength; aesthetic already runs glute-emphasis full-body and rehab
+  // stays injury-specific. 5+ day programs keep their splits.
+  function _fullBodyPool(g,sbx){
+    var strong=(g==='strength');
+    var LOW=[
+      strong?pw('Squat','5×5','strength','5-5-5-5-5',100):pw('Squat','4×8-12','volume','8-8-8-8',80),
+      strong?pw('Deadlift','5×3','strength','3-3-3-3-3',120):pw('Deadlift','3×5-8','strength','5-5-5',120),
+      strong?pw('Squat','5×5','strength','5-5-5-5-5',100):pw('Leg Press','4×10-15','volume','10-10-10-10',120),
+      pw('Romanian Deadlift','3×10-15','volume','10-10-10',65)
+    ];
+    var PUSH=[
+      strong?pw('Bench Press','5×5','strength','5-5-5-5-5',80):pw('Bench Press','4×8-12','volume','8-8-8-8',70),
+      strong?pw('Overhead Press','4×5','strength','5-5-5-5',50):pw('Overhead Press','3×10-15','volume','10-10-10',35),
+      strong?pw('Incline Bench Press','3×6','strength','6-6-6',65):pw('Incline Bench Press','3×8-12','volume','8-8-8',55),
+      pw('Chest Machine Press','4×8-12','volume','8-8-8-8',60)
+    ];
+    var PULL=[
+      strong?pw('Barbell Row','4×6','strength','6-6-6-6',80):pw('Barbell Row','4×8-12','volume','8-8-8-8',70),
+      pw('Pull-ups','3×max','strength','max-max-max',0),
+      pw('Cable Row','4×10-12','volume','10-10-10-10',55),
+      pw('Lat Pulldown','3×10-15','volume','10-10-10',55)
+    ];
+    var LACC=[pw('Leg Curl','3×10-15','volume','10-10-10',40),pw('Leg Extension','3×12-15','volume','12-12-12',40),pw('Leg Curl','3×10-15','volume','10-10-10',40),pw('Leg Press','3×10-15','volume','10-10-10',100)];
+    var UACC=[pw('Lateral Raise','3×12-15','volume','12-12-12',10),pw('Tricep Pushdown','3×12-15','volume','12-12-12',30),pw('Barbell Curl','3×10-15','volume','10-10-10',25),pw('Rear Delt Fly','3×12-20','rehab','12-12-12',8)];
+    var CALF=pw('Calf Raises','4×15-20','volume','15-15-15-15',60);
+    var nm=['Full Body A','Full Body B','Full Body C','Full Body D'];var out=[];
+    for(var i=0;i<4;i++){
+      var exs=[LOW[i],PUSH[i],PULL[i],LACC[i],UACC[i]];
+      if(sbx==='upper')exs.push(i%2===0?UACC[(i+2)%4]:PUSH[(i+2)%4]);
+      else if(sbx==='lower')exs.push(i%2===0?CALF:LACC[(i+3)%4]);
+      else exs.push(i%2===0?CALF:UACC[(i+2)%4]);
+      var _sn={};exs=exs.filter(function(e){if(_sn[e.name])return false;_sn[e.name]=1;return true;});
+      out.push(d(nm[i],true,exs));
+    }
+    return out;
+  }
+  var _fb=(nDays<=4&&(goal==='hypertrophy'||goal==='strength'));
+  if(_fb){pool=_fullBodyPool(goal,sub);}
+  else if(key==='strength-pure'){
     if(poolN===3){pool=[d('Day 1 — Squat',true,[pw('Squat','5×5 — progressive overload','strength','5-5-5-5-5',100),pw('Romanian Deadlift','3×8','volume','8-8-8',70),pw('Leg Press','3×10','volume','10-10-10',100),pw('Calf Raises','3×15','volume','15-15-15',60)]),d('Day 2 — Bench',true,[pw('Bench Press','5×5 — progressive overload','strength','5-5-5-5-5',80),pw('Incline Bench Press','3×8','strength','8-8-8',60),pw('Overhead Press','3×10','strength','10-10-10',40),pw('Tricep Pushdown','3×12','volume','12-12-12',30)]),d('Day 3 — Deadlift',true,[pw('Deadlift','5×3 — heavy','strength','3-3-3-3-3',120),pw('Barbell Row','4×8','strength','8-8-8-8',80),pw('Pull-ups','3×max','strength','max-max-max',0),pw('Barbell Curl','3×12','volume','12-12-12',25)])];}
     else if(poolN===4){pool=[d('Day 1 — Lower Push',true,[pw('Squat','5×5 — progressive overload','strength','5-5-5-5-5',100),pw('Leg Press','4×8','volume','8-8-8-8',100),pw('Romanian Deadlift','3×10','volume','10-10-10',70),pw('Calf Raises','4×15','volume','15-15-15-15',60)]),d('Day 2 — Upper Push',true,[pw('Bench Press','5×5','strength','5-5-5-5-5',80),pw('Incline Bench Press','3×8','strength','8-8-8',60),pw('Overhead Press','3×10','strength','10-10-10',40),pw('Tricep Pushdown','3×12','volume','12-12-12',30)]),d('Day 3 — Lower Pull',true,[pw('Deadlift','5×3 — heavy','strength','3-3-3-3-3',120),pw('Romanian Deadlift','3×8','volume','8-8-8',70),pw('Leg Curl','3×12','volume','12-12-12',40),pw('Hip Thrust','3×10','volume','10-10-10',80)]),d('Day 4 — Upper Pull',true,[pw('Barbell Row','5×5','strength','5-5-5-5-5',80),pw('Pull-ups','4×max','strength','max-max-max-max',0),pw('Face Pulls','3×15','rehab','15-15-15',20),pw('Barbell Curl','3×12','volume','12-12-12',25)])];}
     else if(poolN===5){pool=[d('Day 1 — Squat',true,[pw('Squat','5×5 — progressive overload','strength','5-5-5-5-5',100),pw('Romanian Deadlift','3×10','volume','10-10-10',70),pw('Leg Press','4×10','volume','10-10-10-10',100),pw('Leg Curl','3×12','volume','12-12-12',40)]),d('Day 2 — Bench',true,[pw('Bench Press','5×5','strength','5-5-5-5-5',80),pw('Incline Bench Press','3×10','volume','10-10-10',60),pw('Cable Fly','3×12','volume','12-12-12',20),pw('Tricep Pushdown','3×15','volume','15-15-15',30)]),d('Day 3 — Deadlift',true,[pw('Deadlift','5×3 — heavy','strength','3-3-3-3-3',120),pw('Barbell Row','4×6','strength','6-6-6-6',80),pw('Pull-ups','3×max','strength','max-max-max',0),pw('Lat Pulldown','3×10','volume','10-10-10',55)]),d('Day 4 — Overhead',true,[pw('Overhead Press','5×5','strength','5-5-5-5-5',50),pw('Lateral Raise','4×12','volume','12-12-12-12',10),pw('Face Pulls','3×15','rehab','15-15-15',20),pw('Hip Thrust','3×10','volume','10-10-10',80)]),d('Day 5 — Accessory',false,[pw('Face Pulls','4×15','rehab','15-15-15-15',20),pw('Lateral Raise','4×12','volume','12-12-12-12',10),pw('Hip Thrust','4×10','volume','10-10-10-10',80),pw('Calf Raises','4×15','volume','15-15-15-15',60)])];}
@@ -1082,7 +1124,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   var GROUPS=['legs','back','chest','shoulders','arms'];
   function _nSets(ex){return String(ex.sets).split('-').length;}
   function _resizeEx(ex,n){var parts=String(ex.sets).split('-');var out=[];for(var i=0;i<n;i++)out.push(parts[i%parts.length]);ex.sets=out.join('-');ex.scheme=String(ex.scheme||'').replace(/^\d+×/,n+'×');}
-  if(/^(hypertrophy|aesthetic)-/.test(key)){
+  if(/^(hypertrophy|aesthetic)-/.test(key)||_fb){
     var SESSION_MUSCLE_CAP=10,SESSION_CEILING=25;
     var freq={};GROUPS.forEach(function(g){freq[g]=0;});
     days.forEach(function(day){var fs={};(day.exercises||[]).forEach(function(ex){if(ex.prehab)return;var sp=getExSplits(ex.name);GROUPS.forEach(function(g){if(sp[g])fs[g]=(fs[g]||0)+_nSets(ex)*sp[g];});});day._fs=fs;GROUPS.forEach(function(g){if((fs[g]||0)>=1)freq[g]++;});});
