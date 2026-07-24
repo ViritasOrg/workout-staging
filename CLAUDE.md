@@ -192,10 +192,21 @@ This is the single most common way the rule above gets bypassed — through inte
 - **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10): `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust; Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×, and the session-ceiling trim takes sets from non-compounds first
 - Squat and Deadlift are allocator-sized like any other exercise — no hardcoded set counts
 
-### Shoulder-injury programs include active cuff work (rule 2026-07-10)
+### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
+A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
+day containing a pressing movement (bench/incline/OHP/dips/chest-or-landmine press) — **even in
+a shoulder-rehab context.** Enforced in `_generateWorkoutProgram`: Face Pulls are kept on the
+press-free day with the most back work; if every day carrying them contains a press, the entry
+is relocated to the best press-free day that has back work, else dropped. At most one Face Pulls
+day per program. *(Supersedes the earlier behaviour that injected Face Pulls onto pressing days
+for shoulder rehab.)*
+
+### Shoulder-injury programs include active cuff work (rule 2026-07-10, revised 2026-07-24)
 Rehab is active, not just avoidance. When `shoulders` is selected in the wizard Injuries
-step, the generator injects a rotator-cuff/scapular block — **Cable External Rotation
-(2×15) + Face Pulls (3×15), tag `rehab`** — at the end of up to 3 pressing days/week.
+step, the generator injects a rotator-cuff block — **Cable External Rotation (2×15), tag
+`rehab`** — at the end of up to 3 pressing days/week. **Face Pulls are NOT injected** (they may
+never sit on a press day — see the rule above); the user still gets Face Pulls via normal
+pull-day placement.
 - Injected exercises carry `prehab: true`: they keep the `rehab` tag inside non-rehab
   programs (exempt from the rehab→volume normalization) and are exempt from allocator
   resizing (fixed prescription)

@@ -2843,8 +2843,8 @@ console.log('\n── Rotator cuff prehab (shoulders injury) ──────�
   check('injected ER keeps rehab tag at 15 reps',
     cuffDays.every(d => { const e = d.exercises.find(x => x.name === 'Cable External Rotation');
       return e.tag === 'rehab' && e.prehab === true && String(e.sets).split('-').every(r => r === '15'); }));
-  check('Face Pulls present on cuff days',
-    cuffDays.every(d => d.exercises.some(e => e.name === 'Face Pulls')));
+  check('cuff block injects no Face Pulls (only External Rotation; rule 2026-07-24)',
+    !ps.days.some(d => d.exercises.some(e => e.name === 'Face Pulls' && e.prehab)));
   check('prehab exempt from allocator resize (ER stays 2 sets)',
     cuffDays.every(d => String(d.exercises.find(x => x.name === 'Cable External Rotation').sets).split('-').length === 2));
   check('sessions still ≤ 25 with cuff block',
@@ -3273,10 +3273,12 @@ if (typeof G._generateWorkoutProgram === 'function') {
 }
 
 // ── Face Pulls: at most one day per generated program ──────────────────────────
-// Rule (2026-07-23): base templates must not schedule Face Pulls on two days at once.
-// The prehab cuff block (shoulder injury) is the intentional exception.
+// Rule (2026-07-24): Face Pulls must NEVER sit on a push/press day — any day containing a
+// pressing movement — even in shoulder rehab. The shoulder-injury cuff block injects Cable
+// External Rotation (not Face Pulls) on pressing days. At most one Face Pulls day per program.
 if (typeof G._generateWorkoutProgram === 'function') {
-  console.log('\n── Face Pulls: ≤1 day per program ─────────────────────────');
+  console.log('\n── Face Pulls: never on a push/press day ──────────────────');
+  const _isPress = (nm) => /bench|incline|overhead press|\bohp\b|shoulder press|arnold press|chest press|chest machine|landmine press|\bdips?\b|push-?up|close grip/i.test(nm) && !/leg press/i.test(nm);
   const _fpDayCount = (p) => (p.days || []).filter(d => (d.exercises || []).some(e => e.name === 'Face Pulls')).length;
   const _combos = [
     ['strength','pure',5], ['strength','hybrid',6],
@@ -3285,37 +3287,29 @@ if (typeof G._generateWorkoutProgram === 'function') {
   const _over = _combos.filter(([g,s,n]) => _fpDayCount(G._generateWorkoutProgram(g,s,n,'T',16,[])) > 1);
   check('No non-injury program schedules Face Pulls on more than one day',
     _over.length === 0, _over.map(c => c.join('-')).join(', '));
-  // Face Pulls must never sit on a push-dominant day (back < chest+shoulder set-volume),
-  // across every goal/sub/day-count and with/without shoulder injury. prehab cuff Face Pulls
-  // (injected on pressing days for active rehab) are the intentional exception.
-  const _dayScore = (day) => {
-    let bk = 0, pp = 0;
-    (day.exercises || []).forEach(e => {
-      if (e.name === 'Face Pulls') return;
-      const sp = G.getExSplits(e.name); const n = String(e.sets).split('-').length;
-      bk += (sp.back || 0) * n; pp += ((sp.chest || 0) + (sp.shoulders || 0)) * n;
-    });
-    return { bk, pp };
-  };
+  // Sweep every goal/sub/day-count, with and without shoulder injury: no Face Pulls (prehab or
+  // not) may share a day with a pressing movement.
   const _allCombos = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],
-    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower']];
-  const _nd = { strength:[3,4,5,6], hypertrophy:[3,4,5,6,7], aesthetic:[3,5] };
-  let _pushFP = [];
+    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],
+    ['rehab','shoulder'],['rehab','back'],['rehab','knee']];
+  const _nd = { strength:[3,4,5,6], hypertrophy:[3,4,5,6,7], aesthetic:[3,5], rehab:[6] };
+  let _pressFP = [];
   _allCombos.forEach(([g,s]) => _nd[g].forEach(n => [[],['shoulders']].forEach(inj => {
     const p = G._generateWorkoutProgram(g, s, n, 'T', 16, inj);
     (p.days || []).forEach(d => {
-      if ((d.exercises || []).some(e => e.name === 'Face Pulls' && !e.prehab)) {
-        const sc = _dayScore(d);
-        if (sc.pp > sc.bk) _pushFP.push(`${g}-${s}-${n}/${inj.join('')}: ${d.name}`);
-      }
+      const hasFP = (d.exercises || []).some(e => e.name === 'Face Pulls');
+      const hasPress = (d.exercises || []).some(e => _isPress(e.name));
+      if (hasFP && hasPress) _pressFP.push(`${g}-${s}-${n}/${inj.join('')}: ${d.name}`);
     });
   })));
-  check('Face Pulls never placed on a push-dominant day (any program)',
-    _pushFP.length === 0, _pushFP.slice(0, 4).join(' | '));
-  // Shoulder-injury cuff work is preserved (prehab Face Pulls injected on pressing days)
+  check('Face Pulls never share a day with a pressing movement (any program)',
+    _pressFP.length === 0, _pressFP.slice(0, 5).join(' | '));
+  // Shoulder-injury cuff work is preserved via Cable External Rotation (NOT Face Pulls)
   const _shoulder = G._generateWorkoutProgram('hypertrophy','balanced',6,'T',16,['shoulders']);
-  const _hasPrehabFP = (_shoulder.days || []).some(d => (d.exercises || []).some(e => e.name === 'Face Pulls' && e.prehab));
-  check('Shoulder-injury program still injects prehab cuff Face Pulls', _hasPrehabFP);
+  const _hasExtRot = (_shoulder.days || []).some(d => (d.exercises || []).some(e => e.name === 'Cable External Rotation' && e.prehab));
+  check('Shoulder-injury program still injects prehab Cable External Rotation', _hasExtRot);
+  const _cuffFP = (_shoulder.days || []).some(d => (d.exercises || []).some(e => e.name === 'Face Pulls' && e.prehab));
+  check('Shoulder-injury cuff block no longer injects Face Pulls', _cuffFP === false);
 }
 
 // ── Manual program builder (blank, no wizard) ──────────────────────────────────
