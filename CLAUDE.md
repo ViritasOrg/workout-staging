@@ -64,6 +64,40 @@ Rules:
 - **Never display US$ amounts, per-unit prices, or cost totals** in any modal or UI
 - Any pricelist CSV must have no price column ever
 
+## ⚠️ HISTORY VIEWS READ AND PLOT — THEY NEVER CALCULATE ⚠️
+**Any view whose job is to show *stored history* must load it from the backend and draw
+it. Full stop. No re-derivation, no recomputation, no backfill, no "re-capture if the
+data looks stale or empty" — not even once, not even as a convenience.**
+
+The split is:
+- **The tab that owns the model computes** — e.g. T-Calc owns the free-T PK model — and
+  **persists** the per-day value (`/plasma-history`, marker-keyed).
+- **The history view loads that and plots it.** If the backend has nothing, it shows an
+  empty state that says where the data comes from. It does **not** helpfully generate one.
+- The only other legitimate capture is immediately after a user **write** that changes
+  the underlying data (e.g. saving a past injection).
+
+**What triggered this rule (2026-07-25):** `buildTHist()` in `tab-thist.js` backfilled
+whenever the store looked empty *or* the stored tail extended past the last injection.
+Opening the T-History tab therefore recomputed the entire series with whatever the client
+model happened to be that build, and wrote it back **over the stored values**. Two
+consequences, both bad:
+- A bug anywhere in the PK model silently **rewrote saved history** — the data the user
+  had was replaced by a fresh wrong answer, with no action on their part.
+- The view stopped being a view. It disagreed with the source of truth it existed to show,
+  and read ~10× high because it inherited a calibration-anchor bug from the live model.
+
+**Why "just backfill once if it's empty" is still wrong:** it is indistinguishable from
+the failure above. Empty *is* a valid state, and the fix for missing data is to make the
+owning tab capture it, never to have the reader invent it. "Stale" heuristics are worse —
+they overwrite data that was correct when it was written.
+
+**The rule:**
+- A history/read view may call `fetch` + render. Nothing else.
+- If you are about to add "compute the series here so the chart isn't blank", stop — that
+  is this bug.
+- Regression tests assert `buildTHist` contains no capture/compute/model call. Keep them.
+
 ## ⚠️ localStorage IS A CACHE — NEVER THE SOURCE OF TRUTH ⚠️
 localStorage is a read cache for performance only. It is NEVER the source of truth.
 
