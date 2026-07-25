@@ -70,12 +70,15 @@ it. Full stop. No re-derivation, no recomputation, no backfill, no "re-capture i
 data looks stale or empty" — not even once, not even as a convenience.**
 
 The split is:
-- **The tab that owns the model computes** — e.g. T-Calc owns the free-T PK model — and
-  **persists** the per-day value (`/plasma-history`, marker-keyed).
+- **The tab that owns the model computes** — e.g. T-Calc owns the free-T PK model.
+- **It persists only on an explicit user action** — a "save/update history" control the
+  user presses (`tcSaveHistoryFromCurve`), storing the curve **exactly as displayed**.
+  Nothing captures automatically: not on view load, not on profile save, not even when a
+  past injection is logged. Stored history stays exactly as the user last saved it until
+  they choose to refresh it. (Confirmed 2026-07-25: "corrected, then never touched unless
+  I ask for it.")
 - **The history view loads that and plots it.** If the backend has nothing, it shows an
   empty state that says where the data comes from. It does **not** helpfully generate one.
-- The only other legitimate capture is immediately after a user **write** that changes
-  the underlying data (e.g. saving a past injection).
 
 **What triggered this rule (2026-07-25):** `buildTHist()` in `tab-thist.js` backfilled
 whenever the store looked empty *or* the stored tail extended past the last injection.
