@@ -56,6 +56,17 @@ published, peer-reviewed research or an established clinical guideline.**
   possible failure** — worse than omitting the claim. Verify before writing.
 - Where evidence is thin, pre-clinical, or animal-only, say so in-line.
 
+### 🔻 Primary sources CAN be downloaded — do it, never ask
+Your sandbox cannot reach DailyMed, FDA, eMC, EuropePMC or PubMed (all 403 through the
+agent proxy). That is **not** a reason to leave a value unsourced or to cite a web-search
+summary as though you had read the document. `claude-agent-backend` has
+`scripts/fetch_sources.py` + the **Fetch research sources** workflow, which runs on a
+GitHub runner (full internet) and commits retrieved document text to
+`claude-agent-backend/docs/enhanced-bodybuilding/sources/`. Add the source, trigger the
+workflow, pull, read the file, then cite it. Henrik's standing instruction (2026-07-29):
+**"Dont even ask me before downloading research to support app development."** Full
+procedure and the cautionary Labetalol incident are in that repo's CLAUDE.md.
+
 ## ⚠️ NO PRICES IN THE APP — NEVER ⚠️
 Supplier pricing is commercially sensitive and must **NEVER** appear in any app UI, rendered HTML, or user-facing output. If a `PRICELIST` or similar pricing structure is ever added to this app, it must contain only vial sizes and quantities — **no `usd` or price fields**.
 
