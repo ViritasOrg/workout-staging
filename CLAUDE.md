@@ -392,6 +392,11 @@ asks for that specific change in that conversation turn.
   prescriptions (`max-max-max`) survive an edit, and any stored value the dropdowns cannot
   express (a mixed string like `10-10-12`) is offered as its own option rather than silently
   rewritten — picking a real value normalises it.
+- **Both dropdowns carry an explicit `width`** (40px / 52px). A `<select>` sizes itself to its
+  widest option *or optgroup label*, so "Strength 4-6" stretched the control, overflowed the
+  editor row and pushed the kg field, tag chip and remove button off-screen — the program looked
+  like it had lost its weights (2026-08-01). The row also has `flex-wrap:wrap` as a safety net.
+  Only the sets field became two dropdowns; nothing else in that row changed.
 - Picking reps IS picking the tag: `_progSetSets()` writes the derived tag and refreshes the
   read-only chip. An illegal reps/tag pair can no longer be authored by hand.
 

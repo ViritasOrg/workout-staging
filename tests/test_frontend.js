@@ -3608,6 +3608,18 @@ if (typeof G._generateWorkoutProgram === 'function') {
     const sel  = (h) => [...h.matchAll(/<option selected>([^<]*)</g)].map(m => m[1]);
     const h = G._progSetsSelects(0, 0, '8-8-8-8');
     check('two dropdowns rendered', (h.match(/<select/g) || []).length === 2);
+    // Regression (2026-08-01): a <select> sizes itself to its widest option OR optgroup label,
+    // so "Strength 4-6" stretched the control, overflowed the editor row and pushed the kg
+    // field, tag chip and remove button off-screen — the program looked like it had no weights.
+    check('both dropdowns carry an explicit width', (h.match(/width:\d+px/g) || []).length === 2,
+      JSON.stringify(h.match(/width:\d+px/g)));
+    check('dropdown widths stay within the old sets field footprint',
+      (h.match(/width:(\d+)px/g) || []).map(w => +w.match(/\d+/)[0]).reduce((a,b) => a+b, 0) <= 100);
+    check('editor row wraps rather than pushing controls off-screen',
+      /display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;/.test(rawScript));
+    check('editor row still renders the kg field next to the dropdowns',
+      /_progSetsSelects\(di,ei,ex\.sets\)/.test(rawScript) &&
+      rawScript.indexOf("].kg=unitToKg(this.value)") > rawScript.indexOf('_progSetsSelects(di,ei,ex.sets)'));
     check('4x8 preselects 4 sets and 8 reps', JSON.stringify(sel(h)) === '["4","8"]', JSON.stringify(sel(h)));
     const all = opts(h);
     check('sets options are 1-6', JSON.stringify(all.slice(0, 6)) === '["1","2","3","4","5","6"]', JSON.stringify(all.slice(0, 6)));
