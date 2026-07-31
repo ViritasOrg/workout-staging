@@ -2647,13 +2647,28 @@ console.log('\n── Leg-day rules in generated programs ───────�
     !!legsB7 && legsB7.exercises[legsB7.exercises.length - 1].name === 'Deadlift'
              && !legsB7.exercises.some(e => /squat/i.test(e.name) && !/split/i.test(e.name)),
     legsB7 ? JSON.stringify(legsB7.exercises.map(e => e.name)) : 'no Legs B');
-  // Deadlift is allocator-sized (2-5 sets, scheme in sync) on Deadlift days
-  const p16 = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T16', 16);
-  const dlDays16 = p16.days.filter(d => /legs/i.test(d.name) && d.exercises.some(e => e.name === 'Deadlift'));
-  check('setsPerMuscle=16: Deadlift allocator-sized (2-5 sets, scheme matches)',
-    dlDays16.length > 0 && dlDays16.every(d => { const l = d.exercises[d.exercises.length - 1]; const n = String(l.sets).split('-').length;
-      return l.name === 'Deadlift' && n >= 2 && n <= 5 && String(l.scheme).startsWith(n + '×5-8'); }),
-    JSON.stringify(dlDays16.map(d => d.exercises[d.exercises.length - 1].sets)));
+  // The heavy Deadlift finisher is a FIXED prescription (rule 2026-07-31, supersedes the
+  // 2026-07-10 "Deadlift is allocator-sized like any other exercise" rule for this entry):
+  // it is always present, always last, and keeps exactly the sets it was authored with at
+  // every setsPerMuscle. Everything else in the session is sized around it.
+  const _dlFin = (spm) => G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T', spm)
+    .days.filter(d => /legs/i.test(d.name) && d.exercises.some(e => e.name === 'Deadlift'))
+    .map(d => d.exercises[d.exercises.length - 1]);
+  const _dl9 = _dlFin(9), _dl16 = _dlFin(16), _dl25 = _dlFin(25);
+  check('heavy Deadlift finisher present and last on the Deadlift leg day',
+    _dl9.length > 0 && _dl9.every(l => l.name === 'Deadlift'));
+  check('heavy Deadlift finisher is flagged as a fixed prescription',
+    _dl16.every(l => l.fixed === true));
+  check('heavy Deadlift finisher keeps its sets at every setsPerMuscle (9/16/25)',
+    [_dl9, _dl16, _dl25].every(a => a.every(l => String(l.sets) === '6' && String(l.scheme).startsWith('1×5-8'))),
+    JSON.stringify([_dl9, _dl16, _dl25].map(a => a.map(l => l.sets))));
+  // Strength programs keep it too — the linear scaling path must not scale it either.
+  const _dlStr = G._generateWorkoutProgram('strength', 'hybrid', 6, 'T', 20)
+    .days.filter(d => /legs/i.test(d.name)).map(d => d.exercises[d.exercises.length - 1])
+    .filter(l => l.name === 'Deadlift');
+  check('strength path leaves the heavy Deadlift finisher unscaled',
+    _dlStr.length > 0 && _dlStr.every(l => String(l.sets) === '6'),
+    JSON.stringify(_dlStr.map(l => l.sets)));
   // Rehab programs are untouched (no heavy deadlift forced into rehab days)
   const pk = G._generateWorkoutProgram('rehab', 'knee', 6, 'TK', 12);
   check('rehab-knee program has no forced Deadlift finishers',
@@ -2787,10 +2802,18 @@ console.log('\n── Frequency-aware volume allocation ────────
   let schemeOk=true;
   for(const d of hi.p.days)for(const ex of d.exercises){const n=String(ex.sets).split('-').length;const m=String(ex.scheme).match(/^(\d+)×/);if(m&&parseInt(m[1])!==n)schemeOk=false;}
   check('scheme N× prefix matches resized set count', schemeOk);
-  // Strength SPLITS (5+ days) and rehab keep their fixed schemes (linear scaling path).
-  // (≤4-day strength is now full-body and uses the frequency-aware allocator — see below.)
+  // Strength SPLITS now run through the frequency-aware allocator too (rule 2026-07-31,
+  // supersedes "strength splits keep their fixed 5×5/5×3 schemes"): the weekly sets-per-muscle
+  // target applies to every goal, so a strength Squat is target-sized like any other lift.
+  // Rehab keeps the linear path. Reps/tag are untouched — only the set count moves.
   const sp12=G._generateWorkoutProgram('strength','pure',5,'T',12);
-  check('strength-pure 5-day @12: Squat keeps its 5×5 scheme', sp12.days[0].exercises[0].sets==='5-5-5-5-5', sp12.days[0].exercises[0].sets);
+  const sp25=G._generateWorkoutProgram('strength','pure',5,'T',25);
+  const _sq12=sp12.days[0].exercises[0], _sq25=sp25.days[0].exercises[0];
+  check('strength-pure 5-day: Squat is target-sized, not a fixed 5×5',
+    String(_sq12.sets).split('-').length < String(_sq25.sets).split('-').length,
+    `@12 ${_sq12.sets} vs @25 ${_sq25.sets}`);
+  check('strength-pure Squat keeps its strength rep scheme (4-6 reps)',
+    String(_sq12.sets).split('-').every(r => +r >= 4 && +r <= 6), _sq12.sets);
   const rk12=allocStats('rehab','knee',6,12), rk24=allocStats('rehab','knee',6,24);
   check('rehab scales linearly (24 = 2× the sets of 12)', rk24.tots[0]===rk12.tots[0]*2, `${rk12.tots[0]} vs ${rk24.tots[0]}`);
   // Wizard review shows the computed outcome
@@ -3257,8 +3280,13 @@ if (typeof G._generateWorkoutProgram === 'function') {
     if (_sq && _rdl) {
       check('RDL does not out-rank the primary Squat (leakage fixed)',
         _ns(_rdl) <= _ns(_sq), `Squat ${_ns(_sq)} vs RDL ${_ns(_rdl)}`);
-      check('Squat gets meaningful volume at 20 sets/muscle (leads the day)',
-        _ns(_sq) >= 4, `Squat ${_ns(_sq)}`);
+      // Squat leads its day, but a hard "≥4 sets" is arithmetically incompatible with hitting
+      // the weekly target (2026-07-31): 5 leg exercises at a 2-set floor already spend the
+      // 10-set session budget, so leading is expressed as "≥ every other exercise", not a
+      // fixed count.
+      check('Squat leads its day at 20 sets/muscle (≥ every other exercise)',
+        _legA.exercises.filter(e => !e.fixed && !e.prehab).every(e => _ns(_sq) >= _ns(e)),
+        _legA.exercises.map(e => e.name + ' ' + _ns(e)).join(' | '));
     }
   }
 }
@@ -3378,10 +3406,14 @@ if (typeof G._generateWorkoutProgram === 'function') {
 if (typeof G._generateWorkoutProgram === 'function') {
   console.log('\n── Intra-session set balance ──────────────────────────────');
   const _ns = (e) => String(e.sets).split('-').length;
-  const _sizable = (d) => (d.exercises || []).filter(e => !e.prehab);
+  // Fixed prescriptions (the heavy Deadlift finisher) and prehab blocks are not allocator-sized,
+  // so they neither set nor break the balance invariant.
+  const _sizable = (d) => (d.exercises || []).filter(e => !e.prehab && !e.fixed);
 
-  check('secondary muscle group cannot raise an exercise\'s set count',
-    /if\(f<0\.5\)r=Math\.min\(1,r\);/.test(rawScript));
+  check('sets are allocated from the muscle an exercise targets (split >= 0.5)',
+    /\(getExSplits\(ex\.name\)\[g\]\|\|0\)>=0\.5/.test(rawScript));
+  check('a muscle only counts a day toward its frequency if something targets it',
+    /if\(sp\[g\]>=0\.5\)dom\[g\]=1;/.test(rawScript));
   check('balance guardrail constant defined (BALANCE_RATIO=2)',
     rawScript.includes('SESSION_MUSCLE_CAP=10,SESSION_CEILING=25,BALANCE_RATIO=2'));
   check('balance guardrail runs after the 25-set ceiling trim',
@@ -3448,6 +3480,92 @@ if (typeof G._generateWorkoutProgram === 'function') {
     });
   });
   check('25-set session ceiling still holds', _overCeiling.length === 0, _overCeiling.slice(0, 3).join('; '));
+}
+
+// ── Weekly sets-per-muscle lands on target ────────────────────────────────────
+// Rule (2026-07-31): the wizard's sets-per-muscle is a target the generator must actually hit,
+// for every goal including strength. Before this, a 12-set weekly leg target generated 20 sets
+// (+68%) on hypertrophy-upper and 39 sets (+145%) on strength-hybrid, because the compound bias
+// multiplied the total and a 2-set floor across 5-6 exercises could not go lower.
+if (typeof G._generateWorkoutProgram === 'function') {
+  console.log('\n── Weekly sets-per-muscle vs target ───────────────────────');
+  const _GR = ['legs','back','chest','shoulders','arms'];
+  const _n = (e) => String(e.sets).split('-').length;
+  const _weekly = (p) => {
+    const w = {}; _GR.forEach(g => w[g] = 0);
+    (p.days || []).forEach(d => (d.exercises || []).forEach(e => {
+      const sp = G.getExSplits(e.name); _GR.forEach(g => { if (sp[g]) w[g] += _n(e) * sp[g]; });
+    }));
+    return w;
+  };
+  // The two programs from the report, at the volumes that were worst.
+  const _hw = _weekly(G._generateWorkoutProgram('hypertrophy', 'upper', 6, 'T', 12, []));
+  check('hypertrophy-upper 6-day @12: weekly leg sets within 1.35x target',
+    _hw.legs <= 12 * 1.35, `legs ${_hw.legs.toFixed(1)} vs 12`);
+  const _sw = _weekly(G._generateWorkoutProgram('strength', 'hybrid', 6, 'T', 16, []));
+  check('strength-hybrid 6-day @16: weekly leg sets within 1.35x target',
+    _sw.legs <= 16 * 1.35, `legs ${_sw.legs.toFixed(1)} vs 16`);
+
+  // No muscle may run away from the target in any allocator-sized program.
+  // Overshoot is only ever allowed when every lift for that muscle already sits on the 2-set
+  // floor — the smallest a session can prescribe. A 9-set weekly leg target spread over three
+  // leg days cannot physically be met (3 exercises x 2 sets x 3 days = 18). Anywhere above that
+  // floor, 1.6x is a bug.
+  const _runaway = [];
+  [['hypertrophy','upper'],['hypertrophy','lower'],['hypertrophy','balanced'],
+   ['aesthetic','ppl'],['aesthetic','upperlower'],['strength','pure'],['strength','hybrid']]
+    .forEach(([g,s]) => [4,5,6,7].forEach(nd => [9,12,16,20,25].forEach(spm => {
+      const p = G._generateWorkoutProgram(g, s, nd, 'T', spm, []);
+      const w = _weekly(p);
+      _GR.forEach(m => {
+        if (w[m] <= spm * 1.6) return;
+        // every session training this muscle must be at the floor for the overshoot to be legal
+        const atFloor = (p.days || []).every(d =>
+          (d.exercises || []).filter(e => !e.prehab && !e.fixed && (G.getExSplits(e.name)[m] || 0) >= 0.5)
+            .every(e => _n(e) <= 2));
+        if (!atFloor) _runaway.push(`${g}/${s} ${nd}d spm${spm} ${m} ${w[m].toFixed(1)}`);
+      });
+    })));
+  check('no muscle exceeds 1.6x its weekly target unless the sessions are at their floor',
+    _runaway.length === 0, _runaway.slice(0, 4).join('; '));
+
+  // Drop-to-fit: sessions may lose accessories, never compounds, the heavy Deadlift, or drop
+  // below 3 exercises.
+  const _pruneBad = [];
+  [['hypertrophy','upper',6,9],['hypertrophy','balanced',6,9],['strength','pure',6,9],['aesthetic','ppl',6,9]]
+    .forEach(([g,s,nd,spm]) => {
+      const p = G._generateWorkoutProgram(g, s, nd, 'T', spm, []);
+      (p.days || []).forEach(d => {
+        const es = (d.exercises || []).filter(e => !e.prehab);
+        if (es.length < 3) _pruneBad.push(`${g}/${s} ${d.name}: only ${es.length} exercises`);
+      });
+      // Nothing that survives at a high target (where little pruning happens) may be pruned away
+      // at a low one if it is a compound or a fixed prescription.
+      const hi = G._generateWorkoutProgram(g, s, nd, 'T', 25, []);
+      (hi.days || []).forEach((d, i) => {
+        const lo = (p.days || [])[i]; if (!lo) return;
+        d.exercises.filter(e => G.isCompoundEx(e.name) || e.fixed).forEach(e => {
+          if (!lo.exercises.some(x => x.name === e.name))
+            _pruneBad.push(`${g}/${s} ${d.name}: pruned ${e.name}`);
+        });
+      });
+    });
+  check('drop-to-fit keeps >=3 exercises and never prunes a compound or the heavy Deadlift',
+    _pruneBad.length === 0, _pruneBad.slice(0, 3).join('; '));
+
+  // Shape: the muscle's main compound is never out-ranked by an accessory that only touches it
+  // as a secondary muscle (the original RDL-vs-Squat failure, from the volume side this time).
+  const _shape = [];
+  [['hypertrophy','upper'],['hypertrophy','balanced']].forEach(([g,s]) =>
+    [5,6,7].forEach(nd => [12,16,20,25].forEach(spm => {
+      (G._generateWorkoutProgram(g, s, nd, 'T', spm, []).days || []).forEach(d => {
+        const sq = d.exercises.find(e => /^Squat/.test(e.name));
+        const rdl = d.exercises.find(e => /Romanian Deadlift/.test(e.name));
+        if (sq && rdl && _n(rdl) > _n(sq)) _shape.push(`${g}/${s} ${nd}d spm${spm} ${d.name}: Squat ${_n(sq)} RDL ${_n(rdl)}`);
+      });
+    })));
+  check('RDL never out-ranks the Squat it sits behind, at any volume',
+    _shape.length === 0, _shape.slice(0, 3).join('; '));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
