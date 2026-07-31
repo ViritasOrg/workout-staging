@@ -804,13 +804,17 @@ function _progSetsParts(sets){
 }
 function _progSetsSelects(di,ei,sets){
   var cur=_progSetsParts(sets),o='',i;
-  var st='background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 4px;color:var(--text);font-size:11px;font-family:var(--font-ui);outline:none;flex-shrink:0;cursor:pointer;';
-  o+='<select title="Sets" onchange="_progSetSets('+di+','+ei+',this.value,null)" style="'+st+'">';
+  // Explicit widths are load-bearing: a <select> sizes itself to its widest option OR optgroup
+  // label, so "Strength 4-6" stretched the control far past the 72px the old sets text field
+  // used, overflowed the row and pushed the kg field, tag chip and remove button off-screen.
+  var st='background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 2px;color:var(--text);font-size:11px;font-family:var(--font-ui);outline:none;flex-shrink:0;cursor:pointer;';
+  var stSets=st+'width:40px;';var stReps=st+'width:52px;';
+  o+='<select title="Sets" onchange="_progSetSets('+di+','+ei+',this.value,null)" style="'+stSets+'">';
   for(i=PROG_SETS_MIN;i<=PROG_SETS_MAX;i++)o+='<option'+(cur.n===i?' selected':'')+'>'+i+'</option>';
   if(cur.n<PROG_SETS_MIN||cur.n>PROG_SETS_MAX)o+='<option selected>'+cur.n+'</option>';
   o+='</select>';
-  o+='<span style="color:var(--muted);font-size:11px;flex-shrink:0;">×</span>';
-  o+='<select title="Reps" onchange="_progSetSets('+di+','+ei+',null,this.value)" style="'+st+'">';
+  o+='<span style="color:var(--muted);font-size:11px;flex-shrink:0;margin:0 -2px;">×</span>';
+  o+='<select title="Reps" onchange="_progSetSets('+di+','+ei+',null,this.value)" style="'+stReps+'">';
   var known=cur.reps==='max';
   // Only rep counts a tag range defines are offered, grouped by the tag they produce — picking
   // reps IS picking the tag (rule 2026-07-31), so an illegal reps/tag pair cannot be authored.
@@ -885,11 +889,11 @@ function _renderProgOverlay(){
     day.exercises.forEach(function(ex,ei){
       html+='<div style="border-bottom:1px solid var(--border);padding:10px 0;">';
       html+=_exOpts(di,ei,ex.name);
-      html+='<div style="display:flex;gap:6px;margin-top:6px;align-items:center;">';
+      html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;">';
       html+='<input type="text" id="prog-scheme-'+di+'-'+ei+'" value="'+_escP(ex.scheme)+'" oninput="_progEditBuf.days['+di+'].exercises['+ei+'].scheme=this.value" placeholder="Scheme e.g. 5×5" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11px;font-family:var(--font-ui);outline:none;">';
       html+=_progSetsSelects(di,ei,ex.sets);
       html+='<input type="text" inputmode="decimal" value="'+(ex.kg?kgToUnit(ex.kg):'')+'" oninput="_progEditBuf.days['+di+'].exercises['+ei+'].kg=unitToKg(this.value)||0" placeholder="'+unitLabel()+'" style="width:52px;flex-shrink:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--accent);font-size:11px;font-family:var(--font-ui);outline:none;">';
-      html+='<span id="prog-tag-'+di+'-'+ei+'" class="tag '+(_PROG_TAG_CLASS[ex.tag]||'tag-volume')+'" title="Set automatically by the rep count" style="flex-shrink:0;font-size:10px;">'+_progTagLabel(ex.tag)+'</span>';
+      html+='<span id="prog-tag-'+di+'-'+ei+'" class="tag '+(_PROG_TAG_CLASS[ex.tag]||'tag-volume')+'" title="Set automatically by the rep count" style="flex-shrink:0;font-size:10px;padding:2px 6px;">'+_progTagLabel(ex.tag)+'</span>';
       html+='<button onclick="_progRmEx('+di+','+ei+')" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;">×</button>';
       html+='</div></div>';
     });
