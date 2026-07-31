@@ -3655,6 +3655,48 @@ if (typeof G._generateWorkoutProgram === 'function') {
   }
 }
 
+// ── Every numeric field raises a numeric keypad, app-wide ─────────────────────
+// Reported 2026-07-31 (peptide app, same fix applied here): the onboarding Age
+// field opened iOS's numbers-and-punctuation keyboard — digits plus - / : ; ( )
+// £ & @ " and an ABC key — rather than a plain keypad. That layout is what bare
+// type="number" gets on iOS; inputmode is what actually selects the keypad.
+// Decimal-capable fields use inputmode="decimal", integer fields use "numeric".
+{
+  console.log('\n── Numeric keypad on every number field ───────────────────');
+  const _bareNum = [];
+  const _numRe = /type="number"/g;
+  let _nm;
+  while ((_nm = _numRe.exec(html))) {
+    const st = html.lastIndexOf('<input', _nm.index), en = html.indexOf('>', _nm.index);
+    if (st === -1 || en === -1) continue;
+    if (html.slice(st, en + 1).indexOf('inputmode') === -1)
+      _bareNum.push('line ' + html.slice(0, _nm.index).split('\n').length);
+  }
+  check('no type="number" input is left without an inputmode', _bareNum.length === 0,
+    _bareNum.length ? _bareNum.join(', ') : 'all number inputs declare one');
+
+  // Behavioural: the onboarding steps the report came from. Age sits in step 2,
+  // height and body weight in step 3 — check the rendered markup, not the source.
+  if (typeof G._obHtml2 === 'function' && typeof G._obHtml3 === 'function') {
+    const _svOb = G._obData;
+    G._obData = {gender:'male'};
+    const _ob = G._obHtml2() + G._obHtml3();
+    const _obIn = (_ob.match(/<input[^>]*>/g) || []).filter(t => /type="(number|text)"/.test(t));
+    check('the onboarding stats steps render their inputs', _obIn.length === 3, `got ${_obIn.length}`);
+    check('  …every one declares an inputmode', _obIn.every(t => t.indexOf('inputmode=') !== -1),
+      _obIn.filter(t => t.indexOf('inputmode=') === -1).join(' | '));
+    check('  …Age asks for a plain numeric keypad',
+      /Age<\/label>[\s\S]{0,80}inputmode="numeric"/.test(_ob));
+    check('  …Height asks for a plain numeric keypad',
+      /Height \(cm\)<\/label>[\s\S]{0,80}inputmode="numeric"/.test(_ob));
+    check('  …Body Weight still allows a decimal point',
+      /inputmode="decimal"[^>]*placeholder="85"/.test(_ob));
+    G._obData = _svOb;
+  } else {
+    check('_obHtml2/_obHtml3 available for the onboarding keypad check', false);
+  }
+}
+
 // ── Automatic tagging from prescribed reps ────────────────────────────────────
 // Rule (2026-07-31): "make tagging automatic and honor the rep ranges". The tag is derived
 // from the PRESCRIPTION, never set by hand. Logged reps never re-label anything — an AMRAP set

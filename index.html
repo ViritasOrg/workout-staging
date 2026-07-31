@@ -1551,14 +1551,14 @@ function _obHtml2(){
     +'<button class="ob-gender-btn'+(g==='female'?' ob-sel':'')+'" onclick="obGender(\'female\')">♀ Female</button>'
     +'</div></div>'
     +'<div class="ob-field"><label>Age</label>'
-    +'<input type="number" placeholder="28" min="10" max="100" value="'+(_obData.age||'')+'" oninput="_obData.age=this.value"></div>';
+    +'<input type="number" inputmode="numeric" placeholder="28" min="10" max="100" value="'+(_obData.age||'')+'" oninput="_obData.age=this.value"></div>';
 }
 function _obHtml3(){
   return '<div style="margin-bottom:20px">'
     +'<div style="font-family:var(--font-display);font-size:30px;letter-spacing:1px;color:var(--text)">Physical Stats</div>'
     +'<div style="font-size:13px;color:var(--muted);margin-top:4px">Needed for body fat estimation.</div></div>'
     +'<div class="ob-field"><label>Height (cm)</label>'
-    +'<input type="number" placeholder="180" min="100" max="250" value="'+(_obData.height||'')+'" oninput="_obData.height=this.value"></div>'
+    +'<input type="number" inputmode="numeric" placeholder="180" min="100" max="250" value="'+(_obData.height||'')+'" oninput="_obData.height=this.value"></div>'
     +'<div class="ob-field"><label>Body Weight</label>'
     +'<div style="display:flex;gap:8px;margin:6px 0 10px;">'
     +['kg','lb'].map(function(u){var on=unitLabel()===u;return '<div onclick="setUnit(\''+u+'\');obRender()" style="flex:1;text-align:center;padding:10px 0;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;background:'+(on?'var(--accent)':'var(--surface2)')+';color:'+(on?'#000':'var(--text)')+';border:1px solid '+(on?'var(--accent)':'var(--border)')+';">'+u+'</div>';}).join('')
