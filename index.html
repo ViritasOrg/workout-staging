@@ -1054,7 +1054,11 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
       for(var _r2=exs.length-1;_r2>=0;_r2--){if(_isSq(exs[_r2]))exs.splice(_r2,1);}
       var dli=-1;for(var _j2=0;_j2<exs.length;_j2++){if(exs[_j2].name==='Deadlift'){dli=_j2;break;}}
       var dlx;if(dli>=0){dlx=exs.splice(dli,1)[0];}else{dlx=pw('Deadlift','1×5-8','strength','6',Math.round(((exs[0]||{}).kg||80)*1.5));}
-      dlx.tag='strength';dlx.scheme=String(dlx.sets).split('-').length+'×5-8';exs.push(dlx);
+      // The heavy Deadlift is a fixed prescription (2026-07-31): it is always present and keeps
+      // exactly the sets it was authored with. `fixed` exempts it from the volume allocator, the
+      // linear strength scaling, the 25-set ceiling trim and the balance guardrail — its sets are
+      // still counted as real volume, so everything else in the session is sized around it.
+      dlx.tag='strength';dlx.fixed=true;dlx.scheme=String(dlx.sets).split('-').length+'×5-8';exs.push(dlx);
     }});
   var days=pool.slice(0,nDays).map(function(day,i){return Object.assign({},day,{name:'Day '+(i+1)+' — '+day.name.replace(/^Day \d+ — /,'')});});
   // Injuries (2026-07-10): substitutions are baked into the program permanently — the
@@ -1115,39 +1119,89 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   var GROUPS=['legs','back','chest','shoulders','arms'];
   function _nSets(ex){return String(ex.sets).split('-').length;}
   function _resizeEx(ex,n){var parts=String(ex.sets).split('-');var out=[];for(var i=0;i<n;i++)out.push(parts[i%parts.length]);ex.sets=out.join('-');ex.scheme=String(ex.scheme||'').replace(/^\d+×/,n+'×');}
-  if(/^(hypertrophy|aesthetic)-/.test(key)||_fb){
-    var SESSION_MUSCLE_CAP=10,SESSION_CEILING=25,BALANCE_RATIO=2;
-    var freq={};GROUPS.forEach(function(g){freq[g]=0;});
-    days.forEach(function(day){var fs={};(day.exercises||[]).forEach(function(ex){if(ex.prehab)return;var sp=getExSplits(ex.name);GROUPS.forEach(function(g){if(sp[g])fs[g]=(fs[g]||0)+_nSets(ex)*sp[g];});});day._fs=fs;GROUPS.forEach(function(g){if((fs[g]||0)>=1)freq[g]++;});});
+  if(/^(hypertrophy|aesthetic|strength)-/.test(key)||_fb){
+    var SESSION_MUSCLE_CAP=10,SESSION_CEILING=25,BALANCE_RATIO=2,MIN_SETS=2,MIN_EX=3,OVER_TOL=1.0,SHAPE_W=0.05;
+    var freq={};
+    // Recomputed after pruning: pruning changes both the per-day bases and how many days
+    // actually train each muscle, so the sizing pass must run on post-prune counts.
+    function _recount(){
+      GROUPS.forEach(function(g){freq[g]=0;});
+      days.forEach(function(day){var fs={},dom={};(day.exercises||[]).forEach(function(ex){if(ex.prehab)return;var sp=getExSplits(ex.name);GROUPS.forEach(function(g){if(sp[g]){fs[g]=(fs[g]||0)+_nSets(ex)*sp[g];if(sp[g]>=0.5)dom[g]=1;}});});day._fs=fs;
+        // A day counts toward a muscle's training FREQUENCY only if something there actually
+        // targets it (split >= 0.5). Counting incidental secondary volume — an RDL putting 1.2
+        // back sets into a leg day — split the weekly back target across a day with no back
+        // work, so the real pull days came out ~40% under target.
+        GROUPS.forEach(function(g){if(dom[g])freq[g]++;});});
+    }
+    function _sessTarget(g){return freq[g]?Math.min(setsPerMuscle/freq[g],SESSION_MUSCLE_CAP):0;}
+    _recount();
+    // Drop-to-fit (rule 2026-07-31): weekly sets-per-muscle must actually land on the user's
+    // target. With a 2-set floor per exercise that is impossible by resizing alone — five leg
+    // exercises can never cost less than ~10 leg sets, so a 12-set weekly target over two leg
+    // days overshot by ~70%. When a session's floor volume exceeds its per-muscle target, drop
+    // the lowest-priority isolation work until it fits. Compounds, fixed prescriptions (the
+    // heavy Deadlift) and prehab blocks are never dropped, and a session never falls below
+    // MIN_EX exercises. Pruning to the target exactly (OVER_TOL=1.0) rather than to a tolerance
+    // band is deliberate: a day whose floor volume already equals its target has no room left
+    // for the compound bias and comes out flat at 2 sets across the board.
     days.forEach(function(day){
-      (day.exercises||[]).forEach(function(ex){
-        if(ex.prehab)return;
-        var sp=getExSplits(ex.name);var acc=0,wsum=0;
-        GROUPS.forEach(function(g){var f=sp[g]||0;if(!f)return;var base=day._fs[g]||0;if(base<1||!freq[g])return;var target=Math.min(setsPerMuscle/freq[g],SESSION_MUSCLE_CAP);var r=Math.max(0.4,Math.min(2,target/base));
-          // A group this exercise only partially trains (f<0.5) may pull its set count DOWN but
-          // never UP: on e.g. a leg day the only back volume comes from the RDL itself, so
-          // target/back-base hits the 2× ceiling and (with the 1.5× compound bias) inflated the
-          // RDL to 5 sets beside 2-set leg work. Sizing is driven by the muscle the lift is for.
-          if(f<0.5)r=Math.min(1,r);
-          acc+=f*r;wsum+=f;});
-        if(wsum>0)_resizeEx(ex,Math.max(2,Math.min(5,Math.round(_nSets(ex)*(acc/wsum)*(isCompoundEx(ex.name)?1.5:0.85)))));
-      });
+      var _pg=50;
+      while(_pg-->0){
+        var exs=day.exercises||[];
+        if(exs.filter(function(ex){return !ex.prehab;}).length<=MIN_EX)break;
+        var floorVol={};GROUPS.forEach(function(g){floorVol[g]=0;});
+        exs.forEach(function(ex){if(ex.prehab)return;var sp=getExSplits(ex.name);var sets=ex.fixed?_nSets(ex):MIN_SETS;GROUPS.forEach(function(g){if(sp[g])floorVol[g]+=sets*sp[g];});});
+        var worst='',worstR=0;
+        GROUPS.forEach(function(g){var t=_sessTarget(g);if(!t)return;var r=floorVol[g]/t;if(r>worstR){worstR=r;worst=g;}});
+        if(!worst||worstR<=OVER_TOL)break;
+        // last (= most accessory) isolation exercise carrying the overshooting muscle
+        var pick=-1,pickF=0;
+        for(var _pi=0;_pi<exs.length;_pi++){var _px=exs[_pi];if(_px.prehab||_px.fixed||isCompoundEx(_px.name))continue;var _pf=getExSplits(_px.name)[worst]||0;if(_pf&&_pf>=pickF){pickF=_pf;pick=_pi;}}
+        if(pick<0)break;
+        exs.splice(pick,1);
+      }
+    });
+    _recount();
+    // Per-muscle allocation (rule 2026-07-31): each muscle's session target is split across the
+    // exercises that TARGET it (split >= 0.5) in proportion to split x compound bias, after
+    // subtracting the secondary volume the session's other lifts already supply. Every exercise
+    // has exactly one muscle it targets, so it gets exactly one demand — an RDL is sized as the
+    // leg lift it is and can never be inflated to cover a leg day's back deficit. Volume lands
+    // on target and the 1.5x compound bias sets the distribution, instead of multiplying the
+    // total. Three passes let the secondary contributions settle.
+    days.forEach(function(day){
+      var _exs=(day.exercises||[]).filter(function(ex){return !ex.prehab;});
+      for(var _pass=0;_pass<3;_pass++){
+        GROUPS.forEach(function(g){
+          var t=_sessTarget(g);if(!t)return;
+          var D=_exs.filter(function(ex){return !ex.fixed&&(getExSplits(ex.name)[g]||0)>=0.5;});
+          if(!D.length)return;
+          var supplied=0;
+          _exs.forEach(function(ex){if(D.indexOf(ex)>=0)return;var f=getExSplits(ex.name)[g]||0;if(f)supplied+=_nSets(ex)*f;});
+          var rem=Math.max(0,t-supplied),wsum=0;
+          D.forEach(function(ex){wsum+=getExSplits(ex.name)[g]*(isCompoundEx(ex.name)?1.5:0.85);});
+          if(!wsum)return;
+          D.forEach(function(ex){var f=getExSplits(ex.name)[g],w=f*(isCompoundEx(ex.name)?1.5:0.85);
+            var n=Math.max(2,Math.min(5,Math.round(rem*w/wsum/f)));
+            if(n!==_nSets(ex))_resizeEx(ex,n);});
+        });
+      }
       var _guard=100;
       while(_guard-->0){
         var _tot=(day.exercises||[]).reduce(function(s,ex){return s+_nSets(ex);},0);
         if(_tot<=SESSION_CEILING)break;
         var _trimmed=false;
-        for(var _ti=day.exercises.length-1;_ti>=0;_ti--){var _tx=day.exercises[_ti];if(!isCompoundEx(_tx.name)&&_nSets(_tx)>2){_resizeEx(_tx,_nSets(_tx)-1);_trimmed=true;break;}}
-        if(!_trimmed){for(var _tj=day.exercises.length-1;_tj>=0;_tj--){var _ty=day.exercises[_tj];if(_nSets(_ty)>2){_resizeEx(_ty,_nSets(_ty)-1);_trimmed=true;break;}}}
+        for(var _ti=day.exercises.length-1;_ti>=0;_ti--){var _tx=day.exercises[_ti];if(_tx.fixed)continue;if(!isCompoundEx(_tx.name)&&_nSets(_tx)>2){_resizeEx(_tx,_nSets(_tx)-1);_trimmed=true;break;}}
+        if(!_trimmed){for(var _tj=day.exercises.length-1;_tj>=0;_tj--){var _ty=day.exercises[_tj];if(_ty.fixed)continue;if(_nSets(_ty)>2){_resizeEx(_ty,_nSets(_ty)-1);_trimmed=true;break;}}}
         if(!_trimmed)break;
       }
       // Balance guardrail: no exercise may carry more than BALANCE_RATIO× the sets of the
       // smallest exercise in the same session — a 5-set lift beside 2-set work is never
       // intended. The compound bias is 1.5 vs 0.85 (~1.76×), so this preserves the bias in
-      // full and only clips rounding/floor pile-ups. Runs last because the ceiling trim above
-      // takes sets from isolation first and can itself open the gap.
+      // full and only clips rounding/floor pile-ups. Runs LAST: both the ceiling trim and the
+      // volume correction above move individual exercises and can reopen the gap.
       (function(){
-        var _sizable=(day.exercises||[]).filter(function(ex){return !ex.prehab;});
+        var _sizable=(day.exercises||[]).filter(function(ex){return !ex.prehab&&!ex.fixed;});
         if(_sizable.length<2)return;
         var _min=_sizable.reduce(function(m,ex){return Math.min(m,_nSets(ex));},99);
         var _cap=Math.max(2,Math.floor(_min*BALANCE_RATIO));
@@ -1156,7 +1210,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
       delete day._fs;
     });
   }else{
-    days.forEach(function(day){(day.exercises||[]).forEach(function(ex){ex.sets=scaleSets(ex.sets);});});
+    days.forEach(function(day){(day.exercises||[]).forEach(function(ex){if(ex.prehab||ex.fixed)return;ex.sets=scaleSets(ex.sets);});});
   }
   return{name:name,days:days,goal:goal,setsPerMuscle:setsPerMuscle,injuries:injuries||[]};
 }

@@ -235,20 +235,48 @@ This is the single most common way the rule above gets bypassed — through inte
 - **Bulgarian Split Squat — banned from `hypertrophy-*` programs only.** Allowed in
   `aesthetic-*`, `strength-*`, and `rehab-*`.
 
-### Volume allocation (hypertrophy/aesthetic program generation)
-- Weekly sets-per-muscle target ÷ days training that muscle = per-session target, capped at 10 hard sets/muscle/session; 25-set session ceiling
-- **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10): `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust; Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×, and the session-ceiling trim takes sets from non-compounds first
-- Squat and Deadlift are allocator-sized like any other exercise — no hardcoded set counts
-- **A secondary muscle group may only pull an exercise's sets DOWN, never up (rule 2026-07-31).**
-  In the per-exercise ratio, any group with split fraction < 0.5 has its `target/base` clamped at
-  1.0. Without this, the *only* back volume in a leg day comes from the RDL itself, so `target/base`
-  for back hit the 2× ceiling and — times the 1.5× compound bias — generated a 5-set RDL beside
-  2-set Leg Extension/Press/Curl (hypertrophy-upper 6-day, Day 6 Legs B).
-- **Balance guardrail: within a session no exercise may exceed 2× the sets of the smallest exercise
-  (rule 2026-07-31).** `BALANCE_RATIO=2`, applied *after* the 25-set ceiling trim (that trim takes
-  from isolation first and can itself open the gap). The compound bias is ~1.76×, so the guardrail
-  preserves it in full and only clips rounding/floor pile-ups. Tests assert the invariant across
-  every hypertrophy/aesthetic goal × 1–7 days × sets-per-muscle 9–25.
+### Volume allocation (rule rewritten 2026-07-31)
+**The wizard's sets-per-muscle is a target the generator must actually hit — for every goal,
+including strength.** Applies to `hypertrophy-*`, `aesthetic-*`, `strength-*` and all full-body
+programs; only `rehab-*` still uses the old linear `scaleSets` path.
+
+- **Per-session target** = weekly sets-per-muscle ÷ the number of days that muscle is trained,
+  capped at 10 hard sets/muscle/session. 25-set session ceiling. Sets stay in the 2–5 range.
+- **A day counts toward a muscle's frequency only if something there targets it** (split ≥ 0.5).
+  Counting incidental secondary volume — an RDL putting 1.2 back sets into a leg day — split the
+  weekly back target across a day with no back work and left the real pull days ~40% under.
+- **Per-muscle allocation:** each muscle's session target is split across the exercises that
+  *target* it (split ≥ 0.5), in proportion to `split × bias`, after subtracting the secondary
+  volume the session's other lifts already supply. Every exercise has exactly one muscle it
+  targets, so it gets exactly one demand. **This is why an RDL can never be inflated to cover a
+  leg day's back deficit** — it is sized as the leg lift it is. Three passes let secondary
+  contributions settle.
+- **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10):
+  `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust;
+  Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×. The bias sets the
+  *distribution* of a muscle's target, it does not multiply the total — applying it per exercise
+  is what made a 12-set leg week land on 20.
+- **Drop-to-fit:** when a session's floor volume (2 sets × its exercises) exceeds the target, drop
+  the lowest-priority isolation work until it fits. Compounds, the heavy Deadlift and prehab
+  blocks are never dropped and a session never falls below 3 exercises. Without this a 12-set
+  weekly leg target was unreachable — five leg exercises cost ≥10 leg sets whatever the sets say.
+- **Balance guardrail: within a session no exercise may exceed 2× the sets of the smallest
+  exercise.** `BALANCE_RATIO=2`, applied **last** — both the ceiling trim and the allocation can
+  otherwise open a gap. The compound bias is ~1.76×, so the guardrail preserves it in full and
+  only clips rounding/floor pile-ups.
+- **The heavy Deadlift finisher is a fixed prescription** (`ex.fixed`) — always present, always
+  last on its leg day, keeping exactly the sets it was authored with (1×5-8) at every
+  sets-per-muscle. It is exempt from allocation, the ceiling trim, the balance guardrail and the
+  linear strength scaling, but its volume still counts, so everything else is sized around it.
+  *(Supersedes, for this entry only, the 2026-07-10 "Squat and Deadlift are allocator-sized like
+  any other exercise" rule. Every other lift, including a strength program's Squat, is
+  target-sized — strength splits no longer keep fixed 5×5 / 5×3 set counts, though reps and tags
+  are untouched.)*
+- **Where the target cannot be met:** a muscle overshoots only when every lift for it already
+  sits on the 2-set floor (e.g. 9 weekly leg sets across three leg days is impossible — 3
+  exercises × 2 sets × 3 days = 18). Undershoot at high targets is capped by the 5-set maximum
+  and the number of exercises the template supplies. Tests assert the 1.6× bound with the
+  at-floor exemption, across every goal × 4–7 days × sets-per-muscle 9–25.
 
 ### Full-body at low frequency — ≤4 days/week (rule 2026-07-24)
 When a generated program is **4 days/week or fewer**, it must be **full-body** (each session
@@ -292,7 +320,9 @@ Deadlift always last in every leg day" rule.
 - **Deadlift day**: Deadlift is the last exercise (5–8 reps); contains NO squat variants
   (matcher: `/squat/i` excluding `split`)
 - Leg days alternate between the two types, starting with a Squat day
-- Set counts come from the volume allocator — never hardcoded (2026-07-10)
+- Set counts come from the volume allocator — never hardcoded (2026-07-10). **Exception
+  (2026-07-31): the heavy Deadlift finisher on a Deadlift day is a fixed prescription — see
+  Volume allocation above.**
 - Enforced **only on newly generated programs** (`_generateWorkoutProgram`) on days named
   `Legs*`. **`_ensurePrograms` must NOT re-enforce leg-day rules on stored programs** (rule
   2026-07-24): re-injecting/reordering Squat & Deadlift on every load silently reverted the
