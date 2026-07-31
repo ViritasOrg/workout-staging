@@ -221,6 +221,38 @@ This is the single most common way the rule above gets bypassed — through inte
 
 ## ⚠️ WORKOUT PROGRAM EXERCISE RESTRICTIONS ⚠️
 
+### Tags are DERIVED from the prescribed reps — never set by hand (rule 2026-07-31)
+Henrik: *"make tagging automatic and honor the rep ranges for strength, volume, rehab in the app.
+feels backwards to set it manually."*
+
+- `TAG_RANGES` / `tagForReps()` / `snapReps()` / `applyTagFromReps()` in `index.html` are the
+  single source of truth: **strength 4–6, volume 8–12, rehab exactly 15** (canonical
+  `GET /training-rules`).
+- **A generated program may only prescribe a rep count some range defines** —
+  `REPS_LEGAL = [4,5,6,8,9,10,11,12,15]`. Anything else snaps to the nearest legal count
+  (Calf Raises 20 → 15, a 3-rep strength triple → 4) and the tag is then read off it.
+- The derivation runs **at the very end of `_generateWorkoutProgram`**, after the leg-day rules,
+  injury swaps and prehab injection — those re-author schemes and would otherwise slip past it.
+- **The scheme string is clamped too:** its low end is the prescription and its high end is
+  capped at the tag's ceiling (`3×12-15` volume → `3×12`), so the app never displays rep
+  guidance that crosses out of the tag it shows. Trailing text is preserved.
+- **The program editor has no tag picker.** Reps are chosen from a dropdown grouped by tag
+  (Strength 4-6 / Volume 8-12 / Rehab 15) and the tag chip is read-only and derived.
+- **Logged reps NEVER re-label anything** (Henrik 2026-07-31): *"if someone logs a workout with
+  'wrong' reps ignore and keep label — ie one by mistake uses too light weights and has to do 18
+  reps for AMRAP."* The tag belongs to the prescription. Tests assert `saveLog` writes no tag.
+
+**This SUPERSEDES "non-rehab programs must not show a rehab tag."** That rewrite existed in both
+`_generateWorkoutProgram` and `_ensurePrograms` and produced the exact violation it was meant to
+prevent — it relabelled 15-rep isolation as `volume` and left the reps at 15. Both are removed:
+a 15-rep Calf Raise is labelled `rehab` in any program (and gets the correct 90 s rest), and
+`_ensurePrograms` no longer rewrites tags on stored programs at all — which also brings it back
+in line with "never mutate stored programs".
+
+**Also superseded:** the heavy Deadlift's scheme is now `1×6`, not `1×5-8` — a 5–8 range
+straddles strength (4–6) and volume (8–12), so it is not a range any tag defines. Its sets
+(`'6'`, one heavy single) are unchanged.
+
 ### Exercise placement restrictions
 - **Hip Thrust — Feminine Aesthetic (`aesthetic-*`) and Knee Rehab (`rehab-knee`)
   templates ONLY (rule 2026-07-23).** It must never appear in `hypertrophy-*`,
@@ -317,7 +349,8 @@ Every `Legs*` day is **EITHER** a Squat day **OR** a Deadlift day — never both
 session (systemic/CNS load management). Supersedes the earlier "Squat always first AND
 Deadlift always last in every leg day" rule.
 - **Squat day**: Squat is the first exercise; contains NO conventional Deadlift
-- **Deadlift day**: Deadlift is the last exercise (5–8 reps); contains NO squat variants
+- **Deadlift day**: Deadlift is the last exercise (6 reps, `1×6`, tag `strength` — was
+  documented as "5–8 reps"; superseded 2026-07-31, see Tags are DERIVED above); contains NO squat variants
   (matcher: `/squat/i` excluding `split`)
 - Leg days alternate between the two types, starting with a Squat day
 - Set counts come from the volume allocator — never hardcoded (2026-07-10). **Exception
@@ -353,14 +386,14 @@ asks for that specific change in that conversation turn.
   `inputmode` is what selects the keypad, the same way the kg fields use `inputmode="decimal"`.
   All reps values are read with `parseInt`, so a text input is safe.
 - **The program editor has no free-text sets field.** `_progSetsSelects()` renders two
-  dropdowns — **sets 1–6** and **reps 3–15** (plus `max`) — and `_progSetSets()` writes
+  dropdowns — **sets 1–6** and **reps: only the counts a tag range defines** (4-6, 8-12, 15,
+  grouped by tag label, plus `max`; the 3–15 range shipped hours earlier is superseded) — and `_progSetSets()` writes
   `ex.sets` and keeps the scheme's `N×` prefix in sync. `max` is kept so bodyweight
   prescriptions (`max-max-max`) survive an edit, and any stored value the dropdowns cannot
   express (a mixed string like `10-10-12`) is offered as its own option rather than silently
   rewritten — picking a real value normalises it.
-- Note: the 3–15 reps range is what Henrik asked for and is wider than the training-tag rule
-  allows for `volume`/`strength` (≤12). The dropdown does not enforce the tag rule on manual
-  edits; the rule still binds every generated program.
+- Picking reps IS picking the tag: `_progSetSets()` writes the derived tag and refreshes the
+  read-only chip. An illegal reps/tag pair can no longer be authored by hand.
 
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.

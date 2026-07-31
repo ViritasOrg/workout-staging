@@ -595,6 +595,44 @@ function buildSessionGroupVol(group,cutoffDays){const cutoff=new Date();cutoff.s
 function getISOWeek(d){var dt=new Date(d);dt.setHours(12,0,0,0);dt.setDate(dt.getDate()+4-(dt.getDay()||7));var ys=new Date(dt.getFullYear(),0,1);return Math.ceil((((dt-ys)/86400000)+1)/7);}function buildWeeklyGroupVol(group,cutoffDays){const sessions=buildSessionGroupVol(group,cutoffDays);const weekMap={};for(const s of sessions){const d=new Date(s.date+'T12:00:00');const dow=(d.getDay()+6)%7;const mon=new Date(d);mon.setDate(d.getDate()-dow);const wk=mon.toISOString().split('T')[0];weekMap[wk]=(weekMap[wk]||0)+s.vol;}const today=new Date();const sorted=Object.keys(weekMap).sort();const n=sorted.length;return sorted.map((wk,i)=>{const mon=new Date(wk+'T12:00:00');const isRecent=i>=n-2;const daysElapsed=isRecent?Math.min(7,Math.max(1,Math.round((today-mon)/86400000)+1)):7;const rawVol=weekMap[wk];const extrapVol=(isRecent&&daysElapsed<7)?Math.round(rawVol*7/daysElapsed):rawVol;return{weekStart:wk,rawVol,extrapVol,isRecent,daysElapsed};});}function drawWeeklyGroupChart(canvasId,weeks,color,showLabels){const canvas=document.getElementById(canvasId);if(!canvas)return;const dpr=window.devicePixelRatio||1;const cssW=canvas.offsetWidth||300;const cssH=showLabels?130:100;canvas.width=cssW*dpr;canvas.height=cssH*dpr;canvas.style.width=cssW+'px';canvas.style.height=cssH+'px';const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);const PAD={top:showLabels?28:8,right:8,bottom:24,left:36};const cW=cssW-PAD.left-PAD.right;const cH=cssH-PAD.top-PAD.bottom;if(!weeks.length){ctx.fillStyle='#444';ctx.font='11px -apple-system,sans-serif';ctx.textAlign='left';ctx.fillText('No data yet',PAD.left+4,cssH/2);return;}const roll3=weeks.map((_,j)=>{const win=weeks.slice(Math.max(0,j-2),j+1);return win.reduce((s,w)=>s+w.extrapVol,0)/win.length;});const allVals=[...weeks.map(w=>w.extrapVol),...roll3].filter(v=>v>0);if(!allVals.length)return;const maxV=Math.max(...allVals)*1.2;const n=weeks.length;const slotW=cW/n;const barW=Math.min(slotW*0.55,50);const xOf=i=>PAD.left+(i+0.5)*slotW;const yOf=v=>PAD.top+cH*(1-v/maxV);ctx.strokeStyle='#2a2a2a';ctx.lineWidth=0.5;[maxV*0.5,maxV].forEach(v=>{ctx.beginPath();ctx.moveTo(PAD.left,yOf(v));ctx.lineTo(PAD.left+cW,yOf(v));ctx.stroke();});ctx.fillStyle='#444';ctx.font='9px -apple-system,sans-serif';ctx.textAlign='right';[maxV*0.5,maxV].forEach(v=>{ctx.fillText((v/1000).toFixed(1)+'t',PAD.left-3,yOf(v)+3);});weeks.forEach((w,i)=>{const x=xOf(i);if(w.rawVol>0){const rawH=(w.rawVol/maxV)*cH;ctx.fillStyle=color+'44';ctx.fillRect(x-barW/2,PAD.top+cH-rawH,barW,rawH);}if(w.isRecent&&w.extrapVol>w.rawVol){const extH=(w.extrapVol/maxV)*cH;const rawH=(w.rawVol/maxV)*cH;ctx.fillStyle=color+'1a';ctx.fillRect(x-barW/2,PAD.top+cH-extH,barW,extH-rawH);ctx.save();ctx.setLineDash([2,2]);ctx.strokeStyle=color+'55';ctx.lineWidth=0.5;ctx.strokeRect(x-barW/2,PAD.top+cH-extH,barW,extH-rawH);ctx.restore();ctx.fillStyle='#777';ctx.font='7px -apple-system,sans-serif';ctx.textAlign='center';ctx.fillText(w.daysElapsed+'d',x,yOf(w.extrapVol)-3);}});ctx.setLineDash([]);if(roll3.length>0){ctx.beginPath();weeks.forEach((w,i)=>{const x=xOf(i);const y=yOf(roll3[i]);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();weeks.forEach((w,i)=>{ctx.beginPath();ctx.arc(xOf(i),yOf(roll3[i]),3,0,Math.PI*2);ctx.fillStyle=(w.isRecent&&w.daysElapsed<7)?color+'88':color;ctx.fill();});}ctx.fillStyle='#555';ctx.font='8px -apple-system,sans-serif';ctx.textAlign='center';var _xLblLast=-Infinity;weeks.forEach((w,i)=>{const x=xOf(i);if(x-_xLblLast<44)return;_xLblLast=x;const d=new Date(w.weekStart+'T12:00:00');const lbl='W'+getISOWeek(d)+' '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});ctx.fillText(lbl,x,PAD.top+cH+14);});if(showLabels&&roll3.length>0){const lv=roll3[roll3.length-1];ctx.fillStyle=color;ctx.font='bold 9px -apple-system,sans-serif';ctx.textAlign='right';ctx.fillText((lv/1000).toFixed(1)+'t 3wk avg',PAD.left+cW,PAD.top-5);}}async function drawWeeklyVolumeChart(){ensureVolumes();const days=volWindow||90;const groups=['legs','back','chest','shoulders','arms'];groups.forEach((g,i)=>{const wks=buildWeeklyGroupVol(g,days);drawWeeklyGroupChart('vol-chart-'+g,wks,GROUP_COLORS[g],i===0);});}
 async function drawVolumeChart(){if(_volViewMode==='weekly'){drawWeeklyVolumeChart();return;}ensureVolumes();const days=volWindow||90;const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);const minDate=cutoff.toISOString().split('T')[0];const maxDate=new Date().toISOString().split('T')[0];const xDomain={minDate,maxDate};const groups=['legs','back','chest','shoulders','arms'];const allSessions={};groups.forEach(g=>{allSessions[g]=buildSessionGroupVol(g,days);});const milestones=await fetchAllMarkers();const visMs=milestones.filter(m=>m.date>=minDate&&m.date<=maxDate);groups.forEach((g,i)=>{if(!allSessions[g].length)return;drawGroupChart('vol-chart-'+g,allSessions[g],GROUP_COLORS[g],xDomain,visMs,i===0);});const sortedL=[...logs].sort((a,b)=>b.date.localeCompare(a.date));const lastLog=sortedL.find(l=>l.exercises&&l.exercises.length);const lastVol=lastLog?(lastLog.volume||0):0;const allTotal=logs.reduce((s,l)=>s+(l.volume||0),0);document.getElementById('stat-volume').textContent=lastVol?(lastVol/1000).toFixed(1)+'t':'—';document.getElementById('stat-volume-total').textContent=allTotal?(allTotal/1000).toFixed(1)+'t':'—';}
 function selectDay(num,el){document.querySelectorAll('.day-card').forEach(c=>c.classList.remove('active'));el.classList.add('active');_selectedProgramDay=num;renderWorkout(num);}
+// Training tags are DERIVED from the prescribed reps — canonical ranges from GET /training-rules
+// (rule 2026-07-31: "make tagging automatic"). strength 4-6, volume 8-12, rehab exactly 15;
+// rehab is the only tag permitted above 12 reps. A generated program may therefore only
+// prescribe a rep count that some range defines — REPS_LEGAL — and anything else snaps to the
+// nearest legal value before the tag is read off it.
+var TAG_RANGES={strength:[4,6],volume:[8,12],rehab:[15,15]};
+var REPS_LEGAL=[4,5,6,8,9,10,11,12,15];
+function tagForReps(r){
+  var n=parseInt(r,10);
+  if(!isFinite(n)||String(r).trim()==='')return null; // 'max' / AMRAP keeps whatever it had
+  for(var t in TAG_RANGES){if(n>=TAG_RANGES[t][0]&&n<=TAG_RANGES[t][1])return t;}
+  return n>12?'rehab':(n<4?'strength':'volume');
+}
+function snapReps(r){
+  var n=parseInt(r,10);
+  if(!isFinite(n)||String(r).trim()==='')return r; // leave 'max' alone
+  return REPS_LEGAL.reduce(function(best,v){return Math.abs(v-n)<Math.abs(best-n)?v:best;},REPS_LEGAL[0]);
+}
+// Applies both to one exercise: snap the prescription onto a legal rep count, then label it.
+// NOTE: this is for PRESCRIPTIONS only. Logged reps never re-label anything — an AMRAP set
+// that ran to 18 because the weight was light leaves the program's label untouched
+// (Henrik 2026-07-31).
+function applyTagFromReps(ex){
+  if(!ex||ex.sets==null)return ex;
+  var parts=String(ex.sets).split('-').map(snapReps);
+  ex.sets=parts.join('-');
+  var t=tagForReps(parts[0]);
+  if(t)ex.tag=t;
+  // The scheme string is the rep guidance the user reads ("3×12-15"). Its range has to sit
+  // inside the tag's range too, or the app is still telling him to do 15 reps on a `volume`
+  // lift. Low end = what is prescribed, high end = capped at the tag's ceiling and dropped
+  // when it collapses. Any trailing text ("— progressive overload") is preserved.
+  if(t)ex.scheme=String(ex.scheme||'').replace(/^(\d+)×(\d+)(?:\s*[-–]\s*(\d+))?(.*)$/,function(_,n,lo,hi,rest){
+    var top=hi?Math.min(parseInt(hi,10),TAG_RANGES[t][1]):0;
+    return n+'×'+parts[0]+(top>parts[0]?'-'+top:'')+(rest||'');
+  });
+  return ex;
+}
 function getProgramRest(prog){var g=(prog&&prog.goal)||'hypertrophy';if(g==='strength')return'3–5 min rest between sets';if(g==='rehab')return'90 s – 2 min rest between sets';if(g==='aesthetic')return'60–90 s rest between sets';return'60–90 s rest between sets';}function restSecsForTag(tag){if(tag==='strength')return 240;if(tag==='rehab')return 90;return 120;}
 var _deloadActive=getData('wkt-deload',false);
 function _deloadSets(s){var a=String(s).split('-');var n=Math.max(1,Math.ceil(a.length/2));return a.slice(0,n).join('-');}
@@ -641,8 +679,11 @@ function _ensurePrograms(){
   var hasHyp=_programs.some(function(p){return p.name==='6-Day Hypertrophy — Upper';});
   if(!hasHyp){_programs.unshift(_seedHypertrophyProgram());_activeProgramIndex=0;changed=true;}
   // 5-Day Split is no longer auto-seeded (Henrik 2026-07-10) — deleting it must stick
-  // Normalize: non-rehab programs must not show 'rehab' tag on exercises
-  _programs.forEach(function(p){if((p.goal||'')!=='rehab'){(p.days||[]).forEach(function(d){(d.exercises||[]).forEach(function(e){if(e.tag==='rehab'&&!e.prehab){e.tag='volume';changed=true;}});});}});
+  // The "non-rehab programs must not show a rehab tag" rewrite is GONE (rule 2026-07-31).
+  // Tags are derived from the prescribed reps at generation time, so flipping rehab→volume on
+  // load did two wrong things at once: it undid the derivation the moment the app restarted
+  // (leaving 15-rep work labelled `volume`, the exact violation being fixed), and it mutated
+  // stored programs, which they are never supposed to do. Stored tags are left exactly as saved.
   // Leg-day rules are enforced ONLY on newly generated programs (in _generateWorkoutProgram).
   // _ensurePrograms must NOT re-enforce them on STORED programs — doing so re-injected/reordered
   // Squat & Deadlift on every load, silently reverting the user's own exercise edits (rule
@@ -771,7 +812,17 @@ function _progSetsSelects(di,ei,sets){
   o+='<span style="color:var(--muted);font-size:11px;flex-shrink:0;">×</span>';
   o+='<select title="Reps" onchange="_progSetSets('+di+','+ei+',null,this.value)" style="'+st+'">';
   var known=cur.reps==='max';
-  for(i=PROG_REPS_MIN;i<=PROG_REPS_MAX;i++){var sel=cur.uniform&&String(cur.reps)===String(i);if(sel)known=true;o+='<option'+(sel?' selected':'')+'>'+i+'</option>';}
+  // Only rep counts a tag range defines are offered, grouped by the tag they produce — picking
+  // reps IS picking the tag (rule 2026-07-31), so an illegal reps/tag pair cannot be authored.
+  ['strength','volume','rehab'].forEach(function(t){
+    o+='<optgroup label="'+{strength:'Strength',volume:'Volume',rehab:'Rehab'}[t]+' '+(TAG_RANGES[t][0]===TAG_RANGES[t][1]?TAG_RANGES[t][0]:TAG_RANGES[t][0]+'-'+TAG_RANGES[t][1])+'">';
+    REPS_LEGAL.forEach(function(v){
+      if(tagForReps(v)!==t)return;
+      var sel=cur.uniform&&String(cur.reps)===String(v);if(sel)known=true;
+      o+='<option'+(sel?' selected':'')+'>'+v+'</option>';
+    });
+    o+='</optgroup>';
+  });
   o+='<option'+(cur.reps==='max'?' selected':'')+'>max</option>';
   // a stored value the dropdown cannot express (a rep range, or mixed sets) is kept as its own
   // option rather than silently rewritten — picking a real value normalises it
@@ -791,7 +842,14 @@ function _progSetSets(di,ei,n,reps){
   ex.scheme=String(ex.scheme||'').replace(/^\d+×/,count+'×');
   var si=document.getElementById('prog-scheme-'+di+'-'+ei);
   if(si)si.value=ex.scheme;
+  // the tag follows the reps — it is never set by hand (rule 2026-07-31)
+  var t=tagForReps(r);
+  if(t)ex.tag=t;
+  var ti=document.getElementById('prog-tag-'+di+'-'+ei);
+  if(ti){ti.textContent=_progTagLabel(ex.tag);ti.className='tag '+(_PROG_TAG_CLASS[ex.tag]||'tag-volume');}
 }
+var _PROG_TAG_CLASS={strength:'tag-strength',volume:'tag-volume',rehab:'tag-rehab'};
+function _progTagLabel(t){return{strength:'Strength',volume:'Volume',rehab:'Rehab'}[t]||t||'';}
 function _renderProgOverlay(){
   var title=document.getElementById('prog-title');
   var body=document.getElementById('prog-body');var footer=document.getElementById('prog-footer');if(!body||!footer)return;
@@ -825,14 +883,13 @@ function _renderProgOverlay(){
     html+='</div></div>';
     html+='<div class="prog-day-body">';
     day.exercises.forEach(function(ex,ei){
-      var tagOpts=['strength','volume','rehab'].map(function(t){return'<option value="'+t+'"'+(ex.tag===t?' selected':'')+'>'+{strength:'Strength',volume:'Volume',rehab:'Rehab'}[t]+'</option>';}).join('');
       html+='<div style="border-bottom:1px solid var(--border);padding:10px 0;">';
       html+=_exOpts(di,ei,ex.name);
       html+='<div style="display:flex;gap:6px;margin-top:6px;align-items:center;">';
       html+='<input type="text" id="prog-scheme-'+di+'-'+ei+'" value="'+_escP(ex.scheme)+'" oninput="_progEditBuf.days['+di+'].exercises['+ei+'].scheme=this.value" placeholder="Scheme e.g. 5×5" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11px;font-family:var(--font-ui);outline:none;">';
       html+=_progSetsSelects(di,ei,ex.sets);
       html+='<input type="text" inputmode="decimal" value="'+(ex.kg?kgToUnit(ex.kg):'')+'" oninput="_progEditBuf.days['+di+'].exercises['+ei+'].kg=unitToKg(this.value)||0" placeholder="'+unitLabel()+'" style="width:52px;flex-shrink:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--accent);font-size:11px;font-family:var(--font-ui);outline:none;">';
-      html+='<select onchange="_progEditBuf.days['+di+'].exercises['+ei+'].tag=this.value" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 6px;color:var(--text);font-size:11px;font-family:var(--font-ui);outline:none;flex-shrink:0;">'+tagOpts+'</select>';
+      html+='<span id="prog-tag-'+di+'-'+ei+'" class="tag '+(_PROG_TAG_CLASS[ex.tag]||'tag-volume')+'" title="Set automatically by the rep count" style="flex-shrink:0;font-size:10px;">'+_progTagLabel(ex.tag)+'</span>';
       html+='<button onclick="_progRmEx('+di+','+ei+')" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;">×</button>';
       html+='</div></div>';
     });
@@ -1064,7 +1121,17 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   else{pool=[_seedDefaultProgram().days[0]];}
   (function(){var _base=pool.length;function _mGroup(nm){var n=(nm||'').toLowerCase();if(/leg|lower|squat|hip|lunge|calf|glute|quad|ham|rdl|deadlift/.test(n))return 'legs';if(/pull|row|lat|back|bicep|chin/.test(n))return 'pull';if(/push|bench|chest|press|tricep/.test(n))return 'push';if(/arm|delt|shoulder|lateral/.test(n))return 'arms';return 'other';}while(pool.length>0&&pool.length<nDays){var _pg=_mGroup(pool[pool.length-1].name);var _fg=_mGroup(pool[0].name);var _best=null,_bs=Infinity;for(var _ci=0;_ci<_base;_ci++){var _cg=_mGroup(pool[_ci].name);var _sc=(_cg===_pg?2:0)+(_cg===_fg?1:0);if(_best===null||_sc<_bs){_bs=_sc;_best=pool[_ci];}}pool.push(JSON.parse(JSON.stringify(_best)));}})();
   var _isRehabGoal=key.startsWith('rehab-');
-  pool.forEach(function(day){day.exercises=(day.exercises||[]).map(function(ex){var _t=(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag;return Object.assign({},ex,{tag:_t});});});
+  // Every day gets its OWN exercise objects. _fullBodyPool builds its LOW/PUSH/PULL/ACC pools
+  // once and hands the SAME object to several days (CALF is a single object used by all four),
+  // while the allocator resizes in place — without this clone, sizing day 3 silently rewrote
+  // day 1's set counts behind the balance guardrail that had already run on it.
+  pool.forEach(function(day){day.exercises=(day.exercises||[]).map(function(ex){return Object.assign({},ex);});});
+  // Tags are derived from the prescribed reps (rule 2026-07-31) — see the final pass at the end
+  // of this function, which runs after every structural edit (leg-day rules, injury swaps,
+  // prehab injection) so nothing can re-author a scheme behind the derivation's back. This
+  // REPLACES the old "non-rehab programs must not carry a rehab tag" rewrite, which produced
+  // the very violation it was meant to avoid: it relabelled 15-rep isolation as `volume` and
+  // left the 15 reps in place.
   // Hip Thrust belongs only in Feminine Aesthetic (aesthetic-*) and Knee Rehab
   // (rehab-knee, glute activation) programs (rule 2026-07-23). Everywhere else
   // (strength, hypertrophy, back/shoulder rehab) swap it for a hypertrophy-legal
@@ -1253,6 +1320,10 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
   }else{
     days.forEach(function(day){(day.exercises||[]).forEach(function(ex){if(ex.prehab||ex.fixed)return;ex.sets=scaleSets(ex.sets);});});
   }
+  // Automatic tagging, last word: snap every prescription onto a rep count some range defines,
+  // then label it from that count. Runs after allocation so the scheme's set prefix is already
+  // final, and after the leg-day rule, which re-authors the heavy Deadlift's scheme.
+  days.forEach(function(day){(day.exercises||[]).forEach(applyTagFromReps);});
   return{name:name,days:days,goal:goal,setsPerMuscle:setsPerMuscle,injuries:injuries||[]};
 }
 
