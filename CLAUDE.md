@@ -239,6 +239,16 @@ This is the single most common way the rule above gets bypassed — through inte
 - Weekly sets-per-muscle target ÷ days training that muscle = per-session target, capped at 10 hard sets/muscle/session; 25-set session ceiling
 - **Free-weight compounds are weighted heavier than machines/isolation** (rule 2026-07-10): `isCompoundEx()` (squat/deadlift/RDL/bench/OHP/barbell row/pull-ups/dips/lunges/hip thrust; Smith/Hack/cable/machine variants excluded) gets a 1.5× bias vs 0.85×, and the session-ceiling trim takes sets from non-compounds first
 - Squat and Deadlift are allocator-sized like any other exercise — no hardcoded set counts
+- **A secondary muscle group may only pull an exercise's sets DOWN, never up (rule 2026-07-31).**
+  In the per-exercise ratio, any group with split fraction < 0.5 has its `target/base` clamped at
+  1.0. Without this, the *only* back volume in a leg day comes from the RDL itself, so `target/base`
+  for back hit the 2× ceiling and — times the 1.5× compound bias — generated a 5-set RDL beside
+  2-set Leg Extension/Press/Curl (hypertrophy-upper 6-day, Day 6 Legs B).
+- **Balance guardrail: within a session no exercise may exceed 2× the sets of the smallest exercise
+  (rule 2026-07-31).** `BALANCE_RATIO=2`, applied *after* the 25-set ceiling trim (that trim takes
+  from isolation first and can itself open the gap). The compound bias is ~1.76×, so the guardrail
+  preserves it in full and only clips rounding/floor pile-ups. Tests assert the invariant across
+  every hypertrophy/aesthetic goal × 1–7 days × sets-per-muscle 9–25.
 
 ### Full-body at low frequency — ≤4 days/week (rule 2026-07-24)
 When a generated program is **4 days/week or fewer**, it must be **full-body** (each session
