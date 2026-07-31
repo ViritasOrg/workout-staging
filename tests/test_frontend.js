@@ -2302,15 +2302,19 @@ console.log('\n── Storage inspector ─────────────�
     !src.slice(src.indexOf('async function loadSettings('), src.indexOf('async function loadSettings(') + 4000).includes('buildProgramSettingsCard()'));
 }
 
-// ── Section 60a: No rehab tag in non-rehab programs ──────────────────────────
+// ── Section 60a: tags are derived from reps, never rewritten on load ──────────
+// Rule (2026-07-31) REPLACES "no rehab tag in non-rehab programs": that rewrite relabelled
+// 15-rep isolation as `volume` and left the reps at 15 — the violation it was meant to prevent.
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  check('pool.forEach remaps rehab→volume for non-rehab goals',
-    src.includes("_isRehabGoal=key.startsWith('rehab-')") &&
-    src.includes("(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag"));
-  check('_ensurePrograms normalizes rehab tags in non-rehab stored programs (prehab exempt)',
-    src.includes("(p.goal||'')!=='rehab'") &&
-    src.includes("if(e.tag==='rehab'&&!e.prehab){e.tag='volume';changed=true;}"));
+  check('generator derives every exercise tag from its prescribed reps',
+    src.includes('days.forEach(function(day){(day.exercises||[]).forEach(applyTagFromReps);});'));
+  check('derivation runs after the leg-day rule re-authors the Deadlift scheme',
+    src.indexOf('forEach(applyTagFromReps)') > src.indexOf("dlx.tag='strength';dlx.fixed=true"));
+  check('the old rehab→volume generator rewrite is gone',
+    !src.includes("(!_isRehabGoal&&ex.tag==='rehab')?'volume':ex.tag"));
+  check('_ensurePrograms no longer rewrites tags on stored programs',
+    !src.includes("if(e.tag==='rehab'&&!e.prehab){e.tag='volume';changed=true;}"));
 }
 
 // ── Section 60: Program card toggle switch ────────────────────────────────────
@@ -2628,7 +2632,12 @@ console.log('\n── Leg-day rules in generated programs ───────�
       const isSq = (e) => /squat/i.test(e.name) && !/split/i.test(e.name);
       const hasSq = exs.some(isSq), hasDL = exs.some(e => e.name === 'Deadlift');
       const squatDay = hasSq && !hasDL && isSq(exs[0]);
-      const dlDay = hasDL && !hasSq && exs[exs.length - 1].name === 'Deadlift' && /×5-8$/.test(exs[exs.length - 1].scheme);
+      // Scheme is "1×6", not the old "1×5-8" (rule 2026-07-31): a 5-8 range straddles strength
+      // (4-6) and volume (8-12), so it is not a range any tag defines. The heavy single is
+      // prescribed at 6 reps and labelled strength.
+      const _dl = exs[exs.length - 1];
+      const dlDay = hasDL && !hasSq && _dl.name === 'Deadlift'
+        && new RegExp('×' + String(_dl.sets).split('-')[0] + '$').test(_dl.scheme) && _dl.tag === 'strength';
       if (!(squatDay || dlDay)) { allOk = false; details.push(`${goal}-${sub}-${nDays} ${day.name}: sq=${hasSq} dl=${hasDL} first=${exs[0].name} last=${exs[exs.length-1].name}`); }
     }
   }
@@ -2660,7 +2669,7 @@ console.log('\n── Leg-day rules in generated programs ───────�
   check('heavy Deadlift finisher is flagged as a fixed prescription',
     _dl16.every(l => l.fixed === true));
   check('heavy Deadlift finisher keeps its sets at every setsPerMuscle (9/16/25)',
-    [_dl9, _dl16, _dl25].every(a => a.every(l => String(l.sets) === '6' && String(l.scheme).startsWith('1×5-8'))),
+    [_dl9, _dl16, _dl25].every(a => a.every(l => String(l.sets) === '6' && String(l.scheme) === '1×6' && l.tag === 'strength')),
     JSON.stringify([_dl9, _dl16, _dl25].map(a => a.map(l => l.sets))));
   // Strength programs keep it too — the linear scaling path must not scale it either.
   const _dlStr = G._generateWorkoutProgram('strength', 'hybrid', 6, 'T', 20)
@@ -2915,7 +2924,9 @@ console.log('\n── Rotator cuff prehab (shoulders injury) ──────�
   G.initPrograms();
   const d0 = G.getActiveProgram().days[0];
   check('stored prehab exercise keeps rehab tag', d0.exercises.find(e => e.name === 'Cable External Rotation').tag === 'rehab');
-  check('stored non-prehab rehab tag still converted to volume', d0.exercises.find(e => e.name === 'Face Pulls').tag === 'volume');
+  // Rule 2026-07-31: a stored tag is never rewritten on load — 15-rep Face Pulls stay `rehab`,
+  // which is what the canonical rep ranges say they are. (Supersedes "still converted to volume".)
+  check('stored non-prehab rehab tag is left exactly as saved', d0.exercises.find(e => e.name === 'Face Pulls').tag === 'rehab');
   if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
   else G.localStorage.setItem('workout_programs', savedPrograms);
   G.initPrograms();
@@ -3590,8 +3601,7 @@ if (typeof G._generateWorkoutProgram === 'function') {
   check('program editor has no free-text sets field',
     !/placeholder="5-5-5"/.test(rawScript));
   check('program editor renders sets/reps dropdowns', /_progSetsSelects\(di,ei,ex\.sets\)/.test(rawScript));
-  check('sets range 1-6, reps range 3-15',
-    /PROG_SETS_MIN=1,PROG_SETS_MAX=6,PROG_REPS_MIN=3,PROG_REPS_MAX=15/.test(rawScript));
+  check('sets range 1-6', /PROG_SETS_MIN=1,PROG_SETS_MAX=6/.test(rawScript));
 
   if (typeof G._progSetsSelects === 'function') {
     const opts = (h) => [...h.matchAll(/<option[^>]*>([^<]*)</g)].map(m => m[1]);
@@ -3601,9 +3611,13 @@ if (typeof G._generateWorkoutProgram === 'function') {
     check('4x8 preselects 4 sets and 8 reps', JSON.stringify(sel(h)) === '["4","8"]', JSON.stringify(sel(h)));
     const all = opts(h);
     check('sets options are 1-6', JSON.stringify(all.slice(0, 6)) === '["1","2","3","4","5","6"]', JSON.stringify(all.slice(0, 6)));
-    check('reps options are 3-15 plus max',
-      JSON.stringify(all.slice(6)) === JSON.stringify(['3','4','5','6','7','8','9','10','11','12','13','14','15','max']),
+    // Rule 2026-07-31 (supersedes the 3-15 range): only rep counts a tag range defines are
+    // offered, so picking reps IS picking the tag and an illegal pair cannot be authored.
+    check('reps options are only the legal counts (4-6, 8-12, 15) plus max',
+      JSON.stringify(all.slice(6)) === JSON.stringify(['4','5','6','8','9','10','11','12','15','max']),
       JSON.stringify(all.slice(6)));
+    check('reps are grouped by the tag they produce',
+      /optgroup label="Strength 4-6"/.test(h) && /optgroup label="Volume 8-12"/.test(h) && /optgroup label="Rehab 15"/.test(h));
     check('bodyweight "max" prescription survives', JSON.stringify(sel(G._progSetsSelects(0,0,'max-max-max'))) === '["3","max"]');
     check('the 1-set heavy Deadlift reads as 1 x 6', JSON.stringify(sel(G._progSetsSelects(0,0,'6'))) === '["1","6"]');
     check('a value the dropdowns cannot express is kept, not rewritten',
@@ -3626,6 +3640,97 @@ if (typeof G._generateWorkoutProgram === 'function') {
       G._progEditBuf.days[0].exercises[0].sets === '10-10-10-10', G._progEditBuf.days[0].exercises[0].sets);
     G._progSetSets(99, 99, '3', null); // must not throw on a stale index
     check('_progSetSets ignores a stale exercise index', true);
+  }
+}
+
+// ── Automatic tagging from prescribed reps ────────────────────────────────────
+// Rule (2026-07-31): "make tagging automatic and honor the rep ranges". The tag is derived
+// from the PRESCRIPTION, never set by hand. Logged reps never re-label anything — an AMRAP set
+// that ran to 18 because the weight was light leaves the program's label alone.
+if (typeof G.tagForReps === 'function') {
+  console.log('\n── Automatic tagging from reps ────────────────────────────');
+  check('canonical ranges: strength 4-6, volume 8-12, rehab 15',
+    JSON.stringify(G.TAG_RANGES) === JSON.stringify({strength:[4,6],volume:[8,12],rehab:[15,15]}),
+    JSON.stringify(G.TAG_RANGES));
+  check('4/5/6 reps → strength', [4,5,6].every(r => G.tagForReps(r) === 'strength'));
+  check('8-12 reps → volume', [8,9,10,11,12].every(r => G.tagForReps(r) === 'volume'));
+  check('15 reps → rehab', G.tagForReps(15) === 'rehab');
+  check('rehab is the only tag above 12 reps',
+    [13,15,18,20].every(r => G.tagForReps(r) === 'rehab'));
+  check('AMRAP/max keeps whatever tag it had', G.tagForReps('max') === null && G.tagForReps('') === null);
+  check('snapReps moves an undefined count onto the nearest legal one',
+    G.snapReps(20) === 15 && G.snapReps(13) === 12 && G.snapReps(7) === 6 && G.snapReps(3) === 4);
+  check('snapReps leaves max alone', G.snapReps('max') === 'max');
+
+  // Every generated program, every goal: reps are legal and the tag matches them.
+  const mism = [], illegal = [];
+  [['hypertrophy','upper'],['hypertrophy','lower'],['hypertrophy','balanced'],
+   ['aesthetic','ppl'],['aesthetic','fullbody'],['strength','pure'],['strength','hybrid'],
+   ['rehab','knee'],['rehab','back'],['rehab','shoulder']]
+    .forEach(([g,s]) => [3,4,5,6,7].forEach(nd => [9,12,16,20,25].forEach(spm => {
+      (G._generateWorkoutProgram(g, s, nd, 'T', spm, []).days || []).forEach(d =>
+        (d.exercises || []).forEach(e => String(e.sets).split('-').forEach(r => {
+          const want = G.tagForReps(r);
+          if (!want) return; // 'max'
+          if (!G.REPS_LEGAL.includes(parseInt(r, 10))) illegal.push(`${g}/${s} ${e.name} ${r}`);
+          if (want !== e.tag) mism.push(`${g}/${s} ${nd}d spm${spm} ${d.name} ${e.name} reps=${r} tag=${e.tag} want=${want}`);
+        })));
+    })));
+  check('no generated exercise prescribes a rep count outside the ranges',
+    illegal.length === 0, illegal.slice(0, 3).join('; '));
+  check('every generated exercise tag matches its prescribed reps',
+    mism.length === 0, mism.slice(0, 3).join('; '));
+
+  // The scheme string the user reads must sit inside the tag's range too.
+  const schemeBad = [];
+  [['hypertrophy','upper'],['strength','pure'],['rehab','knee']].forEach(([g,s]) =>
+    [5,6,7].forEach(nd => (G._generateWorkoutProgram(g, s, nd, 'T', 16, []).days || []).forEach(d =>
+      (d.exercises || []).forEach(e => {
+        const m = String(e.scheme).match(/^(\d+)×(\d+)(?:\s*[-–]\s*(\d+))?/);
+        if (!m) return;
+        const lo = String(e.sets).split('-')[0];
+        if (m[2] !== lo) schemeBad.push(`${e.name}: scheme ${e.scheme} vs sets ${e.sets}`);
+        if (m[3] && G.TAG_RANGES[e.tag] && +m[3] > G.TAG_RANGES[e.tag][1])
+          schemeBad.push(`${e.name}: scheme ${e.scheme} exceeds ${e.tag} ceiling`);
+      }))));
+  check('scheme rep guidance never exceeds the tag it carries',
+    schemeBad.length === 0, schemeBad.slice(0, 3).join('; '));
+
+  // A 15-rep lift is `rehab` even inside a hypertrophy program — and gets the 90s rest timer.
+  const _hyp = G._generateWorkoutProgram('hypertrophy', 'upper', 6, 'T', 20, []);
+  const _r15 = [];
+  (_hyp.days || []).forEach(d => (d.exercises || []).forEach(e => {
+    if (String(e.sets).split('-')[0] === '15') _r15.push(e);
+  }));
+  check('15-rep isolation exists in a hypertrophy program and is tagged rehab',
+    _r15.length > 0 && _r15.every(e => e.tag === 'rehab'),
+    _r15.map(e => e.name + ' ' + e.tag).join(', '));
+  check('rest timer follows the derived tag (rehab 90s, strength 240s)',
+    G.restSecsForTag('rehab') === 90 && G.restSecsForTag('strength') === 240 && G.restSecsForTag('volume') === 120);
+
+  // Logging must not re-tag: saveLog writes name/sets/kg/reps only, never a tag.
+  const _saveLog = rawScript.slice(rawScript.indexOf('function saveLog('), rawScript.indexOf('function saveLog(') + 4000);
+  check('saveLog never writes a tag (logged reps do not re-label)',
+    !/\btag\s*:/.test(_saveLog) && !/\.tag\s*=/.test(_saveLog));
+  check('applyTagFromReps is not called from the logging path',
+    !_saveLog.includes('applyTagFromReps') && !_saveLog.includes('tagForReps'));
+
+  // The editor derives the tag too — there is no manual tag picker any more.
+  check('program editor has no manual tag <select>',
+    !rawScript.includes(".exercises['+ei+'].tag=this.value"));
+  check('program editor shows a derived, read-only tag chip',
+    rawScript.includes("id=\"prog-tag-'+di+'-'+ei+'\""));
+  if (typeof G._progSetSets === 'function') {
+    G._progEditBuf = {days:[{name:'D',exercises:[{name:'Calf Raises',scheme:'3×10',sets:'10-10-10',tag:'volume',kg:60}]}]};
+    G._progSetSets(0, 0, null, '15');
+    check('picking 15 reps in the editor sets the rehab tag',
+      G._progEditBuf.days[0].exercises[0].tag === 'rehab', G._progEditBuf.days[0].exercises[0].tag);
+    G._progSetSets(0, 0, null, '5');
+    check('picking 5 reps in the editor sets the strength tag',
+      G._progEditBuf.days[0].exercises[0].tag === 'strength', G._progEditBuf.days[0].exercises[0].tag);
+    G._progSetSets(0, 0, null, 'max');
+    check('picking max leaves the tag as it was',
+      G._progEditBuf.days[0].exercises[0].tag === 'strength', G._progEditBuf.days[0].exercises[0].tag);
   }
 }
 
