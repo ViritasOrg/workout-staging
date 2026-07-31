@@ -346,6 +346,22 @@ asks for that specific change in that conversation turn.
   does **not** undo what it added to stored programs — and undoing that is itself an edit
   to existing programs, so it also requires an explicit ask.
 
+### Reps entry — numeric keypad only, no free-text sets string (rule 2026-07-31)
+- **Every reps input uses `type="text" inputmode="numeric" pattern="[0-9]*"`** — Log Workout,
+  + set, and custom exercises. A bare `<input type="number">` gets iOS's
+  numbers-and-punctuation layout (what Henrik saw as "the qwerty keyboard"), not the 10-key pad;
+  `inputmode` is what selects the keypad, the same way the kg fields use `inputmode="decimal"`.
+  All reps values are read with `parseInt`, so a text input is safe.
+- **The program editor has no free-text sets field.** `_progSetsSelects()` renders two
+  dropdowns — **sets 1–6** and **reps 3–15** (plus `max`) — and `_progSetSets()` writes
+  `ex.sets` and keeps the scheme's `N×` prefix in sync. `max` is kept so bodyweight
+  prescriptions (`max-max-max`) survive an edit, and any stored value the dropdowns cannot
+  express (a mixed string like `10-10-12`) is offered as its own option rather than silently
+  rewritten — picking a real value normalises it.
+- Note: the 3–15 reps range is what Henrik asked for and is wider than the training-tag rule
+  allows for `volume`/`strength` (≤12). The dropdown does not enforce the tag rule on manual
+  edits; the rule still binds every generated program.
+
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 

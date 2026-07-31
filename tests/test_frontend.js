@@ -3568,6 +3568,67 @@ if (typeof G._generateWorkoutProgram === 'function') {
     _shape.length === 0, _shape.slice(0, 3).join('; '));
 }
 
+// ── Numeric keypad + program-editor sets/reps dropdowns ───────────────────────
+// Rule (2026-07-31): entering reps must never raise the full keyboard. A bare
+// <input type="number"> gets iOS's numbers-and-punctuation layout, not the 10-key pad —
+// inputmode="numeric" is what selects the keypad, matching the kg fields' inputmode="decimal".
+// And the program editor's free-text "10-10-10" sets field is replaced by two dropdowns.
+{
+  console.log('\n── Reps entry: numeric keypad + dropdowns ─────────────────');
+  const repsInputs = rawScript.match(/<input[^>]*data-type="reps"[^>]*>/g) || [];
+  check('every reps input exists (log, add-set, custom exercise)', repsInputs.length === 3,
+    `found ${repsInputs.length}`);
+  check('every reps input requests the numeric keypad',
+    repsInputs.length > 0 && repsInputs.every(t => /inputmode="numeric"/.test(t)),
+    repsInputs.filter(t => !/inputmode="numeric"/.test(t)).join(' | '));
+  check('no reps input relies on bare type="number"',
+    !repsInputs.some(t => /type="number"/.test(t)));
+  check('reps inputs are read with parseInt (safe as text inputs)',
+    /parseInt\((?:r|ri)Input?\.value\)/.test(rawScript) || /parseInt\(ri\.value\)/.test(rawScript));
+
+  // Program editor: dropdowns, not a text field
+  check('program editor has no free-text sets field',
+    !/placeholder="5-5-5"/.test(rawScript));
+  check('program editor renders sets/reps dropdowns', /_progSetsSelects\(di,ei,ex\.sets\)/.test(rawScript));
+  check('sets range 1-6, reps range 3-15',
+    /PROG_SETS_MIN=1,PROG_SETS_MAX=6,PROG_REPS_MIN=3,PROG_REPS_MAX=15/.test(rawScript));
+
+  if (typeof G._progSetsSelects === 'function') {
+    const opts = (h) => [...h.matchAll(/<option[^>]*>([^<]*)</g)].map(m => m[1]);
+    const sel  = (h) => [...h.matchAll(/<option selected>([^<]*)</g)].map(m => m[1]);
+    const h = G._progSetsSelects(0, 0, '8-8-8-8');
+    check('two dropdowns rendered', (h.match(/<select/g) || []).length === 2);
+    check('4x8 preselects 4 sets and 8 reps', JSON.stringify(sel(h)) === '["4","8"]', JSON.stringify(sel(h)));
+    const all = opts(h);
+    check('sets options are 1-6', JSON.stringify(all.slice(0, 6)) === '["1","2","3","4","5","6"]', JSON.stringify(all.slice(0, 6)));
+    check('reps options are 3-15 plus max',
+      JSON.stringify(all.slice(6)) === JSON.stringify(['3','4','5','6','7','8','9','10','11','12','13','14','15','max']),
+      JSON.stringify(all.slice(6)));
+    check('bodyweight "max" prescription survives', JSON.stringify(sel(G._progSetsSelects(0,0,'max-max-max'))) === '["3","max"]');
+    check('the 1-set heavy Deadlift reads as 1 x 6', JSON.stringify(sel(G._progSetsSelects(0,0,'6'))) === '["1","6"]');
+    check('a value the dropdowns cannot express is kept, not rewritten',
+      sel(G._progSetsSelects(0,0,'10-10-12')).includes('10-10-12'));
+
+    // _progSetSets writes the sets string and keeps the scheme prefix in sync
+    G._progEditBuf = {days:[{name:'D',exercises:[{name:'Squat',scheme:'4×8-12',sets:'8-8-8-8',tag:'volume',kg:100}]}]};
+    G._progSetSets(0, 0, '3', null);
+    const ex = G._progEditBuf.days[0].exercises[0];
+    check('changing sets rewrites the sets string', ex.sets === '8-8-8', ex.sets);
+    check('changing sets syncs the scheme N× prefix', ex.scheme === '3×8-12', ex.scheme);
+    G._progSetSets(0, 0, null, '12');
+    check('changing reps rewrites every set', G._progEditBuf.days[0].exercises[0].sets === '12-12-12',
+      G._progEditBuf.days[0].exercises[0].sets);
+    check('changing reps leaves the set count alone',
+      G._progEditBuf.days[0].exercises[0].scheme === '3×8-12', G._progEditBuf.days[0].exercises[0].scheme);
+    G._progEditBuf.days[0].exercises[0].sets = '10-10-12';
+    G._progSetSets(0, 0, '4', null);
+    check('a mixed sets string normalises when edited',
+      G._progEditBuf.days[0].exercises[0].sets === '10-10-10-10', G._progEditBuf.days[0].exercises[0].sets);
+    G._progSetSets(99, 99, '3', null); // must not throw on a stale index
+    check('_progSetSets ignores a stale exercise index', true);
+  }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
