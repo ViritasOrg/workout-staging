@@ -59,6 +59,7 @@ check('pin-screen markup removed',          !html.includes('id="pin-screen"'));
 
 // ── Sandbox setup ─────────────────────────────────────────────────────────────
 const patched = rawScript
+  .replace('const APP_ID=', 'var APP_ID=')
   .replace('const EXERCISE_SPLITS=', 'var EXERCISE_SPLITS=')
   .replace('const GROUP_COLORS=',    'var GROUP_COLORS=')
   .replace('const EX_OPTS_HTML=',    'var EX_OPTS_HTML=')
@@ -3790,5 +3791,51 @@ if (typeof G.tagForReps === 'function') {
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(59)}`);
+
+// ── Staging has its own backend namespace ────────────────────────────────────
+// Reported 2026-08-01: "testing stage fucks my prod data". Both builds sent no
+// X-App-Id, so staging wrote into the same user records as production. Staging now
+// declares its own namespace; production keeps sending nothing, which is where its
+// data already lives — changing that would orphan it.
+{
+  console.log('\n── Staging data namespace ─────────────────────────────────');
+  check('APP_ID is declared and keys off IS_STAGING',
+    /const APP_ID=IS_STAGING\?'stage':''/.test(rawScript));
+  check('authHeaders sends X-App-Id when there is one',
+    /function authHeaders\(extra\)\{const h=\{\};if\(APP_ID\)h\['X-App-Id'\]=APP_ID;/.test(rawScript));
+  check('production still sends no namespace header, so its data is untouched',
+    typeof G.APP_ID === 'string' && G.APP_ID === '' && !('X-App-Id' in G.authHeaders()),
+    JSON.stringify(G.authHeaders()));
+  check('  …and the auth token still goes out either way',
+    /const _t=_sessionToken\|\|_googleToken;if\(_t\)h\['Authorization'\]/.test(rawScript));
+
+  // The copy button
+  check('copyDataToStage is defined', typeof G.copyDataToStage === 'function');
+  check('buildStageCopyCard is defined', typeof G.buildStageCopyCard === 'function');
+  check('it posts to the copy endpoint', /AGENT_URL\+'\/account\/copy-to-stage',\{method:'POST'/.test(rawScript));
+  check('  …authenticated', /copy-to-stage',\{method:'POST',headers:authHeaders\(\)\}/.test(rawScript));
+  check('the card is rendered with the other settings cards',
+    (rawScript.match(/buildStageCopyCard\(\)/g)||[]).length >= 3,
+    'found '+((rawScript.match(/buildStageCopyCard\(\)/g)||[]).length));
+  check('it is hidden on staging — there is nothing to copy from there',
+    /if\(IS_STAGING\)\{card\.innerHTML='';return;\}/.test(rawScript));
+  check('the copy is confirmed before it runs', /confirm\('Copy your data to the staging app\?/.test(rawScript));
+  check('  …and says plainly that this app is not changed',
+    /Nothing in this app changes/.test(rawScript));
+
+  // Rendered markup, in the production case
+  if (typeof G.buildStageCopyCard === 'function') {
+    let _html='';
+    const _svGet = G.document.getElementById;
+    G.document.getElementById = id => id==='s-stagecopy-card'
+      ? {set innerHTML(v){_html=v;}, get innerHTML(){return _html;}}
+      : _svGet(id);
+    G.buildStageCopyCard();
+    check('the card renders a copy button', /s-stagecopy-btn/.test(_html) && /Copy my data to staging/.test(_html));
+    check('  …with somewhere to report the result', /s-stagecopy-status/.test(_html));
+    G.document.getElementById = _svGet;
+  }
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
