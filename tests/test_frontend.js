@@ -1432,7 +1432,7 @@ console.log('\n── pollProdVersion waits for actual version change ───�
 check('_prevProdVer variable declared',
   rawScript.includes('let _prevProdVer=null'));
 check('pushToProd snapshots current prod version into _prevProdVer',
-  rawScript.includes("_prevProdVer=null;") && rawScript.includes("fetch('https://henrikschaub.github.io/workout/version.json'"));
+  rawScript.includes("_prevProdVer=null;") && rawScript.includes("fetch('https://viritasorg.github.io/workout/version.json'"));
 check('pushToProd captures staging version at push time (_stagingVer=VERSION)',
   rawScript.includes('_stagingVer=VERSION'));
 check('saveLastPush accepts stagingVer parameter',
