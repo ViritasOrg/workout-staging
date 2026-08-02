@@ -516,3 +516,36 @@ const IS_STAGING = (window.location.pathname||'').startsWith('/workout-staging')
 
 The `IS_STAGING` constant is declared at the top of the `<script>` block, right after `const VERSION`.
 Use it to gate any staging-only UI (e.g., `if(IS_STAGING)buildDeployCard();`).
+
+
+## 🔎 DEFERRED — CodeQL findings on the promoted apps (raised 2026-08-02)
+
+Moving the repos into the **ViritasOrg** enterprise org turned on **CodeQL code
+scanning by default**. Its first run on a promoted prod PR raised three **High**
+findings in `workout`'s `index.html`:
+
+| Finding | Note |
+|---|---|
+| Clear text storage of sensitive information (`gender`) | Likely a false positive — a profile field needed for BMR/macros, stored in the user's own localStorage. Candidate for "dismiss with reason". |
+| DOM text reinterpreted as HTML | Genuine XSS-shaped pattern. Worth fixing, not dismissing. |
+| DOM text reinterpreted as HTML | Same. |
+
+**These describe code that was ALREADY live in production.** The scanner is new;
+the code is not. Nothing regressed at the migration.
+
+**Status: deferred by Henrik on 2026-08-02 — "it will need to be solved next week."**
+Do not treat this as done, and do not silently dismiss the two DOM findings to
+make a dashboard green.
+
+**Why promotion is no longer blocked by them:** the `Wait for CI and merge prod PR`
+gate used to fail on ANY failed/cancelled check on the prod commit, so a scanner the
+repo does not control could block a deploy (as could a `pages-build-deployment`
+cancelled by a visibility change). The gate now selects the **`test`** check by name.
+A failing test still blocks the merge; other red checks are printed to the log
+(`Note: non-blocking checks not passing: ...`) and triaged in the Security tab.
+**Never widen that gate back to "any check" — and never narrow it so test failures
+stop blocking.**
+
+When picking this up: the three apps share rendering code, so the DOM findings very
+likely exist in all of them, not just `workout`. Check every app, not only the one
+CodeQL happened to scan first.
