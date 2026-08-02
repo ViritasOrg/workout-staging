@@ -1,5 +1,32 @@
 # Workout Staging — Claude Instructions
 
+## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
+**The free-T / plasma curve is always in pmol/L. There is no second unit and there must
+never be one.** Missing or incomplete data changes the **confidence** of a number, never
+its **unit**, and never whether a curve is drawn at all.
+
+**What triggered this rule (2026-08-02):** Claude added a "safe" fallback so that when the
+model could not calibrate, the chart silently switched to plotting the drug appearance
+rate in **mg/day** instead. The result was a y-axis reading 0–35 where the user expected
+217+ pmol/L, with a curve that still looked exactly like a free-T curve. Henrik read it as
+a broken scale, which is the only reasonable reading. **Nobody asked for that fallback —
+Claude invented it while fixing something else.**
+
+**The rules:**
+- `unitLabel` for the plasma curve is the literal `'pmol/L'`. Never a ternary, never
+  derived from whether calibration succeeded.
+- **If bloodwork is missing, use the population average for the user's age** and label it
+  clearly as an estimate/educated guess, with a prompt to add a blood test. The curve is
+  still drawn, still in pmol/L. Degrade the *confidence*, never the unit.
+- A user's own free-T value typed in **without a date cannot anchor the curve** — the
+  anchor DAY sets the whole scale, and guessing it made a pre-cycle baseline get read as
+  an accumulated mid-cycle level. Fall back to the age-based population value, which is
+  unambiguously an untreated baseline and anchors at day 0.
+- Never invent a fallback behaviour that was not requested. If a state cannot be handled,
+  say so in the UI in the user's own terms — do not quietly render a different quantity.
+- Tests assert `unitLabel` is never assigned `mg` and that a no-lab case still returns
+  `pmol/L` at the population average. Keep them.
+
 ## ⚠️ UI CONSISTENCY — ALL COMPOUND TIERS MUST BE IDENTICAL ⚠️
 Every compound tier (Peptides, TRT, Enhanced) must have **exactly the same UI features**. If one tier shows dose recommendations, all tiers must show dose recommendations. If one shows an info card, all must. If you add a UI element to one tier, immediately add it to all others in the same session.
 
