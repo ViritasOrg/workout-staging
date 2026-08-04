@@ -1342,6 +1342,38 @@ check('drawBmiChart defined', typeof G.drawBmiChart === 'function');
 // drawBmiChart uses wkt-profile height
 check('drawBmiChart uses wkt-profile for height', rawScript.includes("'wkt-profile'") || rawScript.includes('"wkt-profile"'));
 
+// BMI is invalidated for lean users — BMI cannot separate muscle from fat, so a
+// lean, muscular build reads "Overweight" on muscle alone. Below BMI_LEAN_BF the
+// category must be labelled not valid instead of stated as a bare verdict.
+{
+  check('BMI_LEAN_BF threshold is defined and is 20', /const\s+BMI_LEAN_BF\s*=\s*20\b/.test(rawScript));
+  // Read the threshold from the source rather than the vm global: a top-level
+  // `const` is not a property of the sandbox global, so G.BMI_LEAN_BF is undefined
+  // even though the constant is perfectly in scope for drawBmiChart.
+  const LEAN_BF = Number((rawScript.match(/const\s+BMI_LEAN_BF\s*=\s*(\d+(?:\.\d+)?)/) || [])[1]);
+  check('lean threshold parses to a usable number', Number.isFinite(LEAN_BF), `got ${LEAN_BF}`);
+
+  const bmiStart = rawScript.indexOf('function drawBmiChart(');
+  const bmiEnd = rawScript.indexOf('async function syncBodyComp', bmiStart);
+  const body = bmiStart >= 0 && bmiEnd > bmiStart ? rawScript.slice(bmiStart, bmiEnd) : '';
+  check('drawBmiChart reads the latest bfLog entry', body.includes('bfLog[bfLog.length-1]'));
+  check('drawBmiChart compares BF against BMI_LEAN_BF', body.includes('BMI_LEAN_BF'));
+  check('invalidation note says the reading is not valid', /Not valid at/.test(body));
+  check('invalidation note explains muscle vs fat', /cannot tell muscle from fat/.test(body));
+  // The chart itself must still draw — degrade the interpretation, never the data.
+  check('lean users still get a drawn BMI curve (no early return in the note branch)',
+    !/if\(lastBf[^)]*\)\s*return/.test(body));
+
+  // Henrik's real numbers: 89 kg @ 182 cm = BMI 26.9 = "Overweight" at 15% BF.
+  const bmi = Math.round((89/(1.82*1.82))*10)/10;
+  const cat = bmi<18.5?'Underweight':bmi<25?'Normal':bmi<30?'Overweight':'Obese';
+  check('89kg @ 182cm = BMI 26.9', bmi === 26.9, `got ${bmi}`);
+  check('26.9 categorises as Overweight (the misclassification being labelled)', cat === 'Overweight');
+  check('15% BF is below the lean threshold', 15 < LEAN_BF);
+  check('25% BF is not below the lean threshold', !(25 < LEAN_BF));
+  check('20% BF exactly is not flagged (strict less-than)', !(20 < LEAN_BF));
+}
+
 // ── 37. Rest timer — showRestTimer / startRest / cancelRest ──────────────────
 console.log('\n── Rest timer ───────────────────────────────────────────────');
 check('showRestTimer defined', typeof G.showRestTimer === 'function');
