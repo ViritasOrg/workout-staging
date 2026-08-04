@@ -1388,6 +1388,77 @@ check('drawBmiChart uses wkt-profile for height', rawScript.includes("'wkt-profi
   check('25% flags for a woman but not for a man', flags(25, 'female') && !flags(25, 'male'));
 }
 
+
+// ── Lean body mass — derived from weight log + BF log ────────────────────────
+console.log('\n── Lean body mass chart ─────────────────────────────────────');
+{
+  check('drawLbmChart defined', typeof G.drawLbmChart === 'function');
+  check('lbmChart canvas exists in the Overview panel', /id="lbmChart"/.test(html));
+  check('lbm-note element exists', /id="lbm-note"/.test(html));
+  check('chart is titled Lean Body Mass', /Lean Body Mass/.test(html));
+
+  // Run the SHIPPED _lbmSeries against controlled data. bfLog/weights are top-level
+  // `let`, so they are not reachable on the sandbox global and cannot be injected the
+  // usual way — instead the real function source is re-bound over local inputs.
+  const fnStart = rawScript.indexOf('function _lbmSeries()');
+  const fnEnd   = rawScript.indexOf('function drawLbmChart(');
+  const fnSrc   = fnStart >= 0 && fnEnd > fnStart ? rawScript.slice(fnStart, fnEnd) : '';
+  check('_lbmSeries source located', fnSrc.includes('return out;'));
+  const series = (bf, wt) => new Function('bfLog', 'weights', fnSrc + '\nreturn _lbmSeries();')(bf, wt);
+
+  // Core arithmetic: LBM = weight x (1 - BF/100). 88.5kg @ 15% = 75.2kg.
+  {
+    const r = series([{date:'2026-01-10', bf:15}], [{date:'2026-01-10', weight:88.5}]);
+    check('88.5kg @ 15% BF → 75.2kg lean', r.length === 1 && r[0].lbm === 75.2, `got ${JSON.stringify(r)}`);
+  }
+  // Pairing uses the most recent weight AT OR BEFORE the BF date.
+  {
+    const r = series(
+      [{date:'2026-02-10', bf:20}],
+      [{date:'2026-01-01', weight:100},{date:'2026-02-05', weight:90},{date:'2026-03-01', weight:80}]);
+    check('BF pairs with the weight at-or-before its date, not a later one',
+      r.length === 1 && r[0].weight === 90 && r[0].lbm === 72, `got ${JSON.stringify(r)}`);
+  }
+  // A BF entry with no weight before it is skipped — never paired forward.
+  {
+    const r = series([{date:'2026-01-01', bf:15}], [{date:'2026-06-01', weight:90}]);
+    check('BF entry with no preceding weight is skipped, not back-filled', r.length === 0,
+      `got ${JSON.stringify(r)}`);
+  }
+  // Junk in, nothing out — no invented points.
+  {
+    const r = series(
+      [{date:'2026-01-02', bf:0},{date:'bad-date', bf:15},{date:'2026-01-03', bf:-5},
+       {date:'2026-01-04', bf:100},{date:'2026-01-05', bf:12}],
+      [{date:'2026-01-01', weight:80}]);
+    check('zero / negative / >=100 / malformed BF rows are dropped', r.length === 1 && r[0].bf === 12,
+      `got ${JSON.stringify(r)}`);
+  }
+  // Multiple points keep chronological order.
+  {
+    const r = series(
+      [{date:'2026-01-01', bf:20},{date:'2026-02-01', bf:18},{date:'2026-03-01', bf:15}],
+      [{date:'2026-01-01', weight:100},{date:'2026-02-01', weight:98},{date:'2026-03-01', weight:96}]);
+    check('series is built in date order', r.map(e => e.date).join(',') === '2026-01-01,2026-02-01,2026-03-01');
+    check('lean mass rises while weight falls (the point of the chart)',
+      r[0].lbm === 80 && r[1].lbm === 80.4 && r[2].lbm === 81.6, `got ${r.map(e=>e.lbm).join(',')}`);
+  }
+  // Empty states never throw and never fabricate.
+  check('no BF data → empty series', series([], [{date:'2026-01-01', weight:90}]).length === 0);
+  check('no weight data → empty series', series([{date:'2026-01-01', bf:15}], []).length === 0);
+
+  // Redraw wiring: LBM depends on BOTH logs, so it must redraw when either changes.
+  check('drawLbmChart redraws when the Overview tab opens',
+    /renderBfHistory\(\);drawBmiChart\(\);drawLbmChart\(\)/.test(rawScript));
+  check('drawLbmChart redraws after logging a BF%', /drawBfChart\(\);renderBfHistory\(\);drawLbmChart\(\)/.test(rawScript));
+  check('drawLbmChart redraws after deleting a BF%',
+    /deleteBodyCompFromAgent\(date\);drawBfChart\(\);renderBfHistory\(\);drawLbmChart\(\)/.test(rawScript));
+  check('drawLbmChart redraws after a body-comp sync',
+    /setData\('bf_log',merged\);drawBfChart\(\);renderBfHistory\(\);drawLbmChart\(\)/.test(rawScript));
+  check('drawLbmChart redraws on window change', /drawBmiChart\(\);drawLbmChart\(\);\}/.test(rawScript));
+  check('lean-mass values are shown in the user unit', /kgToUnit\(last\.lbm\)/.test(rawScript));
+}
+
 // ── 37. Rest timer — showRestTimer / startRest / cancelRest ──────────────────
 console.log('\n── Rest timer ───────────────────────────────────────────────');
 check('showRestTimer defined', typeof G.showRestTimer === 'function');
