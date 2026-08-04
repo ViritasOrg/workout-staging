@@ -1346,18 +1346,23 @@ check('drawBmiChart uses wkt-profile for height', rawScript.includes("'wkt-profi
 // lean, muscular build reads "Overweight" on muscle alone. Below BMI_LEAN_BF the
 // category must be labelled not valid instead of stated as a bare verdict.
 {
-  check('BMI_LEAN_BF threshold is defined and is 20', /const\s+BMI_LEAN_BF\s*=\s*20\b/.test(rawScript));
-  // Read the threshold from the source rather than the vm global: a top-level
-  // `const` is not a property of the sandbox global, so G.BMI_LEAN_BF is undefined
-  // even though the constant is perfectly in scope for drawBmiChart.
-  const LEAN_BF = Number((rawScript.match(/const\s+BMI_LEAN_BF\s*=\s*(\d+(?:\.\d+)?)/) || [])[1]);
-  check('lean threshold parses to a usable number', Number.isFinite(LEAN_BF), `got ${LEAN_BF}`);
+  // Threshold is sex-split: women carry more essential fat, so the same BF% is not
+  // the same leanness and a single 20% cutoff would practically never fire for a woman.
+  check('BMI_LEAN_BF is sex-split 20/30', /const\s+BMI_LEAN_BF\s*=\s*\{\s*male:\s*20\s*,\s*female:\s*30\s*\}/.test(rawScript));
+  check('bmiLeanBf resolver defined', typeof G.bmiLeanBf === 'function');
+  check('bmiLeanBf("male") → 20',   G.bmiLeanBf('male')   === 20, `got ${G.bmiLeanBf?.('male')}`);
+  check('bmiLeanBf("female") → 30', G.bmiLeanBf('female') === 30, `got ${G.bmiLeanBf?.('female')}`);
+  // Unset sex resolves as male, matching the app's existing `gender!=='female'` rule.
+  check('bmiLeanBf(undefined) → 20 (app-wide unset-is-male convention)', G.bmiLeanBf(undefined) === 20);
+  check('bmiLeanBf(null) → 20',     G.bmiLeanBf(null) === 20);
+  check('bmiLeanBf("") → 20',       G.bmiLeanBf('') === 20);
 
   const bmiStart = rawScript.indexOf('function drawBmiChart(');
   const bmiEnd = rawScript.indexOf('async function syncBodyComp', bmiStart);
   const body = bmiStart >= 0 && bmiEnd > bmiStart ? rawScript.slice(bmiStart, bmiEnd) : '';
   check('drawBmiChart reads the latest bfLog entry', body.includes('bfLog[bfLog.length-1]'));
-  check('drawBmiChart compares BF against BMI_LEAN_BF', body.includes('BMI_LEAN_BF'));
+  check('drawBmiChart resolves the threshold from profile sex', body.includes('bmiLeanBf(profile&&profile.gender)'));
+  check('drawBmiChart compares BF against the resolved threshold', /lastBf\.bf<leanBf/.test(body));
   check('invalidation note says the reading is not valid', /Not valid at/.test(body));
   check('invalidation note explains muscle vs fat', /cannot tell muscle from fat/.test(body));
   // The chart itself must still draw — degrade the interpretation, never the data.
@@ -1369,9 +1374,18 @@ check('drawBmiChart uses wkt-profile for height', rawScript.includes("'wkt-profi
   const cat = bmi<18.5?'Underweight':bmi<25?'Normal':bmi<30?'Overweight':'Obese';
   check('89kg @ 182cm = BMI 26.9', bmi === 26.9, `got ${bmi}`);
   check('26.9 categorises as Overweight (the misclassification being labelled)', cat === 'Overweight');
-  check('15% BF is below the lean threshold', 15 < LEAN_BF);
-  check('25% BF is not below the lean threshold', !(25 < LEAN_BF));
-  check('20% BF exactly is not flagged (strict less-than)', !(20 < LEAN_BF));
+  const flags = (bf, sex) => bf > 0 && bf < G.bmiLeanBf(sex);
+  // Male side
+  check('male 15% BF is flagged',                 flags(15, 'male'));
+  check('male 25% BF is not flagged',            !flags(25, 'male'));
+  check('male 20% exactly is not flagged (strict <)', !flags(20, 'male'));
+  // Female side — 25% is lean for a woman and must flag, where it would not for a man.
+  check('female 25% BF is flagged',               flags(25, 'female'));
+  check('female 29% BF is flagged',               flags(29, 'female'));
+  check('female 30% exactly is not flagged (strict <)', !flags(30, 'female'));
+  check('female 35% BF is not flagged',          !flags(35, 'female'));
+  // The split is the point: identical BF%, different verdict by sex.
+  check('25% flags for a woman but not for a man', flags(25, 'female') && !flags(25, 'male'));
 }
 
 // ── 37. Rest timer — showRestTimer / startRest / cancelRest ──────────────────
