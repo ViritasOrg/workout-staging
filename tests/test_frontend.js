@@ -4012,5 +4012,31 @@ console.log(`\n${'─'.repeat(59)}`);
   G.localStorage.removeItem('wkt-diag-log');
 }
 
+
+// ── Progress charts: All window (added 2026-08-05) ──────────────────────────
+// Every Progress chart was capped at 90 days with no wider option, so a seeded
+// history (SEED_WEIGHTS goes back to 2024-09) could never be seen in full.
+{
+  check('WINDOW_ALL is defined', /const WINDOW_ALL=36500;/.test(rawScript));
+  for (const [fn, id] of [['setWeightWindow','wt-btn'],['setVolWindow','vol-btn'],['setStrWindow','str-btn']]) {
+    check(`${fn} has an All button`,
+      new RegExp(`onclick="${fn}\\(36500\\)" id="${id}-36500"`).test(html));
+    check(`  …${id} All is not pre-selected (90d stays the default)`,
+      new RegExp(`id="${id}-36500" class="${id}"[^>]*>All<`).test(html));
+    check(`  …${id} 90d keeps the active class`,
+      new RegExp(`id="${id}-90" class="${id} vol-btn-active"`).test(html));
+  }
+  // The windows are plain day counts fed to a date cutoff, so All needs no
+  // special-casing — but it must actually be wider than any real history.
+  check('All is wider than the oldest seeded weight', (() => {
+    const oldest = new Date('2024-09-16');
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 36500);
+    return cutoff < oldest;
+  })());
+  check('the default window is still 90', /let _weightWindow=90/.test(rawScript));
+  check('setWeightWindow still redraws all four overview charts',
+    /setWeightWindow\(days\)\{[^}]*drawChart\(\);drawBfChart\(\);drawBmiChart\(\);drawLbmChart\(\);/.test(rawScript));
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
