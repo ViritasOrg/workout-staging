@@ -851,8 +851,18 @@ function _seedHypertrophyProgram(){
 }
 function _ensurePrograms(){
   var changed=false;
+  // Re-seed the 6-Day Hypertrophy program unless the user deliberately deleted it.
+  // This used to re-add it whenever it was absent, so deleting every program silently
+  // recreated one on the next load. Deleting must stick, exactly as it already does
+  // for the 5-Day Split below (rule 2026-07-10).
+  //
+  // The signal is recorded by the DELETE, not inferred from an empty list: emptiness
+  // alone cannot tell "never had programs" from "deleted them all", and guessing is
+  // what produced the bug.
+  var _hypDeleted=false;
+  try{_hypDeleted=localStorage.getItem('wkt-hyp-deleted')==='1';}catch(e){}
   var hasHyp=_programs.some(function(p){return p.name==='6-Day Hypertrophy — Upper';});
-  if(!hasHyp){_programs.unshift(_seedHypertrophyProgram());_activeProgramIndex=0;changed=true;}
+  if(!hasHyp&&!_hypDeleted){_programs.unshift(_seedHypertrophyProgram());_activeProgramIndex=0;changed=true;}
   // 5-Day Split is no longer auto-seeded (Henrik 2026-07-10) — deleting it must stick
   // The "non-rehab programs must not show a rehab tag" rewrite is GONE (rule 2026-07-31).
   // Tags are derived from the prescribed reps at generation time, so flipping rehab→volume on
@@ -951,7 +961,7 @@ function createNewProgram(){
   _openProgOverlay();
 }
 function _openProgOverlay(){var ov=document.getElementById('prog-overlay');ov.classList.add('open');document.body.classList.add('locked');_renderProgOverlay();}
-function closeProgramOverlay(){if(_progIsNew){_programs.splice(_progEditIdx,1);if(_activeProgramIndex>=_programs.length)_activeProgramIndex=Math.max(0,_programs.length-1);savePrograms();buildProgramSettingsCard();}_progIsNew=false;var ov=document.getElementById('prog-overlay');ov.classList.remove('open');document.body.classList.remove('locked');_progWiz=null;}
+function closeProgramOverlay(){if(_progIsNew){(function(){var _p=_programs[_progEditIdx];if(_p&&_p.name==='6-Day Hypertrophy — Upper'){try{localStorage.setItem('wkt-hyp-deleted','1');}catch(e){}}})();_programs.splice(_progEditIdx,1);if(_activeProgramIndex>=_programs.length)_activeProgramIndex=Math.max(0,_programs.length-1);savePrograms();buildProgramSettingsCard();}_progIsNew=false;var ov=document.getElementById('prog-overlay');ov.classList.remove('open');document.body.classList.remove('locked');_progWiz=null;}
 function _exOpts(di,ei,cur){
   var groups={'Legs':['Squat','Romanian Deadlift','Deadlift','Leg Press','Bilateral Leg Press','Smith Machine Squat','Leg Curl','Leg Extension','Calf Raises','Lunges','Bulgarian Split Squat','Hip Thrust'],'Back':['Pull-ups','Weighted Pull-ups','Chin-ups','Barbell Row','Barbell Row (heavy)','Cable Row','Lat Pulldown','T-Bar Row','Face Pulls','Rear Delt Fly','Rear Delt Cable Fly','Shrug'],'Chest':['Chest Machine Press','Bench Press','Incline Bench Press','Incline DB Press','Cable Fly','Low-to-high Cable Fly','Push-ups','Push-ups (weighted/elevated)','Dips'],'Shoulders':['Landmine Press','Overhead Press','Arnold Press','Lateral Raise','Cable Lateral Raise','Y-Raise','Front Raise','Upright Row'],'Arms':['Barbell Curl','Hammer Curl','EZ Bar Curl','Preacher Curl','Overhead Tricep Cable','Tricep Pushdown','Skull Crushers','Close Grip Press','Curl variation']};
   var allEx=[];Object.values(groups).forEach(function(g){g.forEach(function(e){allEx.push(e);});});
@@ -1113,7 +1123,7 @@ function _applyRehabCondition(condId){var cond=REHAB_CONDITIONS.find(function(c)
 function _useProg(){_activeProgramIndex=_progEditIdx;savePrograms();rebuildDayGrid();rebuildLogDaySelect();buildProgramSettingsCard();closeProgramOverlay();}
 function _deleteProg(){
   if(!confirm('Delete "'+_programs[_progEditIdx].name+'"? This cannot be undone.'))return;
-  _programs.splice(_progEditIdx,1);
+  (function(){var _p=_programs[_progEditIdx];if(_p&&_p.name==='6-Day Hypertrophy — Upper'){try{localStorage.setItem('wkt-hyp-deleted','1');}catch(e){}}})();_programs.splice(_progEditIdx,1);
   if(!_programs.length)_programs=[_seedDefaultProgram()];
   _activeProgramIndex=Math.min(_activeProgramIndex,_programs.length-1);
   savePrograms();rebuildDayGrid();rebuildLogDaySelect();buildProgramSettingsCard();closeProgramOverlay();
