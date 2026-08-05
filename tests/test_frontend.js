@@ -4038,5 +4038,26 @@ console.log(`\n${'─'.repeat(59)}`);
     /setWeightWindow\(days\)\{[^}]*drawChart\(\);drawBfChart\(\);drawBmiChart\(\);drawLbmChart\(\);/.test(rawScript));
 }
 
+
+// ── Deleting every program must stick (regression, 2026-08-05) ─────────────
+// Reported: "if I delete all programs in workout my old 5-day program reappears".
+// _ensurePrograms re-added the 6-Day Hypertrophy program whenever it was absent, so
+// deleting everything silently recreated one on the next load. The 5-Day Split was
+// already fixed this way on 2026-07-10 ("deleting it must stick"); the 6-Day was not.
+{
+  const src = rawScript;
+  check('the re-seed is gated on a deletion signal', /!hasHyp&&!_hypDeleted/.test(src));
+  check('the signal is read from storage', /localStorage\.getItem\('wkt-hyp-deleted'\)==='1'/.test(src));
+  // Recorded by the DELETE, not inferred from an empty list — emptiness cannot tell
+  // "never had programs" from "deleted them all".
+  check('the delete path records the intent',
+    /name==='6-Day Hypertrophy — Upper'\)\{try\{localStorage\.setItem\('wkt-hyp-deleted','1'\)/.test(src));
+  check('both delete call sites record it',
+    (src.match(/localStorage\.setItem\('wkt-hyp-deleted','1'\)/g) || []).length === 2);
+  check('a fresh install still gets the seed (no signal set)',
+    !/localStorage\.getItem\('wkt-hyp-deleted'\)==='1'\)\s*\{[\s\S]{0,40}unshift/.test(src));
+  check('_seedHypertrophyProgram still exists', typeof G._seedHypertrophyProgram === 'function');
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
