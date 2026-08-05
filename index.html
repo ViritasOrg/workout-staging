@@ -449,7 +449,64 @@ const REHAB_CONDITIONS=[
    detect:function(n){return(/\bsquat\b|\blunge\b/i.test(n))&&!/\b(leg press|leg curl|leg extension|machine)\b/i.test(n);},
    suggest:function(n){return/lunge/i.test(n)?'Leg Extension':'Leg Press';}}
 ];
-const GOOGLE_CLIENT_ID='580935445116-sovhqu5i940pjvb3co63af3tm0ekjds8.apps.googleusercontent.com';const AGENT_URL="https://claude-agent-api-aged-sun-3616.fly.dev";let _googleToken=localStorage.getItem('google_token')||'';let _sessionToken=localStorage.getItem('session_token')||'';function authHeaders(extra){const h={};if(APP_ID)h['X-App-Id']=APP_ID;const _t=_sessionToken||_googleToken;if(_t)h['Authorization']='Bearer '+_t;return extra?Object.assign({},h,extra):h;}
+const GOOGLE_CLIENT_ID='580935445116-sovhqu5i940pjvb3co63af3tm0ekjds8.apps.googleusercontent.com';const AGENT_URL="https://claude-agent-api-aged-sun-3616.fly.dev";
+// ── Failure logging ──────────────────────────────────────────────────────────
+// This app had no logging layer at all: 43 backend calls, 31 silent `catch(e){}`,
+// and nothing that survived a reload. On 2026-08-05 two hangs in the sibling apps
+// had to be diagnosed from screenshots because the exception was invisible on an
+// iOS standalone PWA, which has no console. The protocol apps got a diagnostics
+// log that same day and it found a real bug within minutes; this brings the same
+// capability here.
+//
+// Deliberately localStorage-only, no backend push (ruling 2026-08-05). The "pair
+// every write with a backend push" rule protects USER DATA across a cache wipe.
+// This is not user data — it is this device's record of failures, and it has to
+// keep working while the backend is unreachable, which is exactly when it matters.
+var WKT_DIAG_KEY='wkt-diag-log', WKT_DIAG_MAX=60;
+function _diagPush(rec){
+  // Runs inside error handlers and a fetch wrapper — it must never throw.
+  try{
+    var a=[];
+    try{a=JSON.parse(localStorage.getItem(WKT_DIAG_KEY)||'[]');if(!Array.isArray(a))a=[];}catch(e){a=[];}
+    a.push(rec);
+    while(a.length>WKT_DIAG_MAX)a.shift();
+    localStorage.setItem(WKT_DIAG_KEY,JSON.stringify(a));
+  }catch(e){}
+}
+function _diagAll(){try{var a=JSON.parse(localStorage.getItem(WKT_DIAG_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
+function _logErr(ctx,e){try{console.error('[wkt:'+ctx+']',e);}catch(_){}_diagPush({t:Date.now(),ctx:ctx,msg:String((e&&e.message)||e)});}
+function _logHttp(ctx,status,url){try{console.warn('[wkt:'+ctx+'] HTTP '+status+' '+url);}catch(_){}_diagPush({t:Date.now(),ctx:ctx,status:status,url:url});}
+
+// One choke point instead of editing 43 call sites. Wrapping fetch catches every
+// backend failure — including the ones swallowed by a bare `catch(e){}` — because
+// the wrapper sees the response before the caller's catch does. Only AGENT_URL
+// traffic is touched; everything else (Google Sign-In, Pages assets) passes
+// straight through. The original promise is returned unchanged and errors are
+// rethrown, so no caller's behaviour changes.
+(function(){
+  if(typeof window.fetch!=='function')return;
+  var _origFetch=window.fetch.bind(window);
+  window.fetch=function(input,init){
+    var url='';
+    try{url=(typeof input==='string')?input:((input&&input.url)||'');}catch(e){}
+    var p=_origFetch(input,init);
+    if(!url||url.indexOf(AGENT_URL)!==0)return p;
+    var path=url.slice(AGENT_URL.length)||'/';
+    return p.then(function(r){
+      try{if(!r.ok)_logHttp('fetch',r.status,path);}catch(e){}
+      return r;
+    },function(e){
+      try{_logErr('fetch '+path,e);}catch(_){}
+      throw e;
+    });
+  };
+})();
+
+// Uncaught throws and rejected promises nobody handled — the class of failure that
+// no try/catch in this file would ever record.
+window.addEventListener('error',function(ev){try{_logErr('uncaught',(ev&&(ev.error||ev.message))||'error');}catch(e){}});
+window.addEventListener('unhandledrejection',function(ev){try{_logErr('unhandled',(ev&&ev.reason)||'rejection');}catch(e){}});
+let _googleToken=localStorage.getItem('google_token')||'';let _sessionToken=localStorage.getItem('session_token')||'';function authHeaders(extra){const h={};if(APP_ID)h['X-App-Id']=APP_ID;const _t=_sessionToken||_googleToken;if(_t)h['Authorization']='Bearer '+_t;return extra?Object.assign({},h,extra):h;}
 function _hasValidSession(){var st=localStorage.getItem('session_token')||'';if(!st)return false;try{var p=JSON.parse(atob(st.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));return !!(p.exp&&(p.exp*1000)>Date.now());}catch(e){return false;}}var _tokenRefreshResolvers=[];function _onTokenRefreshed(){_tokenRefreshResolvers.forEach(function(r){r();});_tokenRefreshResolvers=[];}async function _ensureValidToken(){if(_hasValidSession())return;if(!_googleToken)return;try{var _tp=JSON.parse(atob(_googleToken.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if((_tp.exp*1000)-Date.now()>30000)return;}catch(e){return;}return new Promise(function(resolve){_tokenRefreshResolvers.push(resolve);if(window.google&&google.accounts)google.accounts.id.prompt();setTimeout(function(){var _ti=_tokenRefreshResolvers.indexOf(resolve);if(_ti>=0)_tokenRefreshResolvers.splice(_ti,1);resolve();},3000);});}function unlockApp(){document.getElementById('login-screen').classList.add('hidden');document.body.classList.remove('login-locked');}function lockApp(msg){const _pm=document.getElementById('login-msg');if(_pm){_pm.style.color='var(--danger,#ff3c3c)';_pm.textContent=msg||'Sign in with Google to continue';}}async function onGoogleSignIn(resp){_googleToken=resp.credential;const _pm=document.getElementById('login-msg');if(_pm){_pm.style.color='var(--muted2,#888)';_pm.textContent='Verifying…';}try{const r=await fetch(AGENT_URL+'/auth/verify',{method:'POST',headers:{'Authorization':'Bearer '+_googleToken}});if(r.ok){const _vd=await r.json().catch(function(){return{};});if(_vd.session_token){_sessionToken=_vd.session_token;localStorage.setItem('session_token',_vd.session_token);}localStorage.setItem('google_token',_googleToken);try{var _jp=JSON.parse(atob(_googleToken.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(_jp&&_jp.email)localStorage.setItem('google_email',_jp.email);}catch(e){}if(typeof _onTokenRefreshed==='function')_onTokenRefreshed();unlockApp();syncWeightsFromAgent();syncWorkoutLogsFromAgent();syncProgramsFromAgent();syncSettingsFromAgent();syncBodyCompFromAgent();syncFeaturesFromAgent();syncWorkoutDraftFromAgent();}else if(r.status===403){_googleToken='';lockApp('Access denied — contact Henrik');}else{_googleToken='';lockApp('Sign-in failed — try again');}}catch(e){_googleToken='';lockApp('Connection error — try again');}}function initGoogleAuth(){var _ih={client_id:GOOGLE_CLIENT_ID,callback:onGoogleSignIn,auto_select:true,cancel_on_tap_outside:false,locale:'en'};var _hl=localStorage.getItem('google_email')||'';if(_hl)_ih.login_hint=_hl;google.accounts.id.initialize(_ih);google.accounts.id.renderButton(document.getElementById('g_signin_container'),{theme:'filled_black',size:'large',shape:'pill',text:'sign_in_with',width:260});if(!_hasValidSession())google.accounts.id.prompt();}function _loadGsi(){const _gsiScript=document.createElement('script');_gsiScript.src='https://accounts.google.com/gsi/client?hl=en';_gsiScript.onload=initGoogleAuth;document.head.appendChild(_gsiScript);}var _startToken=_sessionToken||_googleToken;if(_startToken){var _vt=_startToken,_vc=new AbortController();setTimeout(function(){_vc.abort();},5000);fetch(AGENT_URL+'/auth/verify',{method:'POST',headers:{'Authorization':'Bearer '+_vt},signal:_vc.signal}).then(function(r){if(r.ok){r.json().then(function(d){if(d&&d.session_token){_sessionToken=d.session_token;localStorage.setItem('session_token',d.session_token);}}).catch(function(){});unlockApp();}else if(r.status===401||r.status===403){localStorage.removeItem('session_token');_sessionToken='';localStorage.removeItem('google_token');_googleToken='';}}).catch(function(){if(_startToken===_vt)unlockApp();});}_loadGsi();setInterval(function(){if(!_googleToken)return;try{var _pp=JSON.parse(atob(_googleToken.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if((_pp.exp*1000)-Date.now()<300000&&!_hasValidSession()&&window.google&&google.accounts)google.accounts.id.prompt();}catch(e){}},60000);
 var _userTier=1;var _userFeatures={tier:1,trt:false,enhanced:false,peptides:true};
 async function syncFeaturesFromAgent(){try{const r=await fetch(AGENT_URL+'/user/features',{headers:authHeaders()});if(!r.ok)return;const d=await r.json();_userTier=d.tier||1;_userFeatures=d;}catch(e){_userTier=1;_userFeatures={tier:1,trt:false,enhanced:false,peptides:true};}}
@@ -691,7 +748,72 @@ function _deloadBannerHtml(){var on=_deloadActive;return '<div style="display:fl
 function toggleDeload(){_deloadActive=!_deloadActive;setData('wkt-deload',_deloadActive);pushSettingsToAgent({'wkt-deload':_deloadActive});renderWorkout(_selectedProgramDay);var _lp=document.getElementById('page-log');if(_lp&&_lp.classList&&_lp.classList.contains('active')){var _ld=document.getElementById('log-day');prefillLog(parseInt(_ld&&_ld.value)||_selectedProgramDay);}}
 function renderWorkout(num){var day=getActiveProgramDay(num);if(!day)return;var prog=getActiveProgram();var tc={strength:'tag-strength',volume:'tag-volume',rehab:'tag-rehab'};var tl={strength:'Strength',volume:'Volume',rehab:'🔧 Rehab'};var savedW=getData('template_weights_day'+num,{});var restLabel=getProgramRest(prog);var html='<div class="workout-detail">'+_deloadBannerHtml()+'<div class="workout-header"><div><div class="workout-title">'+day.name+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px">⏱ '+restLabel+'</div></div>'+'</div>';var effExs=_applyRehabSubs(day.exercises,prog);effExs.forEach(function(ex){var lastKg=savedW[ex.name];if((lastKg==null||lastKg===0)&&ex._rehabOrig)lastKg=savedW[ex._rehabOrig];if((lastKg==null||lastKg===0)&&logs.length){var _fl=getBestKgFromLogs(ex.name)||(ex._rehabOrig?getBestKgFromLogs(ex._rehabOrig):null);if(_fl)lastKg=_fl;}if(_deloadActive&&lastKg>0){lastKg=_deloadKg(lastKg);if(isBarbellEx(ex.name))lastKg=roundBarbellKg(lastKg);}var kgStr=lastKg!=null&&lastKg>0?'<span style="color:var(--accent);font-weight:600;margin-left:6px">'+kgToUnit(lastKg)+unitLabel()+'</span>':'';var nameHtml=_escP(ex.name)+(ex._rehabOrig?'<span style="color:#ff9b3c;font-size:10px;margin-left:6px" title="Rehab sub for '+_escP(ex._rehabOrig)+'">↺ rehab</span>':'');html+='<div class="exercise-row"><div class="ex-info"><div class="ex-name">'+nameHtml+'</div><div class="ex-scheme">'+_escP(_deloadActive?_deloadScheme(ex.scheme)+' · deload':ex.scheme)+kgStr+'</div></div><span class="ex-tag '+(tc[ex.tag]||'tag-volume')+'">'+(tl[ex.tag]||ex.tag)+'</span></div>';});html+='</div>';document.getElementById('workout-display').innerHTML=html;}
 var _lsDbgKeys=[];
-function buildStoragePage(){var _el=document.getElementById('page-storage');if(!_el)return;var _esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};_lsDbgKeys=[];for(var _di=0;_di<localStorage.length;_di++){var _dk=localStorage.key(_di);if(_dk!=null)_lsDbgKeys.push(_dk);}_lsDbgKeys.sort();var _rows=_lsDbgKeys.map(function(k,i){var _raw=localStorage.getItem(k)||'';var _extra='';try{var _pv=JSON.parse(_raw);if(Array.isArray(_pv))_extra='array · '+_pv.length+' items';else if(_pv!==null&&typeof _pv==='object')_extra='object · '+Object.keys(_pv).length+' keys';else _extra=typeof _pv;}catch(e){_extra='string';}var _trunc=_raw.length>300;var _disp=_trunc?_raw.slice(0,300)+'…':_raw;return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+'<div><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:600">'+_esc(k)+'</span><span style="font-size:10px;color:var(--muted);margin-left:8px">'+_esc(_extra)+'</span></div>'+'<button onclick="lsDbgCopy('+i+')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 10px;font-size:10px;cursor:pointer;font-family:inherit;flex-shrink:0">Copy</button>'+'</div>'+'<pre style="font-family:monospace;font-size:10px;color:var(--muted);white-space:pre-wrap;word-break:break-all;margin:0;line-height:1.4;max-height:100px;overflow:hidden">'+_esc(_disp)+'</pre>'+'</div>';}).join('');_el.innerHTML='<div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:13px;color:var(--muted)">'+_lsDbgKeys.length+' keys in localStorage</div><div style="display:flex;gap:8px"><button onclick="buildStoragePage()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Refresh</button><button onclick="lsDbgCopyAll()" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Copy All</button></div></div>'+_rows+'</div>';}
+// Built with DOM nodes and textContent, never innerHTML: every value here is an
+// exception message or a URL — exactly the untrusted-text-into-HTML shape CodeQL
+// already flags in this file. No new sink.
+function _diagLine(r){
+  var when=new Date(r.t||0).toISOString().replace('T',' ').slice(0,19);
+  var what=r.status!=null?('HTTP '+r.status+' '+(r.url||'')):(r.msg||'');
+  return when+'  ['+(r.ctx||'?')+']  '+what;
+}
+function _diagText(){
+  var head='app v'+(typeof VERSION!=='undefined'?VERSION:'?')
+    +'  env='+((typeof IS_STAGING!=='undefined'&&IS_STAGING)?'staging':'prod')
+    +'  path='+(location.pathname||'')
+    +'\n'+navigator.userAgent
+    +'\ncopied '+new Date().toISOString();
+  var rows=_diagAll().map(_diagLine);
+  return head+'\n\n'+(rows.length?rows.join('\n'):'(no failures recorded)');
+}
+function copyDiagnostics(btn){
+  var txt=_diagText();
+  function done(){if(btn){var o=btn.textContent;btn.textContent='Copied';setTimeout(function(){btn.textContent=o;},1200);}}
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,fallback);return;}
+  }catch(e){}
+  fallback();
+  function fallback(){
+    try{
+      var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';
+      document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();
+    }catch(e){}
+  }
+}
+function clearDiagnostics(){try{localStorage.removeItem(WKT_DIAG_KEY);}catch(e){}buildStoragePage();}
+function _diagRenderInto(host){
+  if(!host)return;
+  var rows=_diagAll();
+  var card=document.createElement('div');
+  card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:14px 0';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px';
+  var ttl=document.createElement('div');
+  ttl.style.cssText='font-size:13px;font-weight:700;letter-spacing:0.5px;color:var(--text)';
+  ttl.textContent='DIAGNOSTICS ('+rows.length+')';
+  hdr.appendChild(ttl);
+  var btns=document.createElement('div');btns.style.cssText='display:flex;gap:6px';
+  var copy=document.createElement('button');copy.textContent='Copy';
+  copy.style.cssText='background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit';
+  copy.onclick=function(){copyDiagnostics(copy);};
+  var clr=document.createElement('button');clr.textContent='Clear';
+  clr.style.cssText='background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit';
+  clr.onclick=clearDiagnostics;
+  btns.appendChild(copy);btns.appendChild(clr);hdr.appendChild(btns);card.appendChild(hdr);
+  var note=document.createElement('div');
+  note.style.cssText='font-size:11px;color:var(--muted2,#888);margin-bottom:10px;line-height:1.5';
+  note.textContent=rows.length
+    ? 'Recent backend and app failures on this device, newest last. Copy and paste these when reporting a problem.'
+    : 'No failures recorded on this device. Errors appear here automatically when they happen.';
+  card.appendChild(note);
+  if(rows.length){
+    var pre=document.createElement('pre');
+    pre.style.cssText='margin:0;max-height:260px;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--text)';
+    pre.textContent=rows.map(_diagLine).join('\n');
+    card.appendChild(pre);
+  }
+  host.insertBefore(card,host.firstChild);
+}
+function buildStoragePage(){var _el=document.getElementById('page-storage');if(!_el)return;var _esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};_lsDbgKeys=[];for(var _di=0;_di<localStorage.length;_di++){var _dk=localStorage.key(_di);if(_dk!=null)_lsDbgKeys.push(_dk);}_lsDbgKeys.sort();var _rows=_lsDbgKeys.map(function(k,i){var _raw=localStorage.getItem(k)||'';var _extra='';try{var _pv=JSON.parse(_raw);if(Array.isArray(_pv))_extra='array · '+_pv.length+' items';else if(_pv!==null&&typeof _pv==='object')_extra='object · '+Object.keys(_pv).length+' keys';else _extra=typeof _pv;}catch(e){_extra='string';}var _trunc=_raw.length>300;var _disp=_trunc?_raw.slice(0,300)+'…':_raw;return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+'<div><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:600">'+_esc(k)+'</span><span style="font-size:10px;color:var(--muted);margin-left:8px">'+_esc(_extra)+'</span></div>'+'<button onclick="lsDbgCopy('+i+')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 10px;font-size:10px;cursor:pointer;font-family:inherit;flex-shrink:0">Copy</button>'+'</div>'+'<pre style="font-family:monospace;font-size:10px;color:var(--muted);white-space:pre-wrap;word-break:break-all;margin:0;line-height:1.4;max-height:100px;overflow:hidden">'+_esc(_disp)+'</pre>'+'</div>';}).join('');_el.innerHTML='<div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:13px;color:var(--muted)">'+_lsDbgKeys.length+' keys in localStorage</div><div style="display:flex;gap:8px"><button onclick="buildStoragePage()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Refresh</button><button onclick="lsDbgCopyAll()" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Copy All</button></div></div>'+_rows+'</div>';_diagRenderInto(_el);}
 function lsDbgCopy(i){var k=_lsDbgKeys[i];if(k==null)return;var v=localStorage.getItem(k)||'';var out={};try{out[k]=JSON.parse(v);}catch(e){out[k]=v;}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
 function lsDbgCopyAll(){var out={};for(var _ci=0;_ci<localStorage.length;_ci++){var _ck=localStorage.key(_ci);if(!_ck)continue;var _cv=localStorage.getItem(_ck)||'';try{out[_ck]=JSON.parse(_cv);}catch(e){out[_ck]=_cv;}}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
 function showPage(name,btn){localStorage.setItem('wkt-last-page',name);_currentPage=name;var _pr=primaryOf(name);if(_pr){_currentPrimary=_pr;_lastSub[_pr]=name;try{localStorage.setItem('wkt-last-sub-'+_pr,name);}catch(e){}_setPrimaryActive(_pr);_applySubtabVis(_pr);}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs .tab').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');var _tb=document.getElementById('tab-btn-'+name);if(_tb)_tb.classList.add('active');if(name==='program')buildProgramSettingsCard();if(name==='history')renderHistory();if(name==='progress')renderProgress();if(name==='settings')loadSettings();if(name==='storage')buildStoragePage();if(name==='log'){var _lc=document.getElementById('structured-log');var _hasReps=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});var _curDay=parseInt(document.getElementById('log-day').value)||0;

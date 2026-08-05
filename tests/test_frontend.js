@@ -3954,5 +3954,63 @@ console.log(`\n${'─'.repeat(59)}`);
   }
 }
 
+
+// ── Failure logging + diagnostics (added 2026-08-05) ────────────────────────
+// This app had no logging layer at all: 43 backend calls, 31 silent catch(e){},
+// nothing surviving a reload. The protocol apps got a diagnostics log the same day
+// and it identified a real bug within minutes; this is the same capability here.
+{
+  check('_diagPush defined',        typeof G._diagPush === 'function');
+  check('_diagAll defined',         typeof G._diagAll === 'function');
+  check('_logErr defined',          typeof G._logErr === 'function');
+  check('_logHttp defined',         typeof G._logHttp === 'function');
+  check('copyDiagnostics defined',  typeof G.copyDiagnostics === 'function');
+  check('clearDiagnostics defined', typeof G.clearDiagnostics === 'function');
+  check('the Storage page renders the card', /_diagRenderInto\(_el\);/.test(rawScript));
+
+  // One choke point instead of editing 43 call sites: the wrapper sees the response
+  // before any caller's `catch(e){}` swallows it.
+  const w = rawScript.slice(rawScript.indexOf('if(typeof window.fetch!==\'function\')return;'),
+                            rawScript.indexOf('window.addEventListener(\'error\''));
+  check('fetch is wrapped', /window\.fetch=function\(input,init\)/.test(w));
+  check('  …only AGENT_URL traffic is touched',
+    /url\.indexOf\(AGENT_URL\)!==0\)return p;/.test(w));
+  check('  …non-ok responses are logged', /if\(!r\.ok\)_logHttp\('fetch',r\.status,path\)/.test(w));
+  check('  …the response is returned unchanged', /\breturn r;/.test(w));
+  check('  …and network errors are RETHROWN so no caller behaviour changes',
+    /throw e;/.test(w));
+
+  check('uncaught errors are captured',   /addEventListener\('error'/.test(rawScript));
+  check('unhandled rejections are captured', /addEventListener\('unhandledrejection'/.test(rawScript));
+
+  // Must never throw — it runs inside the error handlers and the fetch wrapper.
+  const push = rawScript.slice(rawScript.indexOf('function _diagPush('),
+                               rawScript.indexOf('function _diagAll('));
+  check('_diagPush wraps its whole body', /\}catch\(e\)\{\}/.test(push));
+  check('  …a corrupt stored value degrades to an empty list', /catch\(e\)\{a=\[\];\}/.test(push));
+  check('_diagPush caps the ring buffer', /while\(a\.length>WKT_DIAG_MAX\)a\.shift\(\)/.test(push));
+
+  // Entries are exception text and URLs — never injected as HTML.
+  const render = rawScript.slice(rawScript.indexOf('function _diagRenderInto('),
+                                 rawScript.indexOf('function buildStoragePage('));
+  check('the diagnostics view adds no innerHTML sink', !/innerHTML/.test(render));
+  check('  …it uses textContent for entry text', /pre\.textContent=/.test(render));
+
+  // Round-trip the shipped functions.
+  G.localStorage.removeItem('wkt-diag-log');
+  check('empty store reads as an empty list', G._diagAll().length === 0);
+  G._logErr('unit', new Error('boom'));
+  G._logHttp('unit', 503, '/weights');
+  const all = G._diagAll();
+  check('_logErr persists an entry', all.length === 2, `got ${all.length}`);
+  check('  …with the message', all[0].msg === 'boom', `got ${all[0].msg}`);
+  check('  …and _logHttp keeps the status', all[1].status === 503);
+  for (let i = 0; i < 200; i++) G._diagPush({t: i, ctx: 'flood', msg: String(i)});
+  check('the buffer caps at 60, oldest dropped first', G._diagAll().length === 60,
+    `got ${G._diagAll().length}`);
+  check('  …and the newest survives', G._diagAll().slice(-1)[0].msg === '199');
+  G.localStorage.removeItem('wkt-diag-log');
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
