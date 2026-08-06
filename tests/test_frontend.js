@@ -1310,7 +1310,11 @@ check('bfLog key: bf_log used for storage', rawScript.includes("'bf_log'") || ra
 {
   const _origBfLog2 = [...G.bfLog];
   G.bfLog.push({date:'2026-01-01', bf:18});
+  // The sandbox stubs confirm() to false, and deleteBf now asks before deleting
+  // (it used to delete silently). Say yes for this behavioural check.
+  const _confirmWas = G.confirm; G.confirm = () => true;
   G.deleteBf('2026-01-01');
+  G.confirm = _confirmWas;
   check('deleteBf: removes entry with matching date', !G.bfLog.find(e=>e.date==='2026-01-01'), `still ${G.bfLog.length} entries`);
   G.bfLog.length = 0; _origBfLog2.forEach(e=>G.bfLog.push(e)); // restore
 }
@@ -1888,16 +1892,28 @@ console.log('\n── 47b. BF% pre-isolation migration ────────�
     src.includes("syncBodyCompFromAgent();syncWorkoutDraftFromAgent();(function(){if(!IS_STAGING||localStorage.getItem('wk-bf-isol-v1'))"));
 }
 
-// ── 47c. BF_SEED baseline entries ────────────────────────────────────────────
-console.log('\n── 47c. BF_SEED baseline entries ────────────────────────────────');
+// ── 47c. No hardcoded personal data (2026-08-05) ─────────────────────────────
+// These three checks used to assert the OPPOSITE — that BF_SEED existed and that
+// syncBodyCompFromAgent re-added it. Henrik asked for every hardcoded value to go:
+// SEED_LOGS (33 real training sessions), SEED_WEIGHTS (37 bodyweight readings) and
+// BF_SEED (3 body-fat readings) were one person's records living in a public repo
+// and being written into every user's storage. BF_SEED was the worst of the three —
+// it was re-merged on every backend sync and then pushed back up, so a deleted
+// body-fat entry returned and re-uploaded itself.
+console.log('\n── 47c. No hardcoded personal data ──────────────────────────────');
 {
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
-  check('BF_SEED constant defined with 3 baseline entries',
-    src.includes('const BF_SEED=') && src.includes('2026-03-23') && src.includes('2026-05-02') && src.includes('2026-05-03'));
-  check('syncBodyCompFromAgent merges BF_SEED entries missing from backend+local',
-    src.includes('const seedToAdd=BF_SEED.filter') && src.includes('mergedDates.has(s.date)'));
-  check('syncBodyCompFromAgent pushes missing seed entries to backend',
-    src.includes('seedToAdd') && src.includes('uploads.map'));
+  check('no BF_SEED constant', !/const BF_SEED=/.test(src));
+  check('no SEED_LOGS constant', !/const SEED_LOGS=/.test(src));
+  check('no SEED_WEIGHTS constant', !/const SEED_WEIGHTS=/.test(src));
+  check('syncBodyCompFromAgent no longer re-adds seed rows', !/seedToAdd/.test(src));
+  check('  …and uploads only what the user actually has locally',
+    /const uploads=toUpload;/.test(src));
+  check('nothing is merged into workout_logs at load beyond what is stored',
+    !/for\(const e of SEED_LOGS\)/.test(src));
+  // The dated records themselves. A future paste of the same data fails here.
+  check('no hardcoded body-fat readings', !/bf:23\.0|bf:21\.0|bf:19\.6/.test(src));
+  check('no hardcoded training-log ids', !/id:20260517004|"id":20260517004/.test(src));
 }
 
 // ── 48. Program wizard — days 1-7 + sets per muscle ──────────────────────────
@@ -4088,6 +4104,40 @@ console.log(`\n${'─'.repeat(59)}`);
 
   check('the chart scale is pushed', /setData\('wkt-chart-scale',mode\);pushSettingsToAgent\(\{'wkt-chart-scale':mode\}\)/.test(src));
   check('the startup sync restores the chart scale', /if\(s\['wkt-chart-scale'\]\)/.test(src));
+}
+
+
+// ── Deleting is global, and says so (2026-08-05) ───────────────────────────
+// Henrik: "delete entries need an extra confirmation step explaining that the
+// delete is global." Deleting a record removes it from the backend, so it is gone
+// from every device — deleteWeight and deleteBf did not even ask first.
+{
+  const src = rawScript;
+
+  check('there is one shared confirm helper', /function confirmGlobalDelete\(what\)\{/.test(src));
+  check('  …and it says the record leaves the backend',
+    /deletes it from your account on the backend/.test(src));
+  check('  …and that every device is affected, not just this one',
+    /every device you are signed in on — not just this one/.test(src));
+  check('  …and that it cannot be undone', /It cannot be undone\./.test(src));
+
+  check('deleting a workout entry asks',
+    /function deleteLog\(id\)\{if\(!confirmGlobalDelete\('this workout entry'\)\)return;/.test(src));
+  check('deleting a weight asks (it used to delete silently)',
+    /function deleteWeight\(date\)\{if\(!confirmGlobalDelete\(/.test(src));
+  check('deleting a body-fat reading asks (it used to delete silently)',
+    /function deleteBf\(date\)\{if\(!confirmGlobalDelete\(/.test(src));
+  check('deleting a program asks',
+    /if\(!confirmGlobalDelete\('the program "'\+_programs\[_progEditIdx\]\.name\+'"'\)\)return;/.test(src));
+
+  // Every delete that reaches the backend must go through the helper, so a new one
+  // cannot quietly ship without the warning.
+  const backendDeletes = ['deleteLog','deleteWeight','deleteBf'];
+  backendDeletes.forEach(function(fn){
+    const body = src.slice(src.indexOf('function ' + fn + '('));
+    check(fn + ' confirms before it touches anything',
+      body.slice(0, 120).includes('confirmGlobalDelete'));
+  });
 }
 
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
