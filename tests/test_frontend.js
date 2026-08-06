@@ -4059,5 +4059,36 @@ console.log(`\n${'─'.repeat(59)}`);
   check('_seedHypertrophyProgram still exists', typeof G._seedHypertrophyProgram === 'function');
 }
 
+
+// ── Every preference reaches the backend (2026-08-05) ──────────────────────
+// localStorage is a cache, never the source of truth: anything written there has
+// to be pushed AND read back, or a cache wipe loses it. Three things failed that:
+// the Navy-BF measurements and onboarded flag inside wkt-profile, the theme, and
+// the chart scale — all written locally and never sent anywhere.
+{
+  const src = rawScript;
+
+  check('onboarding pushes the whole profile, not just the shared user_* fields',
+    /_pf\['wkt-profile'\]=profile;/.test(src));
+  check('the profile push is unconditional (an empty user_* set used to skip it)',
+    /_pf\['wkt-profile'\]=profile;\s*\n?\s*pushSettingsToAgent\(_pf\);/.test(src));
+  check('neck/waist/hips are part of the profile that gets pushed',
+    /neck:_obData\.neck\?parseDec\(_obData\.neck\):null,waist:/.test(src));
+  check('the startup sync restores the profile',
+    /if\(s\['wkt-profile'\]\)/.test(src));
+  check('the restored profile is merged, not swapped in whole',
+    /setData\('wkt-profile',Object\.assign\(\{\},getData\('wkt-profile',\{\}\),_sp\)\)/.test(src));
+
+  check('choosing a theme pushes it', /setData\('wkt-theme',id\);pushSettingsToAgent\(\{'wkt-theme':id\}\)/.test(src));
+  check('the startup sync restores the theme', /if\(s\['wkt-theme'\]/.test(src));
+  // applyTheme itself pushes, so re-applying an unchanged value would echo it back
+  // to the backend on every single load.
+  check('the theme is only re-applied when it differs',
+    /s\['wkt-theme'\]&&getData\('wkt-theme',null\)!==s\['wkt-theme'\]/.test(src));
+
+  check('the chart scale is pushed', /setData\('wkt-chart-scale',mode\);pushSettingsToAgent\(\{'wkt-chart-scale':mode\}\)/.test(src));
+  check('the startup sync restores the chart scale', /if\(s\['wkt-chart-scale'\]\)/.test(src));
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
