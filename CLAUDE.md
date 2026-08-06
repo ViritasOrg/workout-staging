@@ -492,6 +492,33 @@ Personal data belonging to a specific real user must **NEVER** be hardcoded anyw
 - Any one-time migration must be scoped to the specific target `user_id`, have a clear expiry, and be removed once confirmed complete
 - Every read/write of user data must be gated by the authenticated user's identity — never cross user boundaries
 
+**Second incident (2026-08-05) — seeded records:** four constants held one person's
+real records and wrote them into **every** user's storage: `SEED_LOGS` (33 training
+sessions), `SEED_WEIGHTS` (37 bodyweight readings), `BF_SEED` and `BC_SEED` (body-fat
+and neck/belly measurements). The backend had the same thing: `routers/bodycomp.py`
+re-inserted three readings via `_ensure_seed()` **on every module import**, i.e. every
+restart — so deleting one never stuck. All removed. `tests/test_no_hardcoded_personal_data.py`
+(backend) and equivalent frontend checks now fail if any of it reappears.
+
+## ⚠️ DELETES ARE GLOBAL — SAY SO BEFORE DELETING ⚠️
+Henrik, 2026-08-05: *"delete entries need an extra confirmation step explaining
+that the delete is global."*
+
+Deleting a record removes it from the **backend**, so it is gone from every device
+signed into that account — not just the one in front of you — and there is no undo.
+Every delete of a stored record goes through `confirmGlobalDelete(what)`, which says
+exactly that. Do not write a bare `confirm('Delete this?')`, and never delete a
+stored record with no prompt at all.
+
+**What triggered it:** `deleteWeight` and `deleteBf` deleted silently, with no
+confirmation of any kind. The rest used generic wording ("Delete this protocol?
+This cannot be undone.") that read like a local action.
+
+- A new delete that reaches the backend must use the helper — tests assert every
+  existing one does, and that the old local-sounding prompts are gone.
+- The helper lives in `index.html` and is called from the tab files, so it is
+  available everywhere.
+
 ## ⚠️ AUTH WARNING — READ BEFORE TOUCHING ANY AUTH CODE ⚠️
 **PIN/passcode auth has been PERMANENTLY REMOVED.** Google Sign-In is the ONLY
 end-user authentication method across this entire ecosystem (peptidetracker,
