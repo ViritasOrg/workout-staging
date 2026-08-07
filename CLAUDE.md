@@ -139,6 +139,25 @@ they overwrite data that was correct when it was written.
   is this bug.
 - Regression tests assert `buildTHist` contains no capture/compute/model call. Keep them.
 
+## ⚠️ THE STORED LOG IS THE TRUE RECORD OF WHAT HAPPENED ⚠️
+Henrik, 2026-08-07 (about injections, but the principle is general): *"the injection
+log must be treated as the true record of what was injected. Also it needs to be well
+protected in backups."*
+
+For any record of something the user actually did — a logged workout, a bodyweight
+reading, a completed set — the **backend file is canonical**. Anything else holding
+the same facts (a profile field, a cached list, a saved chart) is a derived view and
+loses to it when they disagree.
+
+- A view that shows history reads the stored record. It never reconstructs it, and it
+  never narrows it from a partial source — that is how a 14-day cache window came to
+  overwrite six weeks of stored history in the peptide app the same day.
+- Editing history means editing the **record**, not the cache. Writing to a derived
+  list alone is a silent no-op the next render undoes.
+- Backups must **verify** they hold it: parse, count, and compare against the previous
+  backup, never just copy. See `claude-agent-backend/CLAUDE.md` for the mechanics and
+  the guard that stops a re-run overwriting a richer backup.
+
 ## ⚠️ localStorage IS A CACHE — NEVER THE SOURCE OF TRUTH ⚠️
 localStorage is a read cache for performance only. It is NEVER the source of truth.
 
