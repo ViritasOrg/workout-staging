@@ -3505,6 +3505,73 @@ if (typeof G._generateWorkoutProgram === 'function') {
   check('Shoulder-injury cuff block no longer injects Face Pulls', _cuffFP === false);
 }
 
+// ── Pull-ups lead every pull day ───────────────────────────────────────────────
+// Rule (2026-08-08). Henrik: "In no Pull program should any exercise be before Pull-ups."
+// Regression: the seeded "6-Day Hypertrophy — Upper" Day 2 — Pull A opened with Barbell Row
+// and put Pull-ups second.
+console.log('\n── Pull-ups lead every pull day ───────────────────────────');
+check('isPullUpEx defined', typeof G.isPullUpEx === 'function');
+if (typeof G.isPullUpEx === 'function') {
+  check('"Pull-ups" → true',            G.isPullUpEx('Pull-ups'));
+  check('"Weighted Pull-ups" → true',   G.isPullUpEx('Weighted Pull-ups'));
+  check('"Chin-ups" → true',            G.isPullUpEx('Chin-ups'));
+  check('"Lat Pulldown" → false',       !G.isPullUpEx('Lat Pulldown'));
+  check('"Face Pulls" → false',         !G.isPullUpEx('Face Pulls'));
+  check('"Barbell Row" → false',        !G.isPullUpEx('Barbell Row'));
+  check('"Push-ups" → false',           !G.isPullUpEx('Push-ups'));
+}
+if (typeof G._isPullDay === 'function') {
+  check('_isPullDay("Day 2 — Pull A") → true',            G._isPullDay('Day 2 — Pull A'));
+  check('_isPullDay("Day 4 — Upper Pull") → true',        G._isPullDay('Day 4 — Upper Pull'));
+  check('_isPullDay("Day 5 — Vertical Push/Pull") → false', !G._isPullDay('Day 5 — Vertical Push/Pull'));
+  check('_isPullDay("Day 3 — Lower Pull") → false',       !G._isPullDay('Day 3 — Lower Pull'));
+  check('_isPullDay("Day 2 — Full Body B") → false',      !G._isPullDay('Day 2 — Full Body B'));
+}
+// Seed program: Pull A opens with Pull-ups
+if (typeof G._seedHypertrophyProgram === 'function') {
+  const _seed = G._seedHypertrophyProgram();
+  const _pullDays = (_seed.days || []).filter(d => typeof G._isPullDay === 'function' && G._isPullDay(d.name));
+  check('Seed program has pull days', _pullDays.length > 0);
+  const _seedBad = _pullDays.filter(d => {
+    const i = (d.exercises || []).findIndex(e => G.isPullUpEx(e.name));
+    return i > 0;
+  });
+  check('Seeded pull days open with a pull-up variant',
+    _seedBad.length === 0, _seedBad.map(d => d.name + ': ' + d.exercises[0].name).join(' | '));
+}
+// Generator: no exercise may precede a pull-up variant on a pull day, across the catalogue
+if (typeof G._generateWorkoutProgram === 'function') {
+  const _combos = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],
+    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],
+    ['rehab','shoulder'],['rehab','back'],['rehab','knee']];
+  const _nd = { strength:[3,4,5,6], hypertrophy:[3,4,5,6,7], aesthetic:[3,5], rehab:[6] };
+  const _bad = [];
+  const _seenPullDay = [];
+  _combos.forEach(([g,s]) => _nd[g].forEach(n => [[],['shoulders']].forEach(inj =>
+    [9,16,25].forEach(spm => {
+      const p = G._generateWorkoutProgram(g, s, n, 'T', spm, inj);
+      (p.days || []).forEach(d => {
+        if (!G._isPullDay(d.name)) return;
+        const i = (d.exercises || []).findIndex(e => G.isPullUpEx(e.name));
+        if (i < 0) return;
+        _seenPullDay.push(`${g}-${s}-${n}`);
+        if (i > 0) _bad.push(`${g}-${s}-${n}/${spm}/${inj.join('')}: ${d.name} → ${d.exercises[0].name}`);
+      });
+    }))));
+  check('Generated pull days carrying a pull-up variant exist (sweep is meaningful)',
+    _seenPullDay.length > 0);
+  check('No exercise is scheduled before Pull-ups on any generated pull day',
+    _bad.length === 0, _bad.slice(0, 5).join(' | '));
+  // The guard must not reorder days that are NOT pull days — a heavy lower lift keeps its
+  // opening slot on full-body days that happen to carry Pull-ups.
+  const _fb = G._generateWorkoutProgram('hypertrophy','balanced',4,'T',16,[]);
+  const _fbMoved = (_fb.days || []).filter(d => !G._isPullDay(d.name)
+    && (d.exercises || []).some(e => G.isPullUpEx(e.name))
+    && G.isPullUpEx(d.exercises[0].name));
+  check('Full-body days carrying Pull-ups are NOT reordered by the pull-day guard',
+    _fbMoved.length === 0, _fbMoved.map(d => d.name).join(' | '));
+}
+
 // ── Manual program builder (blank, no wizard) ──────────────────────────────────
 console.log('\n── Manual program builder ─────────────────────────────────');
 check('_progBuildManual defined', typeof G._progBuildManual === 'function');
