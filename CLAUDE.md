@@ -369,6 +369,29 @@ strength** goals (aesthetic already runs glute-emphasis full-body; rehab stays i
   per-session ceiling.
 - **5+ day programs keep their splits** (PPL / upper-lower) unchanged.
 
+### Pull-ups lead every pull day (rule 2026-08-08)
+Henrik: *"In no Pull program should any exercise be before Pull-ups."* A pull-up/chin-up
+variant is the most demanding movement a pull session carries, so it is done fresh.
+
+- Enforced in `_generateWorkoutProgram`: on any pull day holding a pull-up variant
+  (`isPullUpEx` — Pull-ups / Weighted Pull-ups / Chin-ups; **not** Lat Pulldown or Face
+  Pulls), that entry is hoisted to the first slot. Runs **after** every structural edit —
+  leg-day rules, injury swaps, prehab injection, Face Pull relocation, drop-to-fit — since
+  those reorder and remove entries.
+- The seeded `6-Day Hypertrophy — Upper` Day 2 — Pull A was the trigger: it opened with
+  Barbell Row. The seed now opens with Pull-ups; Day 5 — Pull B already opened with
+  Weighted Pull-ups.
+- **`_isPullDay` is deliberately narrow, matched on the day NAME** — `/pull/` and not
+  `/push/`, and not `/legs|lower/`:
+  - a mixed `Vertical Push/Pull` day is not a pull program, and hoisting there would
+    reorder someone's pressing work uninvited;
+  - `Lower Pull` is a leg day whose first and last slots belong to the leg-day rule
+    (Squat first / Deadlift last);
+  - full-body days are untouched — `Full Body B` carries Pull-ups next to a heavy
+    Deadlift, and the main lower lift keeps the opening slot.
+- **Newly generated programs only.** Stored programs are not migrated (rule 2026-07-15) —
+  an already-saved program gets the new order when it is regenerated, or reordered by hand.
+
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
 day containing a pressing movement (bench/incline/OHP/dips/chest-or-landmine press) — **even in
