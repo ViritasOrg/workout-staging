@@ -499,6 +499,47 @@ Use them. Every time. No exceptions. Asking Henrik to touch GitHub is a failure.
    - `mcp__github__actions_list` (method: list_workflow_runs, resource_id: pages-build-deployment) → confirm the latest run has `conclusion: success` and its `head_sha` matches the bump commit SHA
    Only once pages-build-deployment is complete say "live as vX.XXX — test now". DO NOT say "live" after just the version-bump — that only commits the bump, it does not deploy. DO NOT attempt to curl or WebFetch `viritasorg.github.io` — outbound network access to that host is always blocked in this remote environment and will always fail.
 
+## ⚠️ SOMETIMES A PUSH CREATES NO WORKFLOW RUN — RE-TRIGGER, NEVER ASSUME
+Intermittently, a push or PR produces **no workflow run at all** — not queued, not
+pending, nothing red. CI never appears, and Version Bump does not fire on the merge
+either (the merge simply lands un-bumped).
+
+**Absent checks are NOT green checks.** `total_count: 0` is not success. Verify a run
+exists before you believe anything about it.
+
+**Re-trigger with an EMPTY COMMIT:**
+```
+git commit --allow-empty -m "chore: re-trigger CI" && git push
+```
+That is the only thing observed to work. **Closing and reopening the PR did nothing**,
+and with no run created there is nothing to re-run.
+
+How strong is that? **One episode** (2026-08-08): after ~40 minutes of nothing, the
+empty commit produced runs on all three affected repos within a couple of minutes. It
+has not been tried on a second, independent occurrence — reach for it first, but do
+not treat it as guaranteed. If it fails, run `node tests/test_frontend.js index.html`
+locally, say so explicitly in the reply, and never imply CI passed.
+
+**Never route around a required check.** This repo requires the `test` check on `main`,
+so the merge is refused outright ("Required status check *test* is expected"). That is
+the guardrail working — get a run, do not look for a way past it.
+
+**What has been seen:**
+- 2026-08-07, ~20:19–20:42 — `claude-agent-backend` only.
+- 2026-08-08, ~09:24–10:04 — `peptidetracker-staging`, `workout-staging` and
+  `claude-agent-backend`, hitting **both** CI and Version Bump. `trt-stage` was
+  unaffected in the same minutes and bumped normally.
+
+Both times Actions were otherwise alive (scheduled runs fired, `workflow_dispatch`
+worked). It is intermittent and not a property of any credential — do not turn it into
+a rule that pushes never trigger workflows.
+
+**A merge left un-bumped is usually harmless — check before acting.** If the merge
+touched only `CLAUDE.md` or other non-app files, what Pages serves is unchanged and
+`version.json` still matches the live build: leave it, do not force a bump for a docs
+change. If it touched `index.html` or a `tab-*.js`, the deploy did not happen — say so
+plainly rather than reporting the change as live.
+
 ## Promotion to prod — Claude must NOT trigger this
 Promotion happens via **Henrik clicking "Push to Prod"** in the staging app's
 Settings UI, which fires a `repository_dispatch` event that runs
