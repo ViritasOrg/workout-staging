@@ -3637,6 +3637,128 @@ if (typeof G._swapResetWeights === 'function') {
     _gearFn.includes("if(inp.value==='')"));
 }
 
+// ── Progress → Exercise tab ───────────────────────────────────────────────────
+// Henrik, 2026-08-08: "Add an Exercise tab to Progress, where Volume and Strength per
+// exercise is presented in the same way as Volume and Strength for muscle groups."
+console.log('\n── Progress → Exercise tab ────────────────────────────────');
+check('Exercise tab button exists', /id="ptab-exercise"[^>]*onclick="showProgressTab\('exercise',this\)"/.test(html));
+check('Exercise panel exists',      /id="ppanel-exercise"/.test(html));
+check('…with a Volume canvas',      /id="exp-chart-vol"/.test(html));
+check('…and an Est. 1RM canvas',    /id="exp-chart-str"/.test(html));
+check('…and the same 30/60/90/All windows as the group tabs',
+  ['30','60','90','36500'].every(d => html.includes('id="exp-btn-' + d + '"')));
+check('…and the same Sessions/Weekly toggle',
+  html.includes('id="expv-btn-sessions"') && html.includes('id="expv-btn-weekly"'));
+check('…and an exercise picker', /id="exp-select"/.test(html));
+{
+  const _spt = String(G.showProgressTab || '');
+  check('showProgressTab renders the Exercise tab', _spt.includes("name==='exercise'") && _spt.includes('renderExerciseCharts()'));
+  check('the Zoomed/Absolute row shows on Exercise (it carries a 1RM chart)',
+    /\['volume','strength','exercise'\]/.test(_spt));
+  check('setChartScale redraws the Exercise tab',
+    String(G.setChartScale || '').includes("tab==='exercise'"));
+}
+check('.exp-btn shares the group window-button styling', /\.vol-btn,\.str-btn,\.exp-btn,\.wt-btn\{/.test(html));
+
+if (typeof G.buildSessionExVol === 'function') {
+  const _sw = G.weights, _sl = G.logs;
+  G.weights = [{ date: '2020-01-01', weight: 90 }];
+  G.logs = [
+    { date: '2030-01-06', exercises: [
+      { name: 'Barbell Row', sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 5 }] },
+      { name: 'Lat Pulldown', sets: [{ kg: 60, reps: 10 }] },
+    ]},
+    { date: '2030-01-13', exercises: [
+      { name: 'Barbell Row', sets: [{ kg: 110, reps: 8 }] },
+    ]},
+  ];
+  const _big = 3650000; // window wide enough that fixed dates are always inside it
+
+  // Volume — the exercise is itself, so NO split fraction is applied. Barbell Row is
+  // back 0.7 / arms 0.3, so a group series would read 700, not 1000.
+  const _v = G.buildSessionExVol('Barbell Row', _big);
+  check('buildSessionExVol returns one entry per session with that exercise',
+    _v.length === 2, JSON.stringify(_v));
+  check('…volume is the exercise\'s own, unscaled by any muscle split (100×10 + 100×5 = 1500)',
+    _v[0] && _v[0].vol === 1500, _v[0] && String(_v[0].vol));
+  check('…and it ignores other exercises in the same session',
+    G.buildSessionExVol('Lat Pulldown', _big).length === 1);
+  check('…an exercise never logged yields an empty series',
+    G.buildSessionExVol('Zercher Squat', _big).length === 0);
+  // The group builder still applies its fraction — the two views are genuinely different
+  check('the muscle-group builder still scales by the split (unchanged)',
+    G.buildSessionGroupVol('back', _big)[0].vol < _v[0].vol);
+
+  // Strength — best set, Epley, unscaled
+  const _s = G.buildSessionExStrength('Barbell Row', _big);
+  check('buildSessionExStrength takes the best set (100kg×10 → 100×(1+10/30) = 133.3)',
+    _s[0] && Math.abs(_s[0].est1rm - 100 * (1 + 10 / 30)) < 0.01, _s[0] && String(_s[0].est1rm));
+  check('…and tracks the later, heavier session',
+    _s[1] && _s[1].est1rm > _s[0].est1rm);
+
+  // Gear factor and the weighted-pull-up body-weight addition, same as the group builders
+  G.logs = [{ date: '2030-01-06', exercises: [
+    { name: 'Weighted Pull-ups', sets: [{ kg: 10, reps: 5 }] },
+  ]}];
+  check('weighted pull-ups add body weight to the load (90+10)×5 = 500',
+    G.buildSessionExVol('Weighted Pull-ups', _big)[0].vol === 500,
+    String(G.buildSessionExVol('Weighted Pull-ups', _big)[0].vol));
+  G.logs = [{ date: '2030-01-06', exercises: [
+    { name: 'Leg Press', gear: 2, sets: [{ kg: 100, reps: 10 }] },
+  ]}];
+  check('the gear factor is applied (100×10×2 = 2000)',
+    G.buildSessionExVol('Leg Press', _big)[0].vol === 2000,
+    String(G.buildSessionExVol('Leg Press', _big)[0].vol));
+
+  // Legacy notes-only logs still resolve to an exercise
+  G.logs = [{ date: '2030-01-06', notes: 'Barbell Row 100kg 10-10\nLat Pulldown 60kg 12-12' }];
+  check('_exLineName reads the name off a legacy notes line',
+    G._exLineName('Barbell Row 100kg 10-10') === 'Barbell Row',
+    G._exLineName('Barbell Row 100kg 10-10'));
+  check('a notes-only log still produces a series', G.buildSessionExVol('Barbell Row', _big).length === 1);
+  check('…reading only its own line (100kg × 20 reps = 2000, not the Lat Pulldown line)',
+    G.buildSessionExVol('Barbell Row', _big)[0].vol === 2000,
+    String(G.buildSessionExVol('Barbell Row', _big)[0].vol));
+  check('…and the other line resolves to its own exercise (60kg × 24 = 1440)',
+    G.buildSessionExVol('Lat Pulldown', _big)[0].vol === 1440,
+    String(G.buildSessionExVol('Lat Pulldown', _big)[0].vol));
+
+  // The picker lists what was actually logged
+  G.logs = [
+    { date: '2030-01-06', exercises: [
+      { name: 'Squat', sets: [{ kg: 100, reps: 5 }] },
+      { name: 'Never Done', sets: [{ kg: 0, reps: 0 }] },
+    ]},
+    { date: '2030-01-13', exercises: [{ name: 'Bench Press', sets: [{ kg: 80, reps: 5 }] }] },
+    { date: '2030-01-20', exercises: [{ name: 'Squat', sets: [{ kg: 105, reps: 5 }] }] },
+  ];
+  const _names = G.logExerciseNames();
+  check('logExerciseNames dedupes and sorts', JSON.stringify(_names) === '["Bench Press","Squat"]', JSON.stringify(_names));
+  check('…and excludes an exercise with no completed reps', _names.indexOf('Never Done') < 0);
+
+  // Weekly views reuse the muscle-group aggregation, not a second copy of it
+  check('buildWeeklyExVol buckets by week', G.buildWeeklyExVol('Squat', _big).length === 2);
+  check('buildWeeklyExStrength buckets by week', G.buildWeeklyExStrength('Squat', _big).length === 2);
+  check('the weekly volume helper is shared with the group tab',
+    typeof G._weeklyFromVolSessions === 'function'
+    && String(G.buildWeeklyGroupVol || '').includes('_weeklyFromVolSessions'));
+  check('the weekly strength helper is shared with the group tab',
+    typeof G._weeklyFromStrSessions === 'function'
+    && String(G.buildWeeklyGroupStrength || '').includes('_weeklyFromStrSessions'));
+  check('the shared weekly helper gives the group tab the same shape as before',
+    (() => { const w = G.buildWeeklyGroupVol('legs', _big);
+      return w.length === 2 && 'weekStart' in w[0] && 'rawVol' in w[0]
+        && 'extrapVol' in w[0] && 'isRecent' in w[0] && 'daysElapsed' in w[0]; })());
+
+  // An exercise is coloured by the muscle group it mostly trains
+  check('_exProgColor: Squat → legs colour',       G._exProgColor('Squat') === G.GROUP_COLORS.legs);
+  check('_exProgColor: Barbell Row → back colour', G._exProgColor('Barbell Row') === G.GROUP_COLORS.back);
+  check('_exProgColor: Bench Press → chest colour',G._exProgColor('Bench Press') === G.GROUP_COLORS.chest);
+  check('_exProgColor falls back for an unknown exercise', typeof G._exProgColor('Nonsense Lift') === 'string');
+
+  G.weights = _sw; G.logs = _sl;
+}
+
 // ── Manual program builder (blank, no wizard) ──────────────────────────────────
 console.log('\n── Manual program builder ─────────────────────────────────');
 check('_progBuildManual defined', typeof G._progBuildManual === 'function');
