@@ -58,8 +58,12 @@ jobs:
             --head "$BRANCH" \
             --title "chore: bump to v${NEW}" \
             --body "Auto-generated version bump. Merges automatically once CI passes.")
-          # --delete-branch removes version-bump/vX.Y once the merge lands. Without
-          # it every bump leaves its branch behind forever; this repo had 154 of them.
+          # --delete-branch only takes effect if this call merges the PR itself. With
+          # --auto it does NOT: auto-merge is merely requested here and lands after
+          # this workflow exits. Verified on the v1.196 run — PR merged, branch
+          # survived. The "Prune superseded bump branches" step below is what
+          # actually clears them; the flag is kept for the case where the PR is
+          # mergeable immediately.
           gh pr merge --auto --squash --delete-branch "$PR_URL"
 
       - name: Rerun blocked CI run
@@ -87,3 +91,22 @@ jobs:
             sleep 5
           done
           echo "No action_required run found after 60s — CI may have run normally"
+
+      - name: Prune superseded bump branches
+        run: |
+          # Every version-bump/* branch except the one this run just created is from
+          # an earlier version: it either merged (its commit is in main) or was
+          # superseded by a later bump. Nothing but a version bump is ever stored on
+          # these branches, so both cases are safe to delete.
+          #
+          # This is why --delete-branch cannot do the job on the auto path:
+          # `gh pr merge --auto` only REQUESTS auto-merge. The merge lands after this
+          # workflow has already exited, and the auto-merge mutation carries no
+          # branch-deletion option — so the branch survives. Pruning at the start of
+          # the NEXT run is what actually keeps the list clean.
+          mapfile -t stale < <(git ls-remote --heads origin 'refs/heads/version-bump/*' \
+            | sed 's|.*refs/heads/||' | grep -vxF "$BRANCH" || true)
+          echo "${#stale[@]} superseded bump branch(es) to remove"
+          for ((i=0; i<${#stale[@]}; i+=50)); do
+            git push origin --delete "${stale[@]:i:50}" || true
+          done
