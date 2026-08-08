@@ -449,6 +449,26 @@ asks for that specific change in that conversation turn.
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 
+## ⚠️ A VERIFIED ERROR IN AN md FILE GETS FIXED IMMEDIATELY ⚠️
+Henrik, 2026-08-08: *"When you find verified errors in md files always fix em
+instantly."*
+
+If you establish that something in a `CLAUDE.md` (or any md in these repos) is
+**wrong** — not merely stale-sounding or awkward — correct it in that session. Do
+not flag it and wait, do not add it to a TODO, do not ask whether to bother.
+
+- **Verified** means you checked: you read the workflow, ran the command, or saw
+  the run. A hunch is not a finding, and "this reads oddly" is not an error.
+- Fix it where it is wrong, in every writable repo that repeats the claim — these
+  files are copied between repos, so one wrong sentence usually exists in several.
+- Say what was wrong and why in the commit and in your reply, so the next session
+  can tell a correction from a drive-by edit.
+- **This does not license rewriting rules you disagree with.** A rule you think is
+  mistaken is Henrik's call — say so and leave it. This is for statements of fact
+  that are demonstrably untrue: a workflow that does not do what the file says, a
+  file credited with behaviour it does not have, a value that no longer matches.
+- A SETTLED marker still wins. If a value is marked settled, raise it, do not edit.
+
 ## Git workflow — ALWAYS follow this
 ### ⚠️ CLAUDE ALWAYS CREATES AND MERGES ITS OWN PRS — NEVER ASK HENRIK ⚠️
 **Claude must NEVER ask Henrik to create a PR, merge a PR, or do anything with GitHub.**
@@ -465,7 +485,15 @@ Use them. Every time. No exceptions. Asking Henrik to touch GitHub is a failure.
 3. `mcp__github__create_pull_request` — do this yourself immediately after pushing
 4. Check CI: `pull_request_read` with `method: get_check_runs` — wait for `conclusion: success`. If still running, poll. If failed, fix and re-push. **Never merge with failing or pending checks.**
 5. `mcp__github__merge_pull_request` — once CI is green, merge it yourself immediately
-5. After merge the `version-bump` GitHub Action auto-increments the minor version in `version.json` and `const VERSION` in `index.html` and commits with `[skip ci]`
+5. After merge the `version-bump` GitHub Action increments the minor version in
+   `version.json` and `const VERSION` in `index.html`. **It does NOT commit with
+   `[skip ci]`** (corrected 2026-08-08 — the file said so, the workflow never did):
+   it pushes a `version-bump/vX.Y` branch, opens a PR and auto-merges it, falling
+   back to merging directly when auto-merge is unavailable. So the bump arrives as
+   its own squash-merged commit on `main`, and Pages deploys **that** commit — which
+   is why step 6 checks the Pages run against the bump SHA, not the merge SHA.
+   The run also prunes superseded `version-bump/*` branches, which used to
+   accumulate forever (407 of them here before #865)
 6. **After merging, you must confirm BOTH of these before telling the user it's live:**
    - `mcp__github__actions_list` (method: list_workflow_runs, resource_id: version-bump.yml) → confirm `conclusion: success` and read the bumped version from the commit message
    - `mcp__github__actions_list` (method: list_workflow_runs, resource_id: pages-build-deployment) → confirm the latest run has `conclusion: success` and its `head_sha` matches the bump commit SHA
