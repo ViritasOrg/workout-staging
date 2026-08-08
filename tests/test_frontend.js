@@ -3572,6 +3572,71 @@ if (typeof G._generateWorkoutProgram === 'function') {
     _fbMoved.length === 0, _fbMoved.map(d => d.name).join(' | '));
 }
 
+// ── Body weight never follows a card onto a loaded lift ────────────────────────
+// Henrik, 2026-08-08: "I never used 89kg on barbell rows (nor is it possible in reality)."
+// 89 kg was his BODY WEIGHT. A bodyweight card's kg boxes are prefilled with body weight (that
+// is how pull-up volume gets counted), and the ⇄ swap only renamed the card — the stale number
+// stayed in the boxes, so saveLog stored it as the NEW exercise's remembered weight and logged
+// a set at a weight that was never lifted.
+console.log('\n── Body weight never follows a swapped card ───────────────');
+const _mkCard = (kgVals, bw) => {
+  const inputs = kgVals.map(v => ({ value: v, dataset: { type: 'kg' } }));
+  return {
+    _inputs: inputs,
+    dataset: bw ? { bw: '1' } : {},
+    querySelectorAll: () => inputs,
+  };
+};
+check('_swapResetWeights defined', typeof G._swapResetWeights === 'function');
+if (typeof G._swapResetWeights === 'function') {
+  // Pull-ups (body weight in the boxes) → Barbell Row: boxes cleared, card no longer bodyweight
+  const c1 = _mkCard(['89', '89', '89', '89'], true);
+  G._swapResetWeights(c1, 'Barbell Row');
+  check('swap to a loaded lift clears every kg box',
+    c1._inputs.every(i => i.value === ''), JSON.stringify(c1._inputs.map(i => i.value)));
+  check('swap to a loaded lift drops data-bw (so _refreshBWPrefill stops re-filling it)',
+    c1.dataset.bw === undefined, String(c1.dataset.bw));
+  // Loaded lift → Pull-ups: boxes cleared and the card becomes a bodyweight card again
+  const c2 = _mkCard(['80', '80', '80'], false);
+  G._swapResetWeights(c2, 'Pull-ups');
+  check('swap to a bodyweight lift clears the old load', c2._inputs.every(i => i.value === ''));
+  check('swap to a bodyweight lift marks the card data-bw', c2.dataset.bw === '1');
+  // Weighted Pull-ups is NOT a bodyweight card — its kg box is ADDED weight
+  const c3 = _mkCard(['15'], true);
+  G._swapResetWeights(c3, 'Weighted Pull-ups');
+  check('Weighted Pull-ups is not treated as a bodyweight card', c3.dataset.bw === undefined);
+  check('a null card is a no-op, not a throw', (() => {
+    try { G._swapResetWeights(null, 'Pull-ups'); return true; } catch (e) { return false; }
+  })());
+}
+// The swap handler must call it — a clear that is never invoked fixes nothing
+{
+  const _swapFn = String(G.swapExercise || '');
+  check('swapExercise clears the weights on swap',
+    _swapFn.includes('_swapResetWeights(card,this.value)'));
+  check('…before _refreshCardGearBtns re-fills body weight for a bodyweight target',
+    _swapFn.indexOf('_swapResetWeights') < _swapFn.indexOf('_refreshCardGearBtns'));
+}
+// saveLog must not invent a remembered weight
+{
+  const _saveFn = String(G.saveLog || '');
+  check('saveLog only remembers a weight from a set that was actually logged',
+    _saveFn.includes('if(kg>0&&reps>0)lastKg=kg'));
+  check('saveLog never stores a bodyweight card\'s prefill as a template weight',
+    /_bwCard/.test(_saveFn) && _saveFn.includes('lastKg!==null&&!_bwCard'));
+  check('the bodyweight test falls back to the name when the card is gone',
+    _saveFn.includes("isBWExName(ex.name))&&!_isWPU"));
+}
+// The body-weight refill helpers must agree on the display unit — _refreshCardGearBtns wrote a
+// raw kg number into a lb field, and clearing on swap makes that path reachable every swap.
+{
+  const _gearFn = String(G._refreshCardGearBtns || '');
+  check('_refreshCardGearBtns fills body weight in the DISPLAY unit',
+    _gearFn.includes('inp.value=kgToUnit(_bw)'));
+  check('_refreshCardGearBtns still only fills EMPTY boxes (never overwrites a typed weight)',
+    _gearFn.includes("if(inp.value==='')"));
+}
+
 // ── Manual program builder (blank, no wizard) ──────────────────────────────────
 console.log('\n── Manual program builder ─────────────────────────────────');
 check('_progBuildManual defined', typeof G._progBuildManual === 'function');
