@@ -3782,6 +3782,35 @@ if (typeof G.buildSessionExVol === 'function') {
       String(G.populateExerciseSelect || '').includes('_exProgRows(expWindow||90)'));
     check('…and the ordering follows the selected window',
       String(G._exProgRows || '').includes('buildSessionExVol(n,days)'));
+    // Zero-volume exercises are hidden (Henrik, 2026-08-08: "You can hide exercises
+    // with 0 kg volume") — including one only ever logged without a load.
+    G.logs = [{ date: '2030-01-06', exercises: [
+      { name: 'Squat', sets: [{ kg: 100, reps: 10 }] },
+      { name: 'Plank', sets: [{ kg: 0, reps: 60 }] },
+    ]}];
+    G._expExercise = 'Squat';
+    check('an exercise logged with no load is hidden from the picker',
+      G._exProgRows(_big).map(r => r.name).join(',') === 'Squat',
+      G._exProgRows(_big).map(r => r.name + ':' + r.vol).join(' | '));
+    check('logExerciseNames itself still sees it (only the picker hides it)',
+      G.logExerciseNames().indexOf('Plank') >= 0);
+    // An exercise outside the window is hidden too, but the SELECTED one is kept so the
+    // <select> cannot end up displaying a different name than the charts below it.
+    G.logs = [
+      { date: '2020-01-06', exercises: [{ name: 'Squat', sets: [{ kg: 100, reps: 10 }] }] },
+      { date: '2030-01-06', exercises: [{ name: 'Bench Press', sets: [{ kg: 80, reps: 10 }] }] },
+    ];
+    G._expExercise = 'Bench Press';
+    check('an exercise with no volume in the window is hidden',
+      G._exProgRows(1).map(r => r.name).join(',') === 'Bench Press',
+      G._exProgRows(1).map(r => r.name).join(','));
+    G._expExercise = 'Squat';
+    check('…unless it is the one currently selected',
+      G._exProgRows(1).map(r => r.name).indexOf('Squat') >= 0,
+      G._exProgRows(1).map(r => r.name).join(','));
+    check('…and the selection is not silently moved when the window narrows',
+      (() => { G._expExercise = 'Squat'; G._exProgRows(1); return G._expExercise === 'Squat'; })());
+    G._expExercise = '';
     // Equal volume falls back to alphabetical so the order does not jitter
     const _tie = [{ name: 'Zzz', vol: 5, best: 0 }, { name: 'Aaa', vol: 5, best: 0 }]
       .sort((a, b) => (b.vol - a.vol) || a.name.localeCompare(b.name));
