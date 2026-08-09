@@ -392,6 +392,43 @@ variant is the most demanding movement a pull session carries, so it is done fre
 - **Newly generated programs only.** Stored programs are not migrated (rule 2026-07-15) —
   an already-saved program gets the new order when it is regenerated, or reordered by hand.
 
+### 1RM is only estimated from low-rep sets — and a real test is a 2-3 rep max (rule 2026-08-08)
+Henrik: *"1RM for Pull-ups (normal and weighted) differs, which obviously is impossible in
+reality. Also 132kg isn't realistic imo."* Then, on how a user should actually get one:
+*"if a user wants a 1RM estimate the rule is rather to go for a 2-3 rep max on a given
+weight after warm up."*
+
+- **`ONE_RM_MAX_REPS = 6`** in `index.html` is the single gate, used by **both**
+  `buildSessionExStrength` (Progress → Exercise) and `buildSessionGroupStrength`
+  (Progress → Strength). Only sets at or below it contribute an estimate. Do not apply it
+  to one tab and not the other — that split is what #356 existed to close.
+- **Why:** a rep-based formula is not credible much above ~6 reps, and an AMRAP set is the
+  worst input of all. Applying Epley to `max-max-max-max` pull-ups is what produced a
+  132 kg "1RM". The `Math.min(reps,10)` cap inside the Epley expression is now unreachable
+  — reps above 6 never reach it — but it is left in place as part of the formula.
+- **Consequence, intended:** on a hypertrophy program most sets are 8–12, so muscle groups
+  and exercises can show an EMPTY Est. 1RM chart. That is the rule working. Both the
+  Strength subtitles and the Exercise section heading say "sets ≤6 reps" so a blank chart
+  reads as a rule and not a bug. **Do not "fix" it by widening the ceiling.**
+- **Volume is never affected.** Every logged set counts toward volume in both tabs; the
+  ceiling governs 1RM only.
+- **A user testing a 1RM should do a 2–3 rep max on a given weight after warming up.**
+  Logging is free-form, so a logged 2- or 3-rep set counts normally. Note the interaction:
+  `REPS_LEGAL=[4,5,6,8,9,10,11,12,15]` means the GENERATOR cannot prescribe 2–3 reps (a
+  3-rep triple snaps to 4), so a max test is something the user performs and logs, not
+  something a program schedules. Raised with Henrik 2026-08-08; left as is.
+
+### One exercise, one 1RM — "Weighted X" is not a separate movement (rule 2026-08-08)
+Pull-ups and Weighted Pull-ups reported two different 1RMs (119 kg and 132 kg) for the same
+lift. `_exCanonName()` strips a leading `Weighted ` so the Progress → Exercise picker groups
+them under one entry.
+- **Only the MATCHING is canonical.** The per-set maths still reads the raw stored name, so
+  a weighted set adds body weight to the plate and an unweighted one uses body weight as the
+  load. Both resolve to *total system load*, which is what makes a shared series valid — do
+  not "simplify" by canonicalising the name before the maths.
+- Also merges Weighted Chin-ups and Weighted Dips with their base movement. **Chin-ups stay
+  distinct from Pull-ups** — a different grip, not a loading variant.
+
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
 day containing a pressing movement (bench/incline/OHP/dips/chest-or-landmine press) — **even in
