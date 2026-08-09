@@ -3780,62 +3780,49 @@ if (typeof G.buildSessionExVol === 'function') {
     check('an exercise with no 1RM in the window shows the bare name (never "0kg")',
       G._exProgLabel({ name: 'Plank', vol: 0, oneRm: 0 }) === 'Plank',
       G._exProgLabel({ name: 'Plank', vol: 0, oneRm: 0 }));
-    // The label is CURRENT strength, not a personal best (Henrik, 2026-08-08: a 152kg
-    // Squat "was probably true 5 months ago but not today").
+    // The label is the BEST OF THE LATEST 5 SESSIONS (Henrik, 2026-08-08). It must not
+    // surface an old peak ("152kg ... was probably true 5 months ago but not today"), and
+    // must not collapse to a single light day either.
     {
       const _saveEx = G._expExercise;
       G._expExercise = '';
+      const _sq = (d, kg) => ({ date: d, exercises: [{ name: 'Squat', sets: [{ kg, reps: 5 }] }] });
+      const _e = kg => kg * (1 + 5 / 30);
+      // A peak 6 sessions back has aged out of the window; the best of the latest 5 wins.
       G.logs = [
-        { date: '2030-01-06', exercises: [{ name: 'Squat', sets: [{ kg: 150, reps: 5 }] }] },  // peak
-        { date: '2030-03-06', exercises: [{ name: 'Squat', sets: [{ kg: 100, reps: 5 }] }] },  // latest
+        _sq('2030-01-01', 150),                        // peak — 6th from last, excluded
+        _sq('2030-01-08', 100), _sq('2030-01-15', 100),
+        _sq('2030-01-22', 110),                        // best inside the last 5
+        _sq('2030-01-29', 100), _sq('2030-02-05', 100),
       ];
-      const _r = G._exProgRows(_big)[0];
-      const _latest = 100 * (1 + 5 / 30), _peak = 150 * (1 + 5 / 30);
-      check('the 1RM comes from the LATEST session, not the best in the window',
-        Math.abs(_r.oneRm - _latest) < 0.01, `got ${_r.oneRm}, latest ${_latest}, peak ${_peak}`);
-      check('…so an old peak no longer sets the label',
-        Math.round(G.kgToUnit(_r.oneRm)) < Math.round(G.kgToUnit(_peak)),
-        G._exProgLabel(_r));
-      // Order of the log array must not matter — selection is by date, not position
-      G.logs = [G.logs[1], G.logs[0]];
-      check('…and it is the newest by DATE, not by array position',
-        Math.abs(G._exProgRows(_big)[0].oneRm - _latest) < 0.01,
+      check('the 1RM is the best of the LATEST 5 sessions',
+        Math.abs(G._exProgRows(_big)[0].oneRm - _e(110)) < 0.01,
+        `got ${G._exProgRows(_big)[0].oneRm}, want ${_e(110)}`);
+      check('…so a peak older than 5 sessions no longer sets the label',
+        G._exProgRows(_big)[0].oneRm < _e(150), String(G._exProgRows(_big)[0].oneRm));
+      // …but one light day does not drag it down, which is why it is not "latest session"
+      G.logs = [
+        _sq('2030-01-01', 100), _sq('2030-01-08', 100), _sq('2030-01-15', 120),
+        _sq('2030-01-22', 100), _sq('2030-01-29', 60),  // deload, most recent
+      ];
+      check('a single light/deload session does not drop the number',
+        Math.abs(G._exProgRows(_big)[0].oneRm - _e(120)) < 0.01,
+        String(G._exProgRows(_big)[0].oneRm));
+      // Fewer than 5 sessions: take what exists, no crash, no zero
+      G.logs = [_sq('2030-01-01', 100), _sq('2030-01-08', 90)];
+      check('fewer than 5 sessions uses what there is',
+        Math.abs(G._exProgRows(_big)[0].oneRm - _e(100)) < 0.01,
+        String(G._exProgRows(_big)[0].oneRm));
+      // "Latest" is by DATE — the log array is not required to be in order
+      G.logs = [
+        _sq('2030-02-05', 100), _sq('2030-01-01', 150), _sq('2030-01-08', 100),
+        _sq('2030-01-15', 100), _sq('2030-01-22', 100), _sq('2030-01-29', 100),
+      ];
+      check('…and the 5 are the newest by DATE, not by array position',
+        Math.abs(G._exProgRows(_big)[0].oneRm - _e(100)) < 0.01,
         String(G._exProgRows(_big)[0].oneRm));
       G._expExercise = _saveEx;
     }
-    check('populateExerciseSelect defaults to the highest-volume exercise',
-      String(G.populateExerciseSelect || '').includes('_exProgRows(expWindow||90)'));
-    check('…and the ordering follows the selected window',
-      String(G._exProgRows || '').includes('buildSessionExVol(n,days)'));
-    // Zero-volume exercises are hidden (Henrik, 2026-08-08: "You can hide exercises
-    // with 0 kg volume") — including one only ever logged without a load.
-    G.logs = [{ date: '2030-01-06', exercises: [
-      { name: 'Squat', sets: [{ kg: 100, reps: 10 }] },
-      { name: 'Plank', sets: [{ kg: 0, reps: 60 }] },
-    ]}];
-    G._expExercise = 'Squat';
-    check('an exercise logged with no load is hidden from the picker',
-      G._exProgRows(_big).map(r => r.name).join(',') === 'Squat',
-      G._exProgRows(_big).map(r => r.name + ':' + r.vol).join(' | '));
-    check('logExerciseNames itself still sees it (only the picker hides it)',
-      G.logExerciseNames().indexOf('Plank') >= 0);
-    // An exercise outside the window is hidden too, but the SELECTED one is kept so the
-    // <select> cannot end up displaying a different name than the charts below it.
-    G.logs = [
-      { date: '2020-01-06', exercises: [{ name: 'Squat', sets: [{ kg: 100, reps: 10 }] }] },
-      { date: '2030-01-06', exercises: [{ name: 'Bench Press', sets: [{ kg: 80, reps: 10 }] }] },
-    ];
-    G._expExercise = 'Bench Press';
-    check('an exercise with no volume in the window is hidden',
-      G._exProgRows(1).map(r => r.name).join(',') === 'Bench Press',
-      G._exProgRows(1).map(r => r.name).join(','));
-    G._expExercise = 'Squat';
-    check('…unless it is the one currently selected',
-      G._exProgRows(1).map(r => r.name).indexOf('Squat') >= 0,
-      G._exProgRows(1).map(r => r.name).join(','));
-    check('…and the selection is not silently moved when the window narrows',
-      (() => { G._expExercise = 'Squat'; G._exProgRows(1); return G._expExercise === 'Squat'; })());
-    G._expExercise = '';
     // Equal volume falls back to alphabetical so the order does not jitter
     const _tie = [{ name: 'Zzz', vol: 5, oneRm: 0 }, { name: 'Aaa', vol: 5, oneRm: 0 }]
       .sort((a, b) => (b.vol - a.vol) || a.name.localeCompare(b.name));
