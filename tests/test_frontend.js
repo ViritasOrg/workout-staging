@@ -62,6 +62,7 @@ const patched = rawScript
   .replace('const APP_ID=', 'var APP_ID=')
   .replace('const EXERCISE_SPLITS=', 'var EXERCISE_SPLITS=')
   .replace('const GROUP_COLORS=',    'var GROUP_COLORS=')
+  .replace('const ONE_RM_MAX_REPS=', 'var ONE_RM_MAX_REPS=')
   .replace('const EX_OPTS_HTML=',    'var EX_OPTS_HTML=')
   .replace('const DAYS=',            'var DAYS=')
   .replace('const DAY_TEMPLATES=',   'var DAY_TEMPLATES=')
@@ -3689,10 +3690,15 @@ if (typeof G.buildSessionExVol === 'function') {
   check('the muscle-group builder still scales by the split (unchanged)',
     G.buildSessionGroupVol('back', _big)[0].vol < _v[0].vol);
 
-  // Strength — best set, Epley, unscaled
+  // Strength — best qualifying set, Epley, unscaled. Sets above ONE_RM_MAX_REPS do not
+  // contribute (see the rep-ceiling block below), so the fixture uses low-rep sets.
+  G.logs = [
+    { date: '2030-01-06', exercises: [{ name: 'Barbell Row', sets: [{ kg: 100, reps: 5 }] }] },
+    { date: '2030-01-13', exercises: [{ name: 'Barbell Row', sets: [{ kg: 110, reps: 5 }] }] },
+  ];
   const _s = G.buildSessionExStrength('Barbell Row', _big);
-  check('buildSessionExStrength takes the best set (100kg×10 → 100×(1+10/30) = 133.3)',
-    _s[0] && Math.abs(_s[0].est1rm - 100 * (1 + 10 / 30)) < 0.01, _s[0] && String(_s[0].est1rm));
+  check('buildSessionExStrength takes the best set (100kg×5 → 100×(1+5/30) = 116.7)',
+    _s[0] && Math.abs(_s[0].est1rm - 100 * (1 + 5 / 30)) < 0.01, _s[0] && String(_s[0].est1rm));
   check('…and tracks the later, heavier session',
     _s[1] && _s[1].est1rm > _s[0].est1rm);
 
@@ -3701,14 +3707,62 @@ if (typeof G.buildSessionExVol === 'function') {
     { name: 'Weighted Pull-ups', sets: [{ kg: 10, reps: 5 }] },
   ]}];
   check('weighted pull-ups add body weight to the load (90+10)×5 = 500',
-    G.buildSessionExVol('Weighted Pull-ups', _big)[0].vol === 500,
-    String(G.buildSessionExVol('Weighted Pull-ups', _big)[0].vol));
+    G.buildSessionExVol('Pull-ups', _big)[0].vol === 500,
+    String(G.buildSessionExVol('Pull-ups', _big)[0].vol));
   G.logs = [{ date: '2030-01-06', exercises: [
     { name: 'Leg Press', gear: 2, sets: [{ kg: 100, reps: 10 }] },
   ]}];
   check('the gear factor is applied (100×10×2 = 2000)',
     G.buildSessionExVol('Leg Press', _big)[0].vol === 2000,
     String(G.buildSessionExVol('Leg Press', _big)[0].vol));
+
+  // Pull-ups and Weighted Pull-ups are ONE movement with ONE 1RM (Henrik, 2026-08-08:
+  // they "differ, which obviously is impossible in reality" — the app showed 119 and 132).
+  check('_exCanonName strips a leading "Weighted"',
+    G._exCanonName('Weighted Pull-ups') === 'Pull-ups', G._exCanonName('Weighted Pull-ups'));
+  check('…case-insensitively', G._exCanonName('weighted dips') === 'dips');
+  check('…and leaves everything else alone',
+    G._exCanonName('Pull-ups') === 'Pull-ups' && G._exCanonName('Barbell Row') === 'Barbell Row');
+  check('Chin-ups stay distinct from Pull-ups (different grip, not a loading variant)',
+    G._exCanonName('Chin-ups') === 'Chin-ups');
+  G.logs = [
+    { date: '2030-01-06', exercises: [{ name: 'Pull-ups',          sets: [{ kg: 90, reps: 5 }] }] },
+    { date: '2030-01-13', exercises: [{ name: 'Weighted Pull-ups', sets: [{ kg: 10, reps: 5 }] }] },
+  ];
+  check('the picker lists ONE pull-up entry, not two',
+    JSON.stringify(G.logExerciseNames()) === '["Pull-ups"]', JSON.stringify(G.logExerciseNames()));
+  {
+    const _pu = G.buildSessionExStrength('Pull-ups', _big);
+    check('…and that entry sees BOTH the weighted and unweighted sessions', _pu.length === 2);
+    // Both resolve to total system load: 90 unweighted, 90+10 weighted
+    check('…unweighted session uses body weight as the load',
+      Math.abs(_pu[0].est1rm - 90 * (1 + 5 / 30)) < 0.01, String(_pu[0].est1rm));
+    check('…weighted session adds body weight to the added load',
+      Math.abs(_pu[1].est1rm - 100 * (1 + 5 / 30)) < 0.01, String(_pu[1].est1rm));
+    check('…so there is a single 1RM for the movement, the higher of the two',
+      Math.abs(G._exProgRows(_big)[0].oneRm - 100 * (1 + 5 / 30)) < 0.01,
+      String(G._exProgRows(_big)[0].oneRm));
+  }
+  // Rep ceiling: an AMRAP/high-rep set must not drive a 1RM — that is where 132kg came from
+  check('ONE_RM_MAX_REPS is 6', G.ONE_RM_MAX_REPS === 6, String(G.ONE_RM_MAX_REPS));
+  G.logs = [{ date: '2030-01-06', exercises: [{ name: 'Pull-ups', sets: [
+    { kg: 90, reps: 12 },  // AMRAP — ignored
+    { kg: 90, reps: 6 },   // counts
+  ]}]}];
+  check('a set above the rep ceiling does not contribute to the 1RM',
+    Math.abs(G.buildSessionExStrength('Pull-ups', _big)[0].est1rm - 90 * (1 + 6 / 30)) < 0.01,
+    String(G.buildSessionExStrength('Pull-ups', _big)[0].est1rm));
+  G.logs = [{ date: '2030-01-06', exercises: [{ name: 'Pull-ups', sets: [{ kg: 90, reps: 12 }] }] }];
+  check('a session of only high-rep sets yields no 1RM at all',
+    G.buildSessionExStrength('Pull-ups', _big).length === 0);
+  check('…but its VOLUME still counts — the ceiling is about 1RM only',
+    G.buildSessionExVol('Pull-ups', _big)[0].vol === 90 * 12,
+    String(G.buildSessionExVol('Pull-ups', _big)[0].vol));
+  check('…and such an exercise shows a bare name, no misleading 1RM',
+    G._exProgLabel(G._exProgRows(_big)[0]) === 'Pull-ups',
+    G._exProgLabel(G._exProgRows(_big)[0]));
+  check('the Est. 1RM heading says what it is built from',
+    /Est\. 1RM — sets ≤6 reps/.test(html));
 
   // Legacy notes-only logs still resolve to an exercise
   G.logs = [{ date: '2030-01-06', notes: 'Barbell Row 100kg 10-10\nLat Pulldown 60kg 12-12' }];
@@ -3759,9 +3813,9 @@ if (typeof G.buildSessionExVol === 'function') {
   // Picker ordered by volume, labelled with est. 1RM (Henrik, 2026-08-08)
   G.logs = [
     { date: '2030-01-06', exercises: [
-      { name: 'Ab Wheel',     sets: [{ kg: 10,  reps: 10 }] },                 // 100
-      { name: 'Squat',        sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 10 }] }, // 2000
-      { name: 'Bench Press',  sets: [{ kg: 80,  reps: 10 }] },                 // 800
+      { name: 'Ab Wheel',     sets: [{ kg: 10,  reps: 10 }] },                // vol 100
+      { name: 'Squat',        sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 5 }] }, // vol 1500
+      { name: 'Bench Press',  sets: [{ kg: 80,  reps: 10 }] },                // vol 800
     ]},
   ];
   {
@@ -3769,10 +3823,10 @@ if (typeof G.buildSessionExVol === 'function') {
     check('the picker is ordered by volume, heaviest first',
       _rows.map(r => r.name).join(',') === 'Squat,Bench Press,Ab Wheel',
       _rows.map(r => r.name + ':' + r.vol).join(' | '));
-    check('…and each row carries an est. 1RM',
-      Math.abs(_rows[0].oneRm - 100 * (1 + 10 / 30)) < 0.01, String(_rows[0].oneRm));
+    check('…and each row carries an est. 1RM, from its qualifying set (100kg×5)',
+      Math.abs(_rows[0].oneRm - 100 * (1 + 5 / 30)) < 0.01, String(_rows[0].oneRm));
     check('the option label appends the 1RM after the name',
-      G._exProgLabel(_rows[0]) === 'Squat — 133kg', G._exProgLabel(_rows[0]));
+      G._exProgLabel(_rows[0]) === 'Squat — 117kg', G._exProgLabel(_rows[0]));
     check('_exProgRows exposes oneRm, not a window-wide best',
       'oneRm' in _rows[0] && !('best' in _rows[0]), Object.keys(_rows[0]).join(','));
     check('…in the display unit, not raw kg',
