@@ -545,16 +545,32 @@ check('buildSessionGroupStrength: picks best est1rm across sets',
 check('buildSessionGroupStrength: session has date field',
   strLegs.length > 0 && strLegs[0].date === '2020-01-15');
 
-// Caps reps at 10 in 1RM formula (Epley validated ≤10 reps; higher reps overestimate)
+// A 1RM is only estimated from sets at or below ONE_RM_MAX_REPS — a rep-based formula is
+// not credible above ~6 reps (Henrik, 2026-08-08, aligned with the Exercise tab).
 G.logs = [{
   date: '2020-01-15',
   exercises: [{ name: 'Squat', sets: [{ kg: 100, reps: 30 }] }]
 }];
-const strHighReps = G.buildSessionGroupStrength('legs', 10000);
-const expectedHighReps = 100 * (1 + 10 / 30) * 1;  // min(30,10)=10
-check('buildSessionGroupStrength: reps capped at 10 in formula',
-  strHighReps.length > 0 && Math.abs(strHighReps[0].est1rm - expectedHighReps) < 0.01,
-  `got ${strHighReps[0]?.est1rm}, expected ${expectedHighReps}`);
+check('buildSessionGroupStrength: a high-rep set yields no 1RM at all',
+  G.buildSessionGroupStrength('legs', 10000).length === 0,
+  JSON.stringify(G.buildSessionGroupStrength('legs', 10000)));
+G.logs = [{
+  date: '2020-01-15',
+  exercises: [{ name: 'Squat', sets: [{ kg: 100, reps: 30 }, { kg: 90, reps: 5 }] }]
+}];
+const strCeil = G.buildSessionGroupStrength('legs', 10000);
+const expectedCeil = 90 * (1 + 5 / 30) * 1;   // the 30-rep set contributes nothing
+check('buildSessionGroupStrength: only the qualifying set drives the estimate',
+  strCeil.length > 0 && Math.abs(strCeil[0].est1rm - expectedCeil) < 0.01,
+  `got ${strCeil[0]?.est1rm}, expected ${expectedCeil}`);
+check('buildSessionGroupStrength: the ceiling matches the Exercise tab',
+  G.ONE_RM_MAX_REPS === 6);
+// The Strength tab says what it is built from, in both view modes, so an empty chart reads
+// as a rule rather than a bug.
+check('Strength subtitle names the rep ceiling (sessions view)',
+  /Bars = best set Epley 1RM estimate \(sets ≤6 reps\)/.test(html));
+check('…and the weekly view too',
+  /Bars = weekly best est\. 1RM \(sets ≤6 reps\)/.test(String(G.setStrViewMode || '')));
 
 // Logs outside cutoff are excluded
 G.logs = [{
@@ -653,23 +669,22 @@ console.log('\n── Gear factor — buildSessionGroupStrength ─────�
 // gear=0.5 halves est1RM
 G.logs = [{
   date: '2020-02-01',
-  exercises: [{ name: 'Face Pull', gear: 0.5, sets: [{ kg: 40, reps: 12 }] }]
+  exercises: [{ name: 'Face Pull', gear: 0.5, sets: [{ kg: 40, reps: 6 }] }]
 }];
 const _sGearHalf = G.buildSessionGroupStrength('shoulders', 10000);
-// est = 40 * 0.5 * (1 + min(12,10)/30) * 0.55
-const _expectedSGearHalf = 40 * 0.5 * (1 + Math.min(12, 10) / 30) * 0.55;
-check('gear=0.5 halves est1RM (Face Pull 40kg×12 shoulders)',
+const _expectedSGearHalf = 40 * 0.5 * (1 + 6 / 30) * 0.55;
+check('gear=0.5 halves est1RM (Face Pull 40kg×6 shoulders)',
   _sGearHalf.length > 0 && Math.abs(_sGearHalf[0].est1rm - _expectedSGearHalf) < 0.01,
   `got ${_sGearHalf[0]?.est1rm}, expected ${_expectedSGearHalf}`);
 
 // gear=1.0 → same as no gear
 G.logs = [{
   date: '2020-02-01',
-  exercises: [{ name: 'Face Pull', gear: 1.0, sets: [{ kg: 40, reps: 12 }] }]
+  exercises: [{ name: 'Face Pull', gear: 1.0, sets: [{ kg: 40, reps: 6 }] }]
 }];
 const _sGearFull = G.buildSessionGroupStrength('shoulders', 10000);
-const _expectedSGearFull = 40 * 1.0 * (1 + Math.min(12, 10) / 30) * 0.55;
-check('gear=1.0 keeps full est1RM (Face Pull 40kg×12 shoulders)',
+const _expectedSGearFull = 40 * 1.0 * (1 + 6 / 30) * 0.55;
+check('gear=1.0 keeps full est1RM (Face Pull 40kg×6 shoulders)',
   _sGearFull.length > 0 && Math.abs(_sGearFull[0].est1rm - _expectedSGearFull) < 0.01,
   `got ${_sGearFull[0]?.est1rm}, expected ${_expectedSGearFull}`);
 
@@ -677,12 +692,12 @@ check('gear=1.0 keeps full est1RM (Face Pull 40kg×12 shoulders)',
 G.logs = [{
   date: '2020-02-01',
   exercises: [{ name: 'Face Pull', gear: 0.5, sets: [
-    { kg: 60, reps: 8 },   // 60*0.5*(1+8/30)*0.55 = ~19.25
-    { kg: 40, reps: 12 },  // 40*0.5*(1+12/30)*0.55 = ~15.4
+    { kg: 60, reps: 5 },   // 60*0.5*(1+5/30)*0.55 = ~19.25
+    { kg: 40, reps: 6 },   // 40*0.5*(1+6/30)*0.55 = ~13.2
   ]}]
 }];
 const _sBest = G.buildSessionGroupStrength('shoulders', 10000);
-const _expectedBest = 60 * 0.5 * (1 + 8 / 30) * 0.55;
+const _expectedBest = 60 * 0.5 * (1 + 5 / 30) * 0.55;
 check('gear=0.5: best set selected after gear applied',
   _sBest.length > 0 && Math.abs(_sBest[0].est1rm - _expectedBest) < 0.01,
   `got ${_sBest[0]?.est1rm}, expected ${_expectedBest}`);
@@ -1685,12 +1700,13 @@ console.log('\n── Weighted pull-up volume fix ──────────
   const _savedWeights44 = G.weights;
   G.weights = [{ date: '2020-01-01', weight: 90 }];
   // Weighted Pull-ups: back=0.65, arms=0.35 (same as pull-ups)
-  // 4 sets × 10 added kg, 8 reps. bw=90, so effective kg = 100
-  // back vol = 4 * (90+10) * 8 * 0.65 = 2080
+  // 4 sets × 10 added kg, 6 reps. bw=90, so effective kg = 100
+  // back vol = 4 * (90+10) * 6 * 0.65 = 1560
+  // 6 reps is at ONE_RM_MAX_REPS, so this log exercises the strength path too
   G.logs = [{
     date: '2020-01-15',
     exercises: [{ name: 'Weighted Pull-ups', sets: [
-      { kg: 10, reps: 8 }, { kg: 10, reps: 8 }, { kg: 10, reps: 8 }, { kg: 10, reps: 8 }
+      { kg: 10, reps: 6 }, { kg: 10, reps: 6 }, { kg: 10, reps: 6 }, { kg: 10, reps: 6 }
     ]}]
   }];
   const wvBack = G.buildSessionGroupVol('back', 10000);
@@ -1699,8 +1715,8 @@ console.log('\n── Weighted pull-up volume fix ──────────
   const puSplit = G.getExSplits('Weighted Pull-ups');
   const bkFrac  = puSplit.back || 0;
   const arFrac  = puSplit.arms || 0;
-  const expectedWVBack = (90 + 10) * 8 * 4 * bkFrac;
-  const expectedWVArms = (90 + 10) * 8 * 4 * arFrac;
+  const expectedWVBack = (90 + 10) * 6 * 4 * bkFrac;
+  const expectedWVArms = (90 + 10) * 6 * 4 * arFrac;
   check('buildSessionGroupVol: Weighted Pull-ups back vol includes bw',
     wvBack.length > 0 && Math.abs(wvBack[0].vol - expectedWVBack) < 0.01,
     `got ${wvBack[0]?.vol}, expected ${expectedWVBack}`);
@@ -1710,8 +1726,8 @@ console.log('\n── Weighted pull-up volume fix ──────────
 
   // buildSessionGroupStrength: Weighted Pull-ups 1RM estimate should use bw + added kg
   const wsStr = G.buildSessionGroupStrength('back', 10000);
-  // Epley: (bw+addedKg) * (1 + min(reps,15)/30) * frac
-  const expectedWSStr = (90 + 10) * (1 + Math.min(8, 15) / 30) * bkFrac;
+  // Epley: (bw+addedKg) * (1 + reps/30) * frac
+  const expectedWSStr = (90 + 10) * (1 + 6 / 30) * bkFrac;
   check('buildSessionGroupStrength: Weighted Pull-ups est1rm includes bw',
     wsStr.length > 0 && Math.abs(wsStr[0].est1rm - expectedWSStr) < 0.01,
     `got ${wsStr[0]?.est1rm}, expected ${expectedWSStr}`);
@@ -2862,11 +2878,11 @@ console.log('\n── WPU body weight inclusion ──────────�
   const _savedW = G.weights, _savedL = G.logs;
   G.weights = [{ date: '2020-01-01', weight: 80 }];
   // WPU set with 0 added weight must still count as BW load (was skipped by kg>0 guard)
-  G.logs = [{ date: '2020-01-15', exercises: [{ name: 'Weighted Pull-ups', sets: [{ kg: 0, reps: 10 }] }] }];
+  G.logs = [{ date: '2020-01-15', exercises: [{ name: 'Weighted Pull-ups', sets: [{ kg: 0, reps: 6 }] }] }];
   const v0 = G.buildSessionGroupVol('back', 10000);
-  check('WPU kg=0: volume counts BW (80×10×0.65)', v0.length === 1 && Math.abs(v0[0].vol - 80 * 10 * 0.65) < 0.01, `got ${v0[0]?.vol}`);
+  check('WPU kg=0: volume counts BW (80×6×0.65)', v0.length === 1 && Math.abs(v0[0].vol - 80 * 6 * 0.65) < 0.01, `got ${v0[0]?.vol}`);
   const s0 = G.buildSessionGroupStrength('back', 10000);
-  const expS0 = 80 * (1 + 10 / 30) * 0.65;
+  const expS0 = 80 * (1 + 6 / 30) * 0.65;
   check('WPU kg=0: strength counts BW', s0.length === 1 && Math.abs(s0[0].est1rm - expS0) < 0.01, `got ${s0[0]?.est1rm}`);
   // WPU with added weight: BW + added
   G.logs = [{ date: '2020-01-15', exercises: [{ name: 'Weighted Pull-ups', sets: [{ kg: 15, reps: 6 }] }] }];
