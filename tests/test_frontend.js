@@ -3769,15 +3769,40 @@ if (typeof G.buildSessionExVol === 'function') {
     check('the picker is ordered by volume, heaviest first',
       _rows.map(r => r.name).join(',') === 'Squat,Bench Press,Ab Wheel',
       _rows.map(r => r.name + ':' + r.vol).join(' | '));
-    check('…and each row carries the best est. 1RM in the window',
-      Math.abs(_rows[0].best - 100 * (1 + 10 / 30)) < 0.01, String(_rows[0].best));
+    check('…and each row carries an est. 1RM',
+      Math.abs(_rows[0].oneRm - 100 * (1 + 10 / 30)) < 0.01, String(_rows[0].oneRm));
     check('the option label appends the 1RM after the name',
       G._exProgLabel(_rows[0]) === 'Squat — 133kg', G._exProgLabel(_rows[0]));
+    check('_exProgRows exposes oneRm, not a window-wide best',
+      'oneRm' in _rows[0] && !('best' in _rows[0]), Object.keys(_rows[0]).join(','));
     check('…in the display unit, not raw kg',
       /^Squat — \d+(kg|lb)$/.test(G._exProgLabel(_rows[0])), G._exProgLabel(_rows[0]));
     check('an exercise with no 1RM in the window shows the bare name (never "0kg")',
-      G._exProgLabel({ name: 'Plank', vol: 0, best: 0 }) === 'Plank',
-      G._exProgLabel({ name: 'Plank', vol: 0, best: 0 }));
+      G._exProgLabel({ name: 'Plank', vol: 0, oneRm: 0 }) === 'Plank',
+      G._exProgLabel({ name: 'Plank', vol: 0, oneRm: 0 }));
+    // The label is CURRENT strength, not a personal best (Henrik, 2026-08-08: a 152kg
+    // Squat "was probably true 5 months ago but not today").
+    {
+      const _saveEx = G._expExercise;
+      G._expExercise = '';
+      G.logs = [
+        { date: '2030-01-06', exercises: [{ name: 'Squat', sets: [{ kg: 150, reps: 5 }] }] },  // peak
+        { date: '2030-03-06', exercises: [{ name: 'Squat', sets: [{ kg: 100, reps: 5 }] }] },  // latest
+      ];
+      const _r = G._exProgRows(_big)[0];
+      const _latest = 100 * (1 + 5 / 30), _peak = 150 * (1 + 5 / 30);
+      check('the 1RM comes from the LATEST session, not the best in the window',
+        Math.abs(_r.oneRm - _latest) < 0.01, `got ${_r.oneRm}, latest ${_latest}, peak ${_peak}`);
+      check('…so an old peak no longer sets the label',
+        Math.round(G.kgToUnit(_r.oneRm)) < Math.round(G.kgToUnit(_peak)),
+        G._exProgLabel(_r));
+      // Order of the log array must not matter — selection is by date, not position
+      G.logs = [G.logs[1], G.logs[0]];
+      check('…and it is the newest by DATE, not by array position',
+        Math.abs(G._exProgRows(_big)[0].oneRm - _latest) < 0.01,
+        String(G._exProgRows(_big)[0].oneRm));
+      G._expExercise = _saveEx;
+    }
     check('populateExerciseSelect defaults to the highest-volume exercise',
       String(G.populateExerciseSelect || '').includes('_exProgRows(expWindow||90)'));
     check('…and the ordering follows the selected window',
@@ -3812,7 +3837,7 @@ if (typeof G.buildSessionExVol === 'function') {
       (() => { G._expExercise = 'Squat'; G._exProgRows(1); return G._expExercise === 'Squat'; })());
     G._expExercise = '';
     // Equal volume falls back to alphabetical so the order does not jitter
-    const _tie = [{ name: 'Zzz', vol: 5, best: 0 }, { name: 'Aaa', vol: 5, best: 0 }]
+    const _tie = [{ name: 'Zzz', vol: 5, oneRm: 0 }, { name: 'Aaa', vol: 5, oneRm: 0 }]
       .sort((a, b) => (b.vol - a.vol) || a.name.localeCompare(b.name));
     check('ties break alphabetically', _tie[0].name === 'Aaa');
   }
