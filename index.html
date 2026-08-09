@@ -1633,12 +1633,16 @@ function _exProgColor(name){const sp=getExSplits(name)||{};let bg=null,bv=0;['le
 // 1RM rather than a misleading 0; picking it shows the empty state.
 // Ordering follows the window, so changing 30/60/90/All re-ranks the list.
 function _exProgRows(days){return logExerciseNames().map(function(n){const vol=buildSessionExVol(n,days).reduce(function(a,x){return a+x.vol;},0);const st=buildSessionExStrength(n,days);
-  // The 1RM on the label is the MOST RECENT session's estimate, not the best in the window
-  // (Henrik, 2026-08-08: a 152kg Squat "was probably true 5 months ago but not today").
-  // buildSessionExStrength returns sessions oldest-first, so the last entry is the newest.
-  // A peak is what the chart is for — it plots every session and keeps the whole history
-  // visible; the label answers "where am I now", which a window-wide max cannot.
-  const oneRm=st.length?st[st.length-1].est1rm:0;
+  // The 1RM on the label is the BEST of the LATEST 5 SESSIONS (Henrik, 2026-08-08).
+  // Not a window-wide max: on a wide window that surfaced an old peak and read as a current
+  // capability ("152kg ... was probably true 5 months ago but not today"). Not the single
+  // latest session either: one light or deload day would drop the number for no real reason.
+  // Best-of-last-5 is current strength that survives a bad day.
+  // buildSessionExStrength returns sessions oldest-first, so the last 5 are the newest 5;
+  // slice(-5) is safe on shorter series and simply takes what exists.
+  // 5 sessions index-based, deliberately matching the volume chart's smoothing window —
+  // sessions, never calendar days, so a training break does not empty it.
+  const _recent=st.slice(-5);let oneRm=0;_recent.forEach(function(x){if(x.est1rm>oneRm)oneRm=x.est1rm;});
   return{name:n,vol:vol,oneRm:oneRm};}).filter(function(r){
   // Hide anything with no volume in the window (Henrik, 2026-08-08). That covers both an
   // exercise not trained in this window and one only ever logged without a load, whose
