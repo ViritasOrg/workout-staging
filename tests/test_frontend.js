@@ -3756,6 +3756,38 @@ if (typeof G.buildSessionExVol === 'function') {
   check('_exProgColor: Bench Press → chest colour',G._exProgColor('Bench Press') === G.GROUP_COLORS.chest);
   check('_exProgColor falls back for an unknown exercise', typeof G._exProgColor('Nonsense Lift') === 'string');
 
+  // Picker ordered by volume, labelled with est. 1RM (Henrik, 2026-08-08)
+  G.logs = [
+    { date: '2030-01-06', exercises: [
+      { name: 'Ab Wheel',     sets: [{ kg: 10,  reps: 10 }] },                 // 100
+      { name: 'Squat',        sets: [{ kg: 100, reps: 10 }, { kg: 100, reps: 10 }] }, // 2000
+      { name: 'Bench Press',  sets: [{ kg: 80,  reps: 10 }] },                 // 800
+    ]},
+  ];
+  {
+    const _rows = G._exProgRows(_big);
+    check('the picker is ordered by volume, heaviest first',
+      _rows.map(r => r.name).join(',') === 'Squat,Bench Press,Ab Wheel',
+      _rows.map(r => r.name + ':' + r.vol).join(' | '));
+    check('…and each row carries the best est. 1RM in the window',
+      Math.abs(_rows[0].best - 100 * (1 + 10 / 30)) < 0.01, String(_rows[0].best));
+    check('the option label appends the 1RM after the name',
+      G._exProgLabel(_rows[0]) === 'Squat — 133kg', G._exProgLabel(_rows[0]));
+    check('…in the display unit, not raw kg',
+      /^Squat — \d+(kg|lb)$/.test(G._exProgLabel(_rows[0])), G._exProgLabel(_rows[0]));
+    check('an exercise with no 1RM in the window shows the bare name (never "0kg")',
+      G._exProgLabel({ name: 'Plank', vol: 0, best: 0 }) === 'Plank',
+      G._exProgLabel({ name: 'Plank', vol: 0, best: 0 }));
+    check('populateExerciseSelect defaults to the highest-volume exercise',
+      String(G.populateExerciseSelect || '').includes('_exProgRows(expWindow||90)'));
+    check('…and the ordering follows the selected window',
+      String(G._exProgRows || '').includes('buildSessionExVol(n,days)'));
+    // Equal volume falls back to alphabetical so the order does not jitter
+    const _tie = [{ name: 'Zzz', vol: 5, best: 0 }, { name: 'Aaa', vol: 5, best: 0 }]
+      .sort((a, b) => (b.vol - a.vol) || a.name.localeCompare(b.name));
+    check('ties break alphabetically', _tie[0].name === 'Aaa');
+  }
+
   G.weights = _sw; G.logs = _sl;
 }
 
