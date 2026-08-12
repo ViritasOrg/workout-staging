@@ -606,11 +606,18 @@ git commit --allow-empty -m "chore: re-trigger CI" && git push
 That is the only thing observed to work. **Closing and reopening the PR did nothing**,
 and with no run created there is nothing to re-run.
 
-How strong is that? **One episode** (2026-08-08): after ~40 minutes of nothing, the
-empty commit produced runs on all three affected repos within a couple of minutes. It
-has not been tried on a second, independent occurrence — reach for it first, but do
-not treat it as guaranteed. If it fails, run `node tests/test_frontend.js index.html`
-locally, say so explicitly in the reply, and never imply CI passed.
+How strong is that? **It has now been tried twice and worked once** (corrected
+2026-08-12). On 2026-08-08 the empty commit produced runs on all three affected repos
+within a couple of minutes, after ~40 minutes of nothing. On **2026-08-12 it did not
+work**: `peptidetracker-staging` PR #878 and `trt-stage` PR #134 sat at
+`total_count: 0` for ~10 minutes, an empty commit was pushed to each, and still no run
+appeared. (`claude-agent-backend` was unaffected in the same minutes and ran CI
+normally on PRs #204 and #205.)
+
+So it is worth trying first and it is **not** a fix. When it fails, the procedure is
+the one that always applies: run the suite locally, **say so explicitly in the reply**,
+never imply CI passed, and **do not merge** — leave the PR open rather than routing
+around the missing check.
 
 **Never route around a required check.** This repo requires the `test` check on `main`,
 so the merge is refused outright ("Required status check *test* is expected"). That is
@@ -621,9 +628,12 @@ the guardrail working — get a run, do not look for a way past it.
 - 2026-08-08, ~09:24–10:04 — `peptidetracker-staging`, `workout-staging` and
   `claude-agent-backend`, hitting **both** CI and Version Bump. `trt-stage` was
   unaffected in the same minutes and bumped normally.
+- 2026-08-12, ~14:40–14:55 — `peptidetracker-staging` and `trt-stage` only, on PRs
+  #878 and #134. **The empty-commit re-trigger did not recover it.** The backend ran
+  CI normally throughout, so it was not account-wide.
 
-Both times Actions were otherwise alive (scheduled runs fired, `workflow_dispatch`
-worked). It is intermittent and not a property of any credential — do not turn it into
+Every time, Actions were otherwise alive (scheduled runs fired, `workflow_dispatch`
+worked, and at least one repo was unaffected in the same minutes). It is intermittent and not a property of any credential — do not turn it into
 a rule that pushes never trigger workflows.
 
 **A merge left un-bumped is usually harmless — check before acting.** If the merge
