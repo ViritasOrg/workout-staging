@@ -336,6 +336,7 @@
         <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><select id="exp-select" onchange="setExProgExercise(this.value)" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);font-size:13px;font-weight:600;font-family:var(--font-ui);outline:none;cursor:pointer"></select><div style="display:flex;gap:1px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:2px"><button id="expv-btn-sessions" class="scale-btn" onclick="setExpViewMode('sessions')">Sessions</button><button id="expv-btn-weekly" class="scale-btn scale-btn-active" onclick="setExpViewMode('weekly')">Weekly</button></div></div>
         <div id="exp-subtitle" style="font-size:10px;color:var(--muted);margin-bottom:4px">Bars = weekly total &middot; Line = 3-week rolling avg (faded = extrapolated)</div>
         <div id="exp-empty" class="empty hidden" style="padding:24px 0"><div class="empty-icon">📈</div>No logged sets for this exercise yet.</div>
+        <div style="margin-bottom:10px"><button onclick="createOneRmProgram()" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--accent);font-size:12px;font-weight:600;border-radius:8px;padding:8px;cursor:pointer;font-family:var(--font-ui);">+ CREATE 1RM TEST PROGRAM</button><div style="font-size:10px;color:var(--muted);margin-top:4px;text-align:center">3 sessions · warm up, then one top set of 3 · Squat, Bench, Deadlift, Row, Overhead Press, Weighted Pull-ups</div></div>
         <div id="exp-charts" style="display:flex;flex-direction:column;gap:16px;margin-top:4px;">
           <div><div id="exp-lbl-vol" style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Volume</div><canvas id="exp-chart-vol" height="100" style="width:100%"></canvas></div>
           <div style="height:1px;background:var(--border)"></div>
@@ -717,8 +718,14 @@ function selectDay(num,el){document.querySelectorAll('.day-card').forEach(c=>c.c
 // rehab is the only tag permitted above 12 reps. A generated program may therefore only
 // prescribe a rep count that some range defines — REPS_LEGAL — and anything else snaps to the
 // nearest legal value before the tag is read off it.
-var TAG_RANGES={strength:[4,6],volume:[8,12],rehab:[15,15]};
-var REPS_LEGAL=[4,5,6,8,9,10,11,12,15];
+// Strength is 2-6, not 4-6 (Henrik, 2026-08-08). Widened so a 1RM test can prescribe a real
+// double or triple instead of snapReps() forcing it up to 4 — "if a user wants a 1RM estimate
+// the rule is rather to go for a 2-3 rep max on a given weight after warm up". The canonical
+// source (GET /training-rules on the backend) was widened in the same change; these must agree.
+// volume and rehab are untouched, 7 still belongs to no band, and rehab is still the only tag
+// permitted above 12.
+var TAG_RANGES={strength:[2,6],volume:[8,12],rehab:[15,15]};
+var REPS_LEGAL=[2,3,4,5,6,8,9,10,11,12,15];
 function tagForReps(r){
   var n=parseInt(r,10);
   if(!isFinite(n)||String(r).trim()==='')return null; // 'max' / AMRAP keeps whatever it had
@@ -1206,6 +1213,47 @@ function _progWizGenerate(){
 // Build manually (2026-07-23): skip the generator wizard entirely — create a blank
 // 1-day program and drop straight into the existing editor (add days/exercises, set
 // schemes/sets/weights/tags). _progIsNew=true means closing without Save discards it.
+// ── 1RM test program (Progress → Exercise) ───────────────────────────────────
+// Henrik, 2026-08-08: "Add creation of 1RM measurment program reachable from Progress tab.
+// Not for all exercises but the ones where it is common and reasonable incl weighted pull ups."
+//
+// The testable set is a deliberate WHITELIST, not everything in the catalogue. Maxing a Face
+// Pull or a Leg Curl is neither common nor sensible, and a rehab/isolation movement should
+// never be taken to a limit single. These six are the standard tested compounds, including the
+// weighted pull-up Henrik named.
+var ONE_RM_TESTABLE=['Squat','Bench Press','Deadlift','Barbell Row','Overhead Press','Weighted Pull-ups'];
+var ONE_RM_PROGRAM_NAME='1RM Test';
+// Prescription: ONE top set of 3 after warming up, per Henrik's rule — "go for a 2-3 rep max on
+// a given weight after warm up". 3 is a legal strength prescription since the band was widened
+// to 2-6 in this same change; before that snapReps() would have forced it to 4.
+// warmup:true on every day — the rule is a max AFTER warming up, and the day carries that flag.
+// kg is 0 on purpose: never seed one person's loads (GDPR rule 2026-06-24). The log prefill
+// fills each lift from the user's own saved/history weight.
+// Days pair two lifts each and NEVER put Squat with a conventional Deadlift, honouring the
+// leg-day CNS rule — a limit single on both in one session is exactly what that rule prevents.
+function _oneRmTestProgram(){
+  function tx(n){return{name:n,scheme:'1×3 — work up to a 3-rep max',tag:'strength',sets:'3',kg:0};}
+  return{name:ONE_RM_PROGRAM_NAME,goal:'strength',days:[
+    {name:'Day 1 — Squat & Bench Max',warmup:true,exercises:[tx('Squat'),tx('Bench Press')]},
+    {name:'Day 2 — Deadlift & Row Max',warmup:true,exercises:[tx('Deadlift'),tx('Barbell Row')]},
+    {name:'Day 3 — Press & Pull-up Max',warmup:true,exercises:[tx('Overhead Press'),tx('Weighted Pull-ups')]}
+  ]};
+}
+function _findOneRmProgram(){for(var i=0;i<_programs.length;i++){if(_programs[i]&&_programs[i].name===ONE_RM_PROGRAM_NAME)return i;}return -1;}
+function createOneRmProgram(){
+  var existing=_findOneRmProgram();
+  if(existing>=0){alert('You already have a "'+ONE_RM_PROGRAM_NAME+'" program — open it from the Program tab.');return;}
+  if(_programs.length>=4){alert('Maximum 4 programs. Delete one before adding the '+ONE_RM_PROGRAM_NAME+' program.');return;}
+  var names=ONE_RM_TESTABLE.join(', ');
+  if(!confirm('Create a "'+ONE_RM_PROGRAM_NAME+'" program?\n\n3 sessions, each warming up then ONE top set of 3 reps:\n'+names+'\n\nIt is added as a separate program — your active program is not changed.'))return;
+  _programs.push(_oneRmTestProgram());
+  // savePrograms() writes localStorage AND pushes to the backend in the same call — a
+  // localStorage-only write would be lost on a cache wipe (backend-is-source-of-truth rule).
+  savePrograms();
+  if(typeof buildProgramSettingsCard==='function')buildProgramSettingsCard();
+  rebuildDayGrid();rebuildLogDaySelect();
+  alert('"'+ONE_RM_PROGRAM_NAME+'" created. Pick it on the Program tab when you want to test.\n\nLog the reps you actually hit — a set of 2-3 is what produces a trustworthy estimate here.');
+}
 function _progBuildManual(){
   if(_programs.length>=4){alert('Maximum 4 programs');return;}
   var prog={name:'My Program',goal:'hypertrophy',days:[{name:'Day 1',warmup:false,exercises:[{name:'',scheme:'3×10',tag:'volume',sets:'10-10-10',kg:0}]}]};

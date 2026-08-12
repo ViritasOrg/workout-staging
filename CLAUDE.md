@@ -272,10 +272,10 @@ Henrik: *"make tagging automatic and honor the rep ranges for strength, volume, 
 feels backwards to set it manually."*
 
 - `TAG_RANGES` / `tagForReps()` / `snapReps()` / `applyTagFromReps()` in `index.html` are the
-  single source of truth: **strength 4–6, volume 8–12, rehab exactly 15** (canonical
+  single source of truth: **strength 2–6, volume 8–12, rehab exactly 15** (canonical
   `GET /training-rules`).
 - **A generated program may only prescribe a rep count some range defines** —
-  `REPS_LEGAL = [4,5,6,8,9,10,11,12,15]`. Anything else snaps to the nearest legal count
+  `REPS_LEGAL = [2,3,4,5,6,8,9,10,11,12,15]`. Anything else snaps to the nearest legal count
   (Calf Raises 20 → 15, a 3-rep strength triple → 4) and the tag is then read off it.
 - The derivation runs **at the very end of `_generateWorkoutProgram`**, after the leg-day rules,
   injury swaps and prehab injection — those re-author schemes and would otherwise slip past it.
@@ -296,7 +296,7 @@ a 15-rep Calf Raise is labelled `rehab` in any program (and gets the correct 90 
 in line with "never mutate stored programs".
 
 **Also superseded:** the heavy Deadlift's scheme is now `1×6`, not `1×5-8` — a 5–8 range
-straddles strength (4–6) and volume (8–12), so it is not a range any tag defines. Its sets
+straddles strength (2–6) and volume (8–12), so it is not a range any tag defines. Its sets
 (`'6'`, one heavy single) are unchanged.
 
 ### Exercise placement restrictions
@@ -392,6 +392,37 @@ variant is the most demanding movement a pull session carries, so it is done fre
 - **Newly generated programs only.** Stored programs are not migrated (rule 2026-07-15) —
   an already-saved program gets the new order when it is regenerated, or reordered by hand.
 
+### The strength band is 2–6, and the 1RM test program (rule 2026-08-08)
+Henrik: *"Add creation of 1RM measurment program reachable from Progress tab. Not for all
+exercises but the ones where it is common and reasonable incl weighted pull ups."* Asked how
+to resolve the clash with `REPS_LEGAL`, he chose to **add 2 and 3 globally**.
+
+- **`TAG_RANGES.strength = [2,6]` and `REPS_LEGAL = [2,3,4,5,6,8,9,10,11,12,15]`.** This is a
+  deliberate widening of a previously settled value, not drift — do not "restore" 4–6.
+- **The canonical source moved with it.** `GET /training-rules` in `claude-agent-backend` now
+  reports `strength: 2–6`, and `tests/test_training_rules.py` there asserts it. The frontend
+  and the endpoint must always agree; changing one alone is the bug both test suites exist to
+  catch.
+- **Unchanged:** volume 8–12, rehab 15, rehab still the only tag permitted above 12, and 7
+  still belongs to no band.
+- **Side effect, accepted:** generated strength programs that authored triples (`5×3`
+  Deadlift in the full-body pool) previously had them snapped to 4 and now keep the 3.
+
+**The 1RM test program** — `_oneRmTestProgram()`, created by `createOneRmProgram()` from a
+button in Progress → Exercise:
+- **`ONE_RM_TESTABLE` is a WHITELIST of six lifts** — Squat, Bench Press, Deadlift, Barbell
+  Row, Overhead Press, Weighted Pull-ups. Henrik: *"Not for all exercises but the ones where
+  it is common and reasonable."* Never extend it to isolation or rehab movements; nobody
+  takes a Face Pull or a Leg Curl to a limit single.
+- Three sessions, **two lifts each**, `warmup:true`, one top set of 3 (`1×3 — work up to a
+  3-rep max`). **No session pairs Squat with a conventional Deadlift** — the leg-day CNS rule
+  applies most of all to limit work.
+- **`kg: 0`** on every entry. Never seed loads (GDPR rule 2026-06-24); the log prefill fills
+  them from the user's own history.
+- It is **added as a separate program and does not become active**, is refused if one already
+  exists or the 4-program cap is reached, and persists through `savePrograms()` so it reaches
+  the backend rather than localStorage alone.
+
 ### 1RM is only estimated from low-rep sets — and a real test is a 2-3 rep max (rule 2026-08-08)
 Henrik: *"1RM for Pull-ups (normal and weighted) differs, which obviously is impossible in
 reality. Also 132kg isn't realistic imo."* Then, on how a user should actually get one:
@@ -413,10 +444,11 @@ weight after warm up."*
 - **Volume is never affected.** Every logged set counts toward volume in both tabs; the
   ceiling governs 1RM only.
 - **A user testing a 1RM should do a 2–3 rep max on a given weight after warming up.**
-  Logging is free-form, so a logged 2- or 3-rep set counts normally. Note the interaction:
-  `REPS_LEGAL=[4,5,6,8,9,10,11,12,15]` means the GENERATOR cannot prescribe 2–3 reps (a
-  3-rep triple snaps to 4), so a max test is something the user performs and logs, not
-  something a program schedules. Raised with Henrik 2026-08-08; left as is.
+  Logging is free-form, so a logged 2- or 3-rep set counts normally. **The generator can now
+  prescribe it too** — `REPS_LEGAL` was widened to `[2,3,4,5,6,8,9,10,11,12,15]` and the
+  strength band to 2–6 later the same day, so a 3-rep top set survives `snapReps()` instead
+  of being forced up to 4. *(Corrected 2026-08-08: an earlier version of this bullet said the
+  generator could not prescribe 2–3 reps. That was true when written and is no longer.)*
 
 ### One exercise, one 1RM — "Weighted X" is not a separate movement (rule 2026-08-08)
 Pull-ups and Weighted Pull-ups reported two different 1RMs (119 kg and 132 kg) for the same
