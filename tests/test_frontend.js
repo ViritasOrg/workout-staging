@@ -3902,6 +3902,69 @@ if (typeof G.buildSessionExVol === 'function') {
   G.weights = _sw; G.logs = _sl;
 }
 
+// ── 1RM test program, created from Progress ───────────────────────────────────
+// Henrik, 2026-08-08: "Add creation of 1RM measurment program reachable from Progress tab.
+// Not for all exercises but the ones where it is common and reasonable incl weighted pull ups."
+console.log('\n── 1RM test program ───────────────────────────────────────');
+check('reachable from the Progress tab', /onclick="createOneRmProgram\(\)"/.test(html));
+check('…from the Exercise panel, where 1RM already lives',
+  html.indexOf('createOneRmProgram()') > html.indexOf('id="ppanel-exercise"')
+  && html.indexOf('createOneRmProgram()') < html.indexOf('id="page-settings"'));
+if (typeof G._oneRmTestProgram === 'function') {
+  const _p = G._oneRmTestProgram();
+  const _exs = _p.days.flatMap(d => d.exercises);
+  const _names = _exs.map(e => e.name);
+  check('covers exactly the whitelisted lifts',
+    JSON.stringify([..._names].sort()) === JSON.stringify([...G.ONE_RM_TESTABLE].sort()),
+    _names.join(', '));
+  check('…including Weighted Pull-ups, named in the request',
+    _names.includes('Weighted Pull-ups'));
+  check('…and NOT isolation/rehab work nobody maxes',
+    !_names.some(n => /face pull|curl|lateral raise|fly|calf|plank|extension/i.test(n)),
+    _names.join(', '));
+  check('every lift is prescribed as a single top set of 3',
+    _exs.every(e => e.sets === '3'), JSON.stringify(_exs.map(e => e.sets)));
+  check('…which the widened band makes legal — snapReps leaves it at 3',
+    G.snapReps(3) === 3);
+  check('…and tags as strength', _exs.every(e => e.tag === 'strength'));
+  check('…still tagged correctly after the derivation runs',
+    _exs.map(e => G.applyTagFromReps(JSON.parse(JSON.stringify(e))))
+        .every(e => e.sets === '3' && e.tag === 'strength'));
+  check('the scheme tells the user to work up to it',
+    _exs.every(e => /work up to a 3-rep max/.test(e.scheme)), _exs[0].scheme);
+  check('every day warms up first — the rule is a max AFTER warm-up',
+    _p.days.every(d => d.warmup === true));
+  check('no day pairs Squat with a conventional Deadlift (CNS rule)',
+    !_p.days.some(d => {
+      const n = d.exercises.map(e => e.name);
+      return n.some(x => /squat/i.test(x) && !/split/i.test(x))
+          && n.some(x => /^deadlift$/i.test(x));
+    }));
+  check('no personal loads are seeded — kg is neutral',
+    _exs.every(e => e.kg === 0), JSON.stringify(_exs.map(e => e.kg)));
+  check('sessions are short — at most 2 lifts each',
+    _p.days.every(d => d.exercises.length <= 2));
+}
+if (typeof G.createOneRmProgram === 'function') {
+  const _fn = String(G.createOneRmProgram);
+  check('it persists to the BACKEND, not just localStorage', _fn.includes('savePrograms()'));
+  check('it asks before creating', _fn.includes('confirm('));
+  check('…and says the active program is not changed', _fn.includes('active program is not changed'));
+  check('it refuses to create a second copy', _fn.includes('_findOneRmProgram()'));
+  check('it respects the 4-program cap', _fn.includes('_programs.length>=4'));
+  check('it does NOT reassign the active program',
+    !/_activeProgramIndex\s*=/.test(_fn), 'must not hijack the active program');
+  // Duplicate guard, exercised rather than grepped
+  const _savedProgs = G._programs, _savedConfirm = G.confirm, _savedAlert = G.alert;
+  let _alerts = [];
+  G.confirm = () => true; G.alert = (m) => _alerts.push(m);
+  G._programs = [G._oneRmTestProgram()];
+  G.createOneRmProgram();
+  check('a second call does not add a duplicate', G._programs.length === 1, String(G._programs.length));
+  check('…and says why', /already have/.test(_alerts[0] || ''), _alerts[0]);
+  G._programs = _savedProgs; G.confirm = _savedConfirm; G.alert = _savedAlert;
+}
+
 // ── Manual program builder (blank, no wizard) ──────────────────────────────────
 console.log('\n── Manual program builder ─────────────────────────────────');
 check('_progBuildManual defined', typeof G._progBuildManual === 'function');
@@ -4156,11 +4219,13 @@ if (typeof G._generateWorkoutProgram === 'function') {
     check('sets options are 1-6', JSON.stringify(all.slice(0, 6)) === '["1","2","3","4","5","6"]', JSON.stringify(all.slice(0, 6)));
     // Rule 2026-07-31 (supersedes the 3-15 range): only rep counts a tag range defines are
     // offered, so picking reps IS picking the tag and an illegal pair cannot be authored.
-    check('reps options are only the legal counts (4-6, 8-12, 15) plus max',
-      JSON.stringify(all.slice(6)) === JSON.stringify(['4','5','6','8','9','10','11','12','15','max']),
+    check('reps options are only the legal counts (2-6, 8-12, 15) plus max',
+      JSON.stringify(all.slice(6)) === JSON.stringify(['2','3','4','5','6','8','9','10','11','12','15','max']),
       JSON.stringify(all.slice(6)));
+    check('the dropdown offers a 2 and a 3, so a max test can be authored by hand',
+      all.includes('2') && all.includes('3'));
     check('reps are grouped by the tag they produce',
-      /optgroup label="Strength 4-6"/.test(h) && /optgroup label="Volume 8-12"/.test(h) && /optgroup label="Rehab 15"/.test(h));
+      /optgroup label="Strength 2-6"/.test(h) && /optgroup label="Volume 8-12"/.test(h) && /optgroup label="Rehab 15"/.test(h));
     check('bodyweight "max" prescription survives', JSON.stringify(sel(G._progSetsSelects(0,0,'max-max-max'))) === '["3","max"]');
     check('the 1-set heavy Deadlift reads as 1 x 6', JSON.stringify(sel(G._progSetsSelects(0,0,'6'))) === '["1","6"]');
     check('a value the dropdowns cannot express is kept, not rewritten',
@@ -4234,17 +4299,27 @@ if (typeof G._generateWorkoutProgram === 'function') {
 // that ran to 18 because the weight was light leaves the program's label alone.
 if (typeof G.tagForReps === 'function') {
   console.log('\n── Automatic tagging from reps ────────────────────────────');
-  check('canonical ranges: strength 4-6, volume 8-12, rehab 15',
-    JSON.stringify(G.TAG_RANGES) === JSON.stringify({strength:[4,6],volume:[8,12],rehab:[15,15]}),
+  // Strength widened 4-6 → 2-6 on 2026-08-08 so a 1RM test can prescribe a real 2-3 rep max.
+  // Must stay in step with GET /training-rules on the backend, which was widened in the same
+  // change (claude-agent-backend tests/test_training_rules.py asserts the same numbers).
+  check('canonical ranges: strength 2-6, volume 8-12, rehab 15',
+    JSON.stringify(G.TAG_RANGES) === JSON.stringify({strength:[2,6],volume:[8,12],rehab:[15,15]}),
     JSON.stringify(G.TAG_RANGES));
+  check('2/3 reps → strength (the max-testing end)', [2,3].every(r => G.tagForReps(r) === 'strength'));
   check('4/5/6 reps → strength', [4,5,6].every(r => G.tagForReps(r) === 'strength'));
+  check('7 still belongs to no band — widening the low end did not blur the volume boundary',
+    G.tagForReps(7) === 'volume' && !(7 >= G.TAG_RANGES.volume[0]));
   check('8-12 reps → volume', [8,9,10,11,12].every(r => G.tagForReps(r) === 'volume'));
   check('15 reps → rehab', G.tagForReps(15) === 'rehab');
   check('rehab is the only tag above 12 reps',
     [13,15,18,20].every(r => G.tagForReps(r) === 'rehab'));
   check('AMRAP/max keeps whatever tag it had', G.tagForReps('max') === null && G.tagForReps('') === null);
   check('snapReps moves an undefined count onto the nearest legal one',
-    G.snapReps(20) === 15 && G.snapReps(13) === 12 && G.snapReps(7) === 6 && G.snapReps(3) === 4);
+    G.snapReps(20) === 15 && G.snapReps(13) === 12 && G.snapReps(7) === 6);
+  check('snapReps leaves a 2 and a 3 alone now — they are legal prescriptions',
+    G.snapReps(2) === 2 && G.snapReps(3) === 3, `${G.snapReps(2)}/${G.snapReps(3)}`);
+  check('…and 1 still snaps up, a single is not a prescription the app authors',
+    G.snapReps(1) === 2, String(G.snapReps(1)));
   check('snapReps leaves max alone', G.snapReps('max') === 'max');
 
   // Every generated program, every goal: reps are legal and the tag matches them.
