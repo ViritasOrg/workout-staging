@@ -1128,7 +1128,31 @@ function _progRmDay(di){if(_progEditBuf.days.length<=1){alert('Program needs at 
 function _progAddDay(){_progEditBuf.days.push({name:'Day '+(_progEditBuf.days.length+1)+' — New Day',warmup:false,exercises:[{name:'Squat',scheme:'3×10',tag:'strength',sets:'10-10-10',kg:60}]});_renderProgOverlay();}
 function _progRmEx(di,ei){_progEditBuf.days[di].exercises.splice(ei,1);_renderProgOverlay();}
 function _progAddEx(di){_progEditBuf.days[di].exercises.push({name:'',scheme:'3×10',tag:'volume',sets:'10-10-10',kg:0});_renderProgOverlay();}
-function _saveProgEdit(){_progIsNew=false;_programs[_progEditIdx]=_progEditBuf;savePrograms();if(_progEditIdx===_activeProgramIndex){rebuildDayGrid();rebuildLogDaySelect();}buildProgramSettingsCard();closeProgramOverlay();}
+// Editing the ACTIVE program changes what the Program and Log screens are supposed to show,
+// but rebuildDayGrid() and rebuildLogDaySelect() only rebuild the day CARDS and the day
+// <select> — neither re-renders the exercise list underneath either one. Nothing else picked
+// the edit up on the way back to those screens:
+//   - showPage('program') calls buildProgramSettingsCard() and nothing else, so the workout
+//     detail is never re-rendered on navigation;
+//   - showPage('log') re-prefills only when the card list is empty, the day changed, or the
+//     deload/unit state went stale — after an edit the day is usually unchanged and no reps
+//     are entered, so every condition is false and the stale cards survive.
+// Net effect: both screens kept the OLD exercises until the app was force-quit and relaunched,
+// which is the only thing that runs initPrograms() again (Henrik, 2026-08-12).
+function _refreshActiveProgramViews(){
+  renderWorkout(_selectedProgramDay);
+  // Never blow away a workout in progress. This is the same guard showPage() and
+  // _refreshUnitUI() already use: if any reps are typed in, leave the log alone — the user
+  // is mid-session and their entries outrank a template refresh.
+  var c=document.getElementById('structured-log');
+  var hasReps=c&&Array.from(c.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});
+  if(hasReps)return;
+  // Read the day back off the select: rebuildLogDaySelect() has just re-pointed it at a
+  // valid day, which matters when the edit removed the day that was selected.
+  var sel=document.getElementById('log-day');
+  if(sel&&sel.value)prefillLog(sel.value);
+}
+function _saveProgEdit(){_progIsNew=false;_programs[_progEditIdx]=_progEditBuf;savePrograms();if(_progEditIdx===_activeProgramIndex){rebuildDayGrid();rebuildLogDaySelect();_refreshActiveProgramViews();}buildProgramSettingsCard();closeProgramOverlay();}
 function _applyRehabSubs(exercises,prog){var subs=(prog||{}).rehabSubs||{};if(!Object.keys(subs).length)return exercises;return exercises.map(function(ex){var eff=subs[ex.name];return eff?Object.assign({},ex,{name:eff,_rehabOrig:ex.name}):ex;});}
 function _rehabSetSub(orig,val){if(!_progEditBuf.rehabSubs)_progEditBuf.rehabSubs={};_progEditBuf.rehabSubs[orig]=val;}
 function _rehabRemoveSub(orig){if(_progEditBuf.rehabSubs)delete _progEditBuf.rehabSubs[orig];_renderProgOverlay();}

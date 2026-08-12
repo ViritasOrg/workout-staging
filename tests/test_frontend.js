@@ -3965,6 +3965,64 @@ if (typeof G.createOneRmProgram === 'function') {
   G._programs = _savedProgs; G.confirm = _savedConfirm; G.alert = _savedAlert;
 }
 
+// ── Editing the active program refreshes the screens it changed ───────────────
+// Henrik, 2026-08-12: "Edit active program doesn't update program view and log screen,
+// need to swipe away and restart app."
+// rebuildDayGrid()/rebuildLogDaySelect() only rebuild the day cards and the day <select>;
+// neither re-renders the exercise list. showPage('program') never calls renderWorkout at
+// all, and showPage('log') skips its re-prefill when the day is unchanged and no reps are
+// entered — exactly the state after an edit. So both screens stayed stale until restart.
+console.log('\n── Active-program edit refreshes the views ────────────────');
+{
+  const _save = String(G._saveProgEdit || '');
+  check('_saveProgEdit refreshes the views after saving',
+    _save.includes('_refreshActiveProgramViews()'));
+  check('…only when the edited program is the ACTIVE one',
+    _save.indexOf('_progEditIdx===_activeProgramIndex') < _save.indexOf('_refreshActiveProgramViews()'));
+  check('…and still persists to the backend first', _save.includes('savePrograms()'));
+  const _ref = String(G._refreshActiveProgramViews || '');
+  check('_refreshActiveProgramViews defined', typeof G._refreshActiveProgramViews === 'function');
+  check('…re-renders the Program view', _ref.includes('renderWorkout('));
+  check('…and re-prefills the Log screen', _ref.includes('prefillLog('));
+  check('…reading the day back off the select, not a stale variable',
+    _ref.includes("getElementById('log-day')"));
+}
+// Exercised, not grepped: both screens refresh normally, and a workout in progress is safe.
+if (typeof G._refreshActiveProgramViews === 'function') {
+  const _rw = G.renderWorkout, _pf = G.prefillLog, _doc = G.document;
+  const mkDoc = (repsValue) => ({
+    getElementById: (id) => {
+      if (id === 'structured-log') {
+        return { querySelectorAll: () => [{ value: repsValue }] };
+      }
+      if (id === 'log-day') return { value: '2' };
+      return null;
+    },
+  });
+  let rendered = [], prefilled = [];
+  G.renderWorkout = (d) => rendered.push(d);
+  G.prefillLog    = (d) => prefilled.push(d);
+
+  // No reps typed → both screens refresh
+  G.document = mkDoc('');
+  G._selectedProgramDay = 3;
+  G._refreshActiveProgramViews();
+  check('with no reps entered, the Program view re-renders',
+    rendered.length === 1, JSON.stringify(rendered));
+  check('…and the Log screen re-prefills, on the day the select now holds',
+    JSON.stringify(prefilled) === '["2"]', JSON.stringify(prefilled));
+
+  // Reps typed → the log is left alone, the program view still refreshes
+  rendered = []; prefilled = [];
+  G.document = mkDoc('8');
+  G._refreshActiveProgramViews();
+  check('mid-workout, the Program view still re-renders', rendered.length === 1);
+  check('…but the Log screen is NOT rebuilt — entered reps outrank a template refresh',
+    prefilled.length === 0, JSON.stringify(prefilled));
+
+  G.renderWorkout = _rw; G.prefillLog = _pf; G.document = _doc;
+}
+
 // ── Manual program builder (blank, no wizard) ──────────────────────────────────
 console.log('\n── Manual program builder ─────────────────────────────────');
 check('_progBuildManual defined', typeof G._progBuildManual === 'function');
