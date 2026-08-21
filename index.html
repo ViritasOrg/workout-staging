@@ -1890,50 +1890,110 @@ let _logStartedAt=null;
 // Shown on the save confirmation and on both history views. ONE function feeds all three so
 // the number on the popup and the number in History can never disagree.
 //
-// METHOD: the standard ACSM metabolic equation, kcal/min = MET x 3.5 x kg / 200, with the MET
-// value taken from the Compendium of Physical Activities entries for resistance training:
-//   02052  3.5 METs — "resistance training, multiple exercises, 8-15 reps at varied resistance"
-//   02050  6.0 METs — "resistance training, power lifting or body building, vigorous effort"
-// A session is a mix of both, so the MET is the set-weighted blend: sets prescribed in the
-// STRENGTH rep range (TAG_RANGES.strength, the app's own definition) count as the vigorous
-// entry, everything else as the moderate one. That makes a heavy 5x5 day cost more than a
-// 12-rep accessory day of the same length, which is the whole point of not using a flat figure.
+// ⚠️ NOT FROM THE CLOCK. The first version of this used session duration and the ACSM MET
+// equation. Henrik, same day: "Time cant be used for kcal calculations, I have sometimes lost
+// logs due to app restarts and had to reenter all data, in reality no workout lasts mere
+// seconds." He was right and the History screen proved it — a 15.9 t leg session stamped 0:01
+// and reported as ~6 kcal, beside a re-entered push day stamped 2:56 and reported as ~959.
+// duration_min is wall-clock between the first rep entered and Save, so a re-entry after a
+// restart records seconds and an abandoned tab records hours. It is not a measure of training.
 //
-// WHAT THIS IS NOT: it is not measured, and it is not the "afterburn" — the Compendium values
-// are steady-state activity costs, and excess post-exercise oxygen consumption is not included.
-// Individual variation at a given MET is wide. It is an estimate and the UI labels it "~".
-var KCAL_MET_MODERATE = 3.5;   // Compendium 02052
-var KCAL_MET_VIGOROUS = 6.0;   // Compendium 02050
+// SO THIS IS COMPUTED FROM THE WORK ACTUALLY DONE — load, reps and how far the load moved:
+//
+//   W = Σ (load_kg × 9.81 × ROM_m × reps)      mechanical work, per set, in joules
+//   kcal = W × (1 + ECCENTRIC) / EFFICIENCY / 4184
+//
+// ECCENTRIC: lowering the weight costs energy too, at roughly a third of the concentric cost
+// for the same force, so each rep is charged 1.33 × its lifting work.
+// EFFICIENCY: skeletal muscle converts about 20% of metabolic energy into external work; the
+// rest leaves as heat. That ratio is what turns bar work into calories burned.
+//
+// `load` is the SAME expression the volume and 1RM code already use — s.kg, plus body weight
+// for weighted pull-ups, times the gear multiplier and the bodyweight `factor` (a push-up
+// lifts 0.64 of you, a dip 0.7). Reusing it means the calorie figure and the tonnage can never
+// describe different sessions.
+//
+// WHAT IT DOES NOT INCLUDE: the resting metabolism you would have spent anyway, the cost of
+// walking between machines, setup and unracking, or grip and stabiliser work that moves no
+// load. It is the cost of the lifting itself, which is the part the log actually records.
+// Every rendering carries a "~".
+var KCAL_ECCENTRIC = 0.33;     // lowering ≈ 1/3 the metabolic cost of lifting, same force
+var KCAL_EFFICIENCY = 0.20;    // mechanical work / metabolic energy, skeletal muscle
+var KCAL_JOULES = 4184;        // J per kcal
+var KCAL_G = 9.81;             // m/s²
 
-// NO DURATION, NO NUMBER. duration_min is only recorded for sessions logged live (saveDraft
-// stamps _logStartedAt on the first rep entered), so older logs and edited ones have none.
-// Estimating a duration from the set count to fill the gap would be inventing a quantity the
-// user never recorded — the app renders nothing instead, exactly as it already does for the
-// duration itself. Returns null when it cannot answer honestly.
+// RANGE OF MOTION, metres — how far the load travels in one rep. Nominal averages for a
+// roughly 180 cm lifter, not measurements: a squat is not a calf raise and a calf raise is not
+// a deadlift, and without this a 15 kg calf raise for 20 reps would look like real work.
+// Ordered longest-key-first and matched by substring, exactly like EXERCISE_SPLITS, so
+// "Romanian Deadlift" resolves before the bare "deadlift" entry.
+var EXERCISE_ROM=[["external rotation",0.35],["leg curl",0.35],["leg extension",0.40],
+  ["leg press",0.45],["calf",0.12],["lunge",0.50],["bulgarian",0.50],["hip thrust",0.35],
+  ["hack squat",0.50],["squat",0.55],["romanian",0.45],["rdl",0.45],["deadlift",0.55],
+  ["rear delt",0.40],["lateral raise",0.50],["face pull",0.40],["y-raise",0.50],["y raise",0.50],
+  ["front raise",0.55],["upright row",0.40],["shrug",0.15],["chin-up",0.60],["chinup",0.60],
+  ["pull-up",0.60],["pullup",0.60],["lat pulldown",0.55],["pulldown",0.55],["t-bar",0.40],
+  ["barbell row",0.45],["cable row",0.50],["cable fly",0.55],["chest fly",0.55],
+  ["cable crossover",0.55],["pec",0.50],["chest machine",0.45],["incline",0.45],["decline",0.40],
+  ["chest press",0.45],["bench",0.45],["push-up",0.40],["pushup",0.40],["dip",0.45],
+  ["landmine",0.50],["overhead tricep",0.45],["overhead press",0.55],["ohp",0.55],
+  ["shoulder press",0.55],["arnold",0.55],["tricep",0.35],["pushdown",0.35],["push-down",0.35],
+  ["skullcrusher",0.40],["close grip",0.45],["preacher",0.40],["hammer",0.40],["curl",0.40],
+  ["fly",0.55],["row",0.45],["press",0.45]];
+var KCAL_ROM_DEFAULT=0.45;
+// BODY MASS THAT TRAVELS WITH THE LOAD, as a fraction of body weight. In a squat the bar is
+// not the only thing rising — torso, head, arms and part of the legs go up the same 0.55 m, and
+// for an 89 kg lifter that is another ~58 kg per rep, comparable to the bar itself. Ignoring it
+// made a barbell squat look like a leg press, which is the opposite of true.
+//
+// ZERO where the body does not travel (bench, leg press, curls, machines) and ZERO where the
+// body IS the load (push-ups, dips, pull-ups) — those already come through the kg field and the
+// `factor` split, and counting them here would charge them twice.
+var EXERCISE_BW_FRAC=[["leg curl",0],["leg extension",0],["leg press",0],["calf",0.90],
+  ["lunge",0.65],["bulgarian",0.65],["hip thrust",0.35],["hack squat",0.50],["squat",0.65],
+  ["romanian",0.30],["rdl",0.30],["deadlift",0.30],["chin-up",0],["chinup",0],["pull-up",0],
+  ["pullup",0],["push-up",0],["pushup",0],["dip",0]];
+function exerciseBwFrac(name){
+  var n=String(name||'').toLowerCase();
+  for(var i=0;i<EXERCISE_BW_FRAC.length;i++){if(n.indexOf(EXERCISE_BW_FRAC[i][0])>=0)return EXERCISE_BW_FRAC[i][1];}
+  return 0;
+}
+function exerciseRom(name){
+  var n=String(name||'').toLowerCase();
+  for(var i=0;i<EXERCISE_ROM.length;i++){if(n.indexOf(EXERCISE_ROM[i][0])>=0)return EXERCISE_ROM[i][1];}
+  return KCAL_ROM_DEFAULT;
+}
+
+// NO BODY WEIGHT, NO NUMBER for a session whose load depends on it. getBWForDate falls back to
+// 80 kg, which is fine for its own callers and wrong here: a calorie figure derived from a body
+// weight the user never entered is a fabricated number wearing the same "~" as a real estimate.
 function estimateSessionKcal(log){
-  if(!log)return null;
-  var min=log.duration_min;
-  if(min==null||!isFinite(min)||min<=0)return null;
-  // getBWForDate FALLS BACK TO 80 kg when nothing has been logged — fine for its own callers,
-  // wrong here: a calorie figure computed from a body weight the user never entered is a
-  // fabricated number wearing the same "~" as a real estimate. No weight history, no number.
-  if(typeof weights==='undefined'||!weights||!weights.length)return null;
-  var bw=(typeof getBWForDate==='function')?getBWForDate(log.date):0;
-  if(!(bw>0))return null;
-  var vig=0,mod=0;
-  (log.exercises||[]).forEach(function(ex){
+  if(!log||!log.exercises||!log.exercises.length)return null;
+  var haveW=(typeof weights!=='undefined'&&weights&&weights.length);
+  var bw=haveW?getBWForDate(log.date):0;
+  var joules=0,counted=0,needBw=false;
+  log.exercises.forEach(function(ex){
+    var sp=(typeof getExSplits==='function')?getExSplits(ex.name):{};
+    var factor=(sp&&sp.factor)||1;
+    var gear=parseFloat(ex.gear)||1;
+    var rom=exerciseRom(ex.name);
+    var isWPU=/weighted\s*(pull|chin)/i.test(ex.name||'');
+    var bwFrac=exerciseBwFrac(ex.name);
+    if(isWPU||factor!==1||bwFrac>0)needBw=true;
+    var bwAdd=isWPU?bw:0;
     (ex.sets||[]).forEach(function(st){
-      var r=parseInt(st&&st.reps,10);
-      if(!(r>0))return;
-      if(typeof TAG_RANGES!=='undefined'&&r>=TAG_RANGES.strength[0]&&r<=TAG_RANGES.strength[1])vig++;
-      else mod++;
+      var reps=parseInt(st&&st.reps,10);
+      if(!(reps>0))return;
+      // The bar, plus the part of the lifter that rises with it.
+      var load=((parseFloat(st.kg)||0)+bwAdd)*gear*factor + bwFrac*bw;
+      if(!(load>0))return;
+      joules+=load*KCAL_G*rom*reps;
+      counted++;
     });
   });
-  var total=vig+mod;
-  // A session with no completed sets has no working MET to blend; treat it as moderate rather
-  // than dividing by zero.
-  var met=total?((vig*KCAL_MET_VIGOROUS+mod*KCAL_MET_MODERATE)/total):KCAL_MET_MODERATE;
-  return Math.round(met*3.5*bw/200*min);
+  if(needBw&&!haveW)return null;
+  if(!counted||!(joules>0))return null;
+  return Math.round(joules*(1+KCAL_ECCENTRIC)/KCAL_EFFICIENCY/KCAL_JOULES);
 }
 function fmtKcal(k){return k==null?'':('~'+k.toLocaleString()+' kcal');}
 function _fmtDur(min){if(min==null||isNaN(min))return '';var h=Math.floor(min/60),m=Math.round(min%60);return h+':'+(m<10?'0':'')+m;}

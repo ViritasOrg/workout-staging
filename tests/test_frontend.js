@@ -4881,74 +4881,102 @@ console.log('\n── Injuries override the leg-day lifts ───────�
 
 
 // ── Session calorie estimate ────────────────────────────────────────────────
-// Henrik, 2026-08-21: "Add a calorie for this workout in this pop up as well in the history
-// records." One function feeds the save popup, the History list and the session detail, so the
-// three can never show different numbers for the same session.
-console.log('\n── Session calorie estimate ───────────────────────────────');
+// Henrik, 2026-08-21: "Time cant be used for kcal calculations, I have sometimes lost logs due
+// to app restarts and had to reenter all data, in reality no workout lasts mere seconds. Use
+// exercise and weights to approximate kcal spent."
+//
+// The first version used duration x MET and History proved it wrong on his own data: a 15.9 t
+// leg session stamped 0:01 reported ~6 kcal, beside a re-entered push day stamped 2:56 at ~959.
+// The estimate is now mechanical work — load, range of motion and reps — and touches
+// duration_min nowhere.
+console.log('\n── Session calorie estimate (from work, not the clock) ────');
 {
   const _savedW = G.weights;
-  G.weights = [{date:'2026-01-01', weight:92}];
-  const _r = (n,reps) => Array.from({length:n}, () => ({kg:100, reps}));
-  const mk = (dur, sets) => ({date:'2026-08-21', duration_min:dur, exercises:[{name:'X', sets}]});
+  G.weights = [{date:'2026-01-01', weight:89}];
+  const S = (n, kg, reps) => ({name:n, sets:reps.map(r => ({kg, reps:r}))});
+  const one = (n, kg, reps) => ({date:'2026-08-21', exercises:[S(n, kg, reps)]});
 
-  const heavy = G.estimateSessionKcal(mk(75, _r(12,5)));
-  const light = G.estimateSessionKcal(mk(75, _r(12,12)));
-  const mixed = G.estimateSessionKcal(mk(75, _r(6,5).concat(_r(6,12))));
+  // THE CLOCK MUST NOT MATTER. Same session, three wildly different stamped durations —
+  // including the 0:01 and 2:56 that started this — must produce the same number.
+  const _sess = ex => ({date:'2026-08-21', exercises:ex});
+  const _ex = [S('Squat',100,[5,6,8,8]), S('Leg Press',180,[12,12,12])];
+  const noDur = G.estimateSessionKcal(_sess(_ex));
+  const oneSec = G.estimateSessionKcal(Object.assign(_sess(_ex), {duration_min:0.017}));
+  const threeHr = G.estimateSessionKcal(Object.assign(_sess(_ex), {duration_min:176}));
+  check('a session with load and reps gets an estimate', noDur > 0, String(noDur));
+  check('a 0:01 stamp gives the SAME number as no stamp at all', oneSec === noDur,
+    `${oneSec} vs ${noDur}`);
+  check('  …and so does a 2:56 one', threeHr === noDur, `${threeHr} vs ${noDur}`);
+  check('the estimator never reads duration_min',
+    String(G.estimateSessionKcal).indexOf('duration_min') < 0);
 
-  check('a session with a duration gets an estimate', heavy > 0, String(heavy));
-  // ACSM: kcal/min = MET x 3.5 x kg / 200. 6.0 METs (Compendium 02050) x 3.5 x 92 / 200 x 75.
-  check('  …matching the ACSM equation at the vigorous MET',
-    heavy === Math.round(6.0 * 3.5 * 92 / 200 * 75), `${heavy} vs ${Math.round(6.0*3.5*92/200*75)}`);
-  check('  …and at the moderate MET for a 12-rep session',
-    light === Math.round(3.5 * 3.5 * 92 / 200 * 75), `${light} vs ${Math.round(3.5*3.5*92/200*75)}`);
-  check('heavy sets cost more than light ones for the same duration', heavy > light,
-    `${heavy} vs ${light}`);
-  check('a mixed session lands between the two', mixed > light && mixed < heavy,
-    `${light} < ${mixed} < ${heavy}`);
-  check('  …blended by SET COUNT, not split down the middle by exercise',
-    mixed === Math.round(((6*6.0 + 6*3.5)/12) * 3.5 * 92 / 200 * 75), String(mixed));
+  // The physics: W = load x g x ROM x reps, then eccentric and efficiency.
+  const _expect = (load, rom, reps) =>
+    Math.round(load * G.KCAL_G * rom * reps * (1 + G.KCAL_ECCENTRIC) / G.KCAL_EFFICIENCY / G.KCAL_JOULES);
+  check('a machine lift matches the work equation exactly',
+    G.estimateSessionKcal(one('Leg Press', 100, [10,10,10,10])) === _expect(100, 0.45, 40),
+    `${G.estimateSessionKcal(one('Leg Press',100,[10,10,10,10]))} vs ${_expect(100,0.45,40)}`);
+  check('  …and a barbell squat adds the body mass that rises with the bar',
+    G.estimateSessionKcal(one('Squat', 100, [10,10,10,10]))
+      === _expect(100 + 0.65 * 89, 0.55, 40));
 
-  // Duration scales it linearly — the same session logged over twice as long costs twice as
-  // much. Compared with a 1 kcal tolerance because the result is rounded once at the end:
-  // 724.5 rounds to 725, and 2 x 724.5 rounds to 1449, not 1450.
-  check('duration scales the estimate linearly',
-    Math.abs(G.estimateSessionKcal(mk(150, _r(12,5))) - heavy * 2) <= 1,
-    `${G.estimateSessionKcal(mk(150, _r(12,5)))} vs ${heavy * 2}`);
-  // Heavier lifter, same session, more energy
+  // RANGE OF MOTION IS THE POINT. Identical tonnage, very different work.
+  const sq = G.estimateSessionKcal(one('Squat', 100, [10,10,10,10]));
+  const lp = G.estimateSessionKcal(one('Leg Press', 100, [10,10,10,10]));
+  const cf = G.estimateSessionKcal(one('Calf Raises', 100, [10,10,10,10]));
+  check('same tonnage, a squat costs more than a leg press', sq > lp, `${sq} vs ${lp}`);
+  check('  …and a leg press more than a calf raise', lp > cf, `${lp} vs ${cf}`);
+  check('  …because a calf raise moves the load ~0.12 m, not 0.45',
+    G.exerciseRom('Calf Raises') === 0.12 && G.exerciseRom('Leg Press') === 0.45);
+  check('"Romanian Deadlift" resolves before the bare "deadlift" entry',
+    G.exerciseRom('Romanian Deadlift') === 0.45 && G.exerciseRom('Deadlift') === 0.55);
+  check('an unknown exercise falls back to the default ROM',
+    G.exerciseRom('Some Novel Machine') === G.KCAL_ROM_DEFAULT);
+
+  // Load and reps both scale it.
+  check('double the load, double the cost',
+    G.estimateSessionKcal(one('Leg Press', 200, [10])) === 2 * G.estimateSessionKcal(one('Leg Press', 100, [10])));
+  check('double the reps, double the cost',
+    G.estimateSessionKcal(one('Leg Press', 100, [20])) === 2 * G.estimateSessionKcal(one('Leg Press', 100, [10])));
+
+  // Body-mass fraction must not double-count the exercises whose load IS the body.
+  check('pull-ups carry no separate body-mass term — the kg field already is the body',
+    G.exerciseBwFrac('Pull-ups') === 0 && G.exerciseBwFrac('Weighted Pull-ups') === 0);
+  check('  …nor push-ups or dips', G.exerciseBwFrac('Push-ups') === 0 && G.exerciseBwFrac('Dips') === 0);
+  check('a bench press does not raise the lifter', G.exerciseBwFrac('Bench Press') === 0);
+  check('a lunge does', G.exerciseBwFrac('Lunges') === 0.65);
+
+  // A heavier lifter does more work on the lifts that move them.
   G.weights = [{date:'2026-01-01', weight:60}];
-  check('a lighter lifter burns less for the same session',
-    G.estimateSessionKcal(mk(75, _r(12,5))) < heavy);
-  G.weights = [{date:'2026-01-01', weight:92}];
+  check('a lighter lifter spends less on a squat',
+    G.estimateSessionKcal(one('Squat', 100, [10,10,10,10])) < sq);
+  check('  …but exactly the same on a leg press',
+    G.estimateSessionKcal(one('Leg Press', 100, [10,10,10,10])) === lp);
+  G.weights = [{date:'2026-01-01', weight:89}];
 
   // ── The honest-refusal cases ──────────────────────────────────────────────
-  check('no duration means NO number, not a guessed one',
-    G.estimateSessionKcal(mk(null, _r(12,5))) === null);
-  check('  …and neither does a zero or negative duration',
-    G.estimateSessionKcal(mk(0, _r(12,5))) === null &&
-    G.estimateSessionKcal(mk(-5, _r(12,5))) === null);
   G.weights = [];
-  check('no logged body weight means no number either',
-    G.estimateSessionKcal(mk(75, _r(12,5))) === null,
+  check('no logged body weight means no number for a lift that needs it',
+    G.estimateSessionKcal(one('Squat', 100, [10])) === null,
     'getBWForDate falls back to 80kg — that fallback must not reach a calorie figure');
-  G.weights = [{date:'2026-01-01', weight:92}];
-  check('a session with no completed sets still returns a number rather than NaN',
-    Number.isFinite(G.estimateSessionKcal(mk(60, [{kg:0, reps:0}]))));
-  check('  …and a log with no exercises at all does not throw',
-    Number.isFinite(G.estimateSessionKcal({date:'2026-08-21', duration_min:60})));
+  check('  …but a machine lift needs no body weight and still reports',
+    G.estimateSessionKcal(one('Leg Press', 100, [10])) > 0);
+  G.weights = [{date:'2026-01-01', weight:89}];
+  check('a log with no exercises returns null', G.estimateSessionKcal({date:'2026-08-21'}) === null);
+  check('a session of empty sets returns null, not 0 kcal',
+    G.estimateSessionKcal(one('Squat', 0, [0,0])) === null);
   check('a null log is handled', G.estimateSessionKcal(null) === null);
 
-  // Formatting: the tilde is the honesty marker — it must never be dropped.
-  check('the estimate is rendered with a ~ and a unit', G.fmtKcal(630) === '~630 kcal', G.fmtKcal(630));
+  // Formatting: the tilde is the honesty marker.
+  check('the estimate is rendered with a ~ and a unit', G.fmtKcal(126) === '~126 kcal', G.fmtKcal(126));
   check('  …and nothing at all when there is no estimate', G.fmtKcal(null) === '');
 
-  // All three surfaces call the SAME function — that is what stops them disagreeing.
-  const _src = G.saveLog ? String(G.saveLog) : '';
-  check('the save popup uses the shared estimator', _src.indexOf('estimateSessionKcal') >= 0);
+  // All three surfaces call the SAME function.
+  check('the save popup uses the shared estimator', String(G.saveLog).indexOf('estimateSessionKcal') >= 0);
   check('the History list uses it too', String(G.renderHistory).indexOf('estimateSessionKcal') >= 0);
   check('the session detail uses it too', String(G.showLogDetail).indexOf('estimateSessionKcal') >= 0);
   G.weights = _savedW;
 }
-
 
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
