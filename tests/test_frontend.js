@@ -4879,5 +4879,76 @@ console.log('\n── Injuries override the leg-day lifts ───────�
 }
 
 
+
+// ── Session calorie estimate ────────────────────────────────────────────────
+// Henrik, 2026-08-21: "Add a calorie for this workout in this pop up as well in the history
+// records." One function feeds the save popup, the History list and the session detail, so the
+// three can never show different numbers for the same session.
+console.log('\n── Session calorie estimate ───────────────────────────────');
+{
+  const _savedW = G.weights;
+  G.weights = [{date:'2026-01-01', weight:92}];
+  const _r = (n,reps) => Array.from({length:n}, () => ({kg:100, reps}));
+  const mk = (dur, sets) => ({date:'2026-08-21', duration_min:dur, exercises:[{name:'X', sets}]});
+
+  const heavy = G.estimateSessionKcal(mk(75, _r(12,5)));
+  const light = G.estimateSessionKcal(mk(75, _r(12,12)));
+  const mixed = G.estimateSessionKcal(mk(75, _r(6,5).concat(_r(6,12))));
+
+  check('a session with a duration gets an estimate', heavy > 0, String(heavy));
+  // ACSM: kcal/min = MET x 3.5 x kg / 200. 6.0 METs (Compendium 02050) x 3.5 x 92 / 200 x 75.
+  check('  …matching the ACSM equation at the vigorous MET',
+    heavy === Math.round(6.0 * 3.5 * 92 / 200 * 75), `${heavy} vs ${Math.round(6.0*3.5*92/200*75)}`);
+  check('  …and at the moderate MET for a 12-rep session',
+    light === Math.round(3.5 * 3.5 * 92 / 200 * 75), `${light} vs ${Math.round(3.5*3.5*92/200*75)}`);
+  check('heavy sets cost more than light ones for the same duration', heavy > light,
+    `${heavy} vs ${light}`);
+  check('a mixed session lands between the two', mixed > light && mixed < heavy,
+    `${light} < ${mixed} < ${heavy}`);
+  check('  …blended by SET COUNT, not split down the middle by exercise',
+    mixed === Math.round(((6*6.0 + 6*3.5)/12) * 3.5 * 92 / 200 * 75), String(mixed));
+
+  // Duration scales it linearly — the same session logged over twice as long costs twice as
+  // much. Compared with a 1 kcal tolerance because the result is rounded once at the end:
+  // 724.5 rounds to 725, and 2 x 724.5 rounds to 1449, not 1450.
+  check('duration scales the estimate linearly',
+    Math.abs(G.estimateSessionKcal(mk(150, _r(12,5))) - heavy * 2) <= 1,
+    `${G.estimateSessionKcal(mk(150, _r(12,5)))} vs ${heavy * 2}`);
+  // Heavier lifter, same session, more energy
+  G.weights = [{date:'2026-01-01', weight:60}];
+  check('a lighter lifter burns less for the same session',
+    G.estimateSessionKcal(mk(75, _r(12,5))) < heavy);
+  G.weights = [{date:'2026-01-01', weight:92}];
+
+  // ── The honest-refusal cases ──────────────────────────────────────────────
+  check('no duration means NO number, not a guessed one',
+    G.estimateSessionKcal(mk(null, _r(12,5))) === null);
+  check('  …and neither does a zero or negative duration',
+    G.estimateSessionKcal(mk(0, _r(12,5))) === null &&
+    G.estimateSessionKcal(mk(-5, _r(12,5))) === null);
+  G.weights = [];
+  check('no logged body weight means no number either',
+    G.estimateSessionKcal(mk(75, _r(12,5))) === null,
+    'getBWForDate falls back to 80kg — that fallback must not reach a calorie figure');
+  G.weights = [{date:'2026-01-01', weight:92}];
+  check('a session with no completed sets still returns a number rather than NaN',
+    Number.isFinite(G.estimateSessionKcal(mk(60, [{kg:0, reps:0}]))));
+  check('  …and a log with no exercises at all does not throw',
+    Number.isFinite(G.estimateSessionKcal({date:'2026-08-21', duration_min:60})));
+  check('a null log is handled', G.estimateSessionKcal(null) === null);
+
+  // Formatting: the tilde is the honesty marker — it must never be dropped.
+  check('the estimate is rendered with a ~ and a unit', G.fmtKcal(630) === '~630 kcal', G.fmtKcal(630));
+  check('  …and nothing at all when there is no estimate', G.fmtKcal(null) === '');
+
+  // All three surfaces call the SAME function — that is what stops them disagreeing.
+  const _src = G.saveLog ? String(G.saveLog) : '';
+  check('the save popup uses the shared estimator', _src.indexOf('estimateSessionKcal') >= 0);
+  check('the History list uses it too', String(G.renderHistory).indexOf('estimateSessionKcal') >= 0);
+  check('the session detail uses it too', String(G.showLogDetail).indexOf('estimateSessionKcal') >= 0);
+  G.weights = _savedW;
+}
+
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
