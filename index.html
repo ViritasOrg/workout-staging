@@ -726,6 +726,228 @@ function selectDay(num,el){document.querySelectorAll('.day-card').forEach(c=>c.c
 // permitted above 12.
 var TAG_RANGES={strength:[2,6],volume:[8,12],rehab:[15,15]};
 var REPS_LEGAL=[2,3,4,5,6,8,9,10,11,12,15];
+// ── LEG-DAY RULE (Henrik, 2026-08-21) ────────────────────────────────────────
+// "every version of leg day MUST start with min 3 sets of squats in strenght rep range.
+//  And every leg day must end with 1-3 sets if strenght rep range deadlifts. No exceptions"
+//
+// SUPERSEDES the 2026-07-10 alternation, which made each leg day EITHER a squat day OR a
+// deadlift day on a systemic-load argument. Henrik has overruled that repeatedly. Gone.
+//
+// "min 3 sets" is a FLOOR, not a fixed count — the squat stays target-sized by the allocator
+// (rule 2026-07-31) and is only ever raised to 3, never pinned there. The deadlift is the
+// fixed prescription it already was, now clamped to the 1-3 window.
+//
+// Rep counts live inside TAG_RANGES.strength so applyTagFromReps confirms the tag rather than
+// flipping it. An entry already prescribing strength-range reps KEEPS them: a goal-specific
+// 5×5 or a 1×6 finisher already complies, and rewriting it would be churn.
+var LEGDAY_SQUAT_MIN_SETS=3;      // "min 3 sets of squats"
+var LEGDAY_DL_MIN_SETS=1;         // "1-3 sets ... deadlifts"
+var LEGDAY_DL_MAX_SETS=3;
+var LEGDAY_STRENGTH_REPS=5;       // used only when authoring fresh, or repairing illegal reps
+
+// The opening squat: any squat pattern EXCEPT the ones that are not the movement being asked
+// for. Split squats and Bulgarians are unilateral accessories; hack/Smith/pendulum are machines.
+// A day carrying only those still gets a real Squat inserted ahead of them.
+function _isMainSquat(name){
+  var n=String(name||'');
+  if(!/squat/i.test(n))return false;
+  return !/split|bulgarian|sissy|goblet|hack|smith|pendulum|belt/i.test(n);
+}
+// The closing deadlift: the conventional pull only. A Romanian/stiff-leg deadlift is a hamstring
+// accessory, not the strength lift being asked for, and counting it as one is how a leg day
+// could "end with a deadlift" while never programming the lift.
+function _isMainDeadlift(name){
+  var n=String(name||'');
+  if(!/deadlift/i.test(n))return false;
+  return !/romanian|\brdl\b|stiff|straight[- ]?leg|deficit|snatch|trap[- ]?bar|smith|single/i.test(n);
+}
+function _legdayRepsOk(sets){
+  var parts=String(sets||'').split('-').filter(Boolean);
+  if(!parts.length)return false;
+  return parts.every(function(r){
+    var n=parseInt(r,10);
+    return isFinite(n)&&n>=TAG_RANGES.strength[0]&&n<=TAG_RANGES.strength[1];
+  });
+}
+function _legdaySetCount(ex){return String((ex&&ex.sets)||'').split('-').filter(Boolean).length;}
+
+// IS THIS A LEG DAY? DECIDED BY CONTENT, NOT BY NAME.
+//
+// The previous rule tested /legs/i against the day NAME and therefore skipped "Lower Strength",
+// "Lower Volume", "Lower A/B", "Lower Push", "Lower Pull", "Heavy Squat", "Squat Volume",
+// "Deadlift", "Quad & Glute", "Glute & Hamstring" and "Glute Specialization" — every one of
+// them a leg day the generator authors. That is the single biggest reason this kept looking
+// unimplemented: on most generated programs the rule never ran at all.
+//
+// Content cannot be spelled wrong. A day is a leg day when legs are what it trains: at least
+// half its exercises are leg movements. The name survives only as a tiebreak for a day whose
+// exercises cannot be classified.
+//
+// FULL-BODY days are excluded by design (rule 2026-07-24): they rotate ONE main lower lift per
+// session, and applying this rule would turn every session into a leg session.
+function _isLegDay(day){
+  if(!day)return false;
+  var nm=String(day.name||'');
+  if(/full\s*body|full\s*light|—\s*full\s*$/i.test(nm))return false;
+  var exs=day.exercises||[];
+  if(!exs.length)return false;
+  // SHARE OF VOLUME, not a count of exercises. Counting exercises called a strength
+  // program's "Day 3 — Deadlift" a leg day: one deadlift beside a Barbell Row, Pull-ups and a
+  // Lat Pulldown is a posterior-chain and BACK session, and injecting a squat at the front of
+  // it added leg volume to a day that was never a leg day. getExSplits already knows a
+  // Deadlift is 0.6 legs / 0.4 back — weighting by that and by set count answers the question
+  // the name cannot.
+  var legVol=0,totVol=0;
+  exs.forEach(function(ex){
+    var sp=(typeof getExSplits==='function')?getExSplits(ex.name):{};
+    var n=String(ex.sets||'').split('-').filter(Boolean).length||1;
+    ['legs','back','chest','shoulders','arms'].forEach(function(g){
+      var f=sp[g]||0;if(!f)return;
+      totVol+=n*f;
+      if(g==='legs')legVol+=n*f;
+    });
+  });
+  // Legs must DOMINATE. The threshold is 0.6, not a bare majority: an accessory day carrying
+  // a Leg Curl and Calf Raises beside Lateral Raises lands at ~0.55 and is NOT a leg day,
+  // while every real leg day the generator authors sits at 0.85-0.95. A bare majority put
+  // squats on the accessory day at high set targets and nowhere near it at low ones — the
+  // same program disagreeing with itself depending on volume.
+  if(totVol>0)return legVol/totVol>0.6;
+  // Only when nothing in the day can be classified does the name get a vote. Deliberately
+  // without `squat`/`deadlift`: those name a LIFT, and a day named after one is not
+  // necessarily a leg day — which is the exact mistake above.
+  return /\blegs?\b|\blower\b|\bquad|\bglute|\bhamstring|\bcalf/i.test(nm);
+}
+
+// THE SLOT IS MANDATORY; THE MOVEMENT IN IT IS NOT.
+//
+// Injury substitution runs before the final re-assert, so a rule that re-injected a raw
+// 'Squat' afterwards would put squats back into a knees-injury program and deadlifts back into
+// a lower-back one — undoing the only safety layer the generator has. Both entry points route
+// the lift name through REHAB_CONDITIONS first, so a knees injury opens the day with Leg Press
+// and a lower-back injury closes it with Leg Press. Henrik's rule decides the SLOT and the set
+// count; the injury layer decides what is safe to put in it.
+function _legdaySafeName(name,injuries){
+  if(!injuries||!injuries.length)return name;
+  if(typeof REHAB_CONDITIONS==='undefined')return name;
+  var out=name;
+  injuries.forEach(function(cid){
+    var c=REHAB_CONDITIONS.find(function(x){return x.id===cid;});
+    if(c&&out&&c.detect(out))out=c.suggest(out);
+  });
+  return out;
+}
+
+// Place both lifts and author their prescriptions. Idempotent: running it twice leaves the same
+// single squat at the front and the same single deadlift at the back.
+//
+// REHAB PROGRAMS ARE EXCLUDED. A rehab program exists because something is injured, and the
+// pre-existing rule "no heavy deadlift forced into rehab days" is explicit about it. Forcing a
+// heavy squat and deadlift into a Knee Rehab or Hip Hinge Rehab session would work against the
+// only thing that session is for. Everything else — every goal, every split, every day name —
+// gets the rule with no exception.
+// A knees injury blocks the squat but not the deadlift: the day still has to END with one.
+function _legdayDeadliftOnly(day,exs,pw,injuries){
+  var dl=null;
+  for(var j=exs.length-1;j>=0;j--){ if(_isMainDeadlift(exs[j].name)){ dl=exs.splice(j,1)[0]; } }
+  if(!dl)dl=(pw?pw:function(n,s,t,r,k){return{name:n,scheme:s,tag:t,sets:r,kg:k};})(
+    _legdaySafeName('Deadlift',injuries),'','strength','',120);
+  var n=Math.min(LEGDAY_DL_MAX_SETS,Math.max(LEGDAY_DL_MIN_SETS,
+        String(dl.sets||'').split('-').filter(Boolean).length||2));
+  var r=_legdayRepsOk(dl.sets)?String(dl.sets).split('-')[0]:LEGDAY_STRENGTH_REPS;
+  var out=[];for(var i=0;i<n;i++)out.push(r);
+  dl.sets=out.join('-');dl.tag='strength';dl.fixed=true;dl.scheme=n+'×'+r;
+  if(!(parseFloat(dl.kg)>0))dl.kg=120;
+  exs.push(dl);
+  return day;
+}
+
+function _applyLegDayRule(day,pw,goal,injuries){
+  if(goal==='rehab')return day;
+  if(!_isLegDay(day))return day;
+  var exs=day.exercises||(day.exercises=[]);
+  function _mk(n,s,t,r,k){return pw?pw(n,s,t,r,k):{name:n,scheme:s,tag:t,sets:r,kg:k};}
+  function _reps(n){var out=[];for(var i=0;i<n;i++)out.push(LEGDAY_STRENGTH_REPS);return out.join('-');}
+
+  // ── Squat first, at least 3 sets ──────────────────────────────────────────
+  // Deliberately NOT `fixed`: "min 3 sets" is a floor. The allocator still sizes it to the
+  // weekly target (rule 2026-07-31) and _enforceLegDayFloor raises it afterwards if the
+  // allocation came in under 3.
+  // When an injury substitutes the squat away there is no squat to hoist and none to insert;
+  // the day keeps whatever the injury layer chose and this half of the rule stands down.
+  var _sqBlocked=_legdaySafeName('Squat',injuries)!=='Squat';
+  var _dlBlocked=_legdaySafeName('Deadlift',injuries)!=='Deadlift';
+  var sq=null;
+  for(var i=exs.length-1;i>=0;i--){ if(_isMainSquat(exs[i].name)){ sq=exs.splice(i,1)[0]; } }
+  if(_sqBlocked&&!sq){ if(!_dlBlocked)_legdayDeadliftOnly(day,exs,pw,injuries); return day; }
+  if(!sq)sq=_mk(_legdaySafeName('Squat',injuries),'','strength',_reps(LEGDAY_SQUAT_MIN_SETS),100);
+  var sqSets=Math.max(LEGDAY_SQUAT_MIN_SETS,_legdaySetCount(sq));
+  if(!_legdayRepsOk(sq.sets))sq.sets=_reps(sqSets);
+  else if(_legdaySetCount(sq)<LEGDAY_SQUAT_MIN_SETS){
+    var _sp=String(sq.sets).split('-').filter(Boolean);
+    while(_sp.length<LEGDAY_SQUAT_MIN_SETS)_sp.push(_sp[_sp.length-1]);
+    sq.sets=_sp.join('-');
+  }
+  sq.tag='strength';
+  sq.scheme=_legdaySetCount(sq)+'×'+String(sq.sets).split('-')[0];
+  if(!(parseFloat(sq.kg)>0))sq.kg=100;
+  exs.unshift(sq);
+
+  // ── Deadlift last, 1-3 sets ───────────────────────────────────────────────
+  // `fixed:true` is load-bearing, not decoration: it is honoured by the volume allocator, the
+  // 25-set session ceiling trim, the balance guardrail and the setsPerMuscle scaling. Without
+  // it the finisher gets resized out of the 1-3 window Henrik specified.
+  if(_dlBlocked){ return day; }
+  var dl=null;
+  for(var j=exs.length-1;j>=0;j--){ if(_isMainDeadlift(exs[j].name)){ dl=exs.splice(j,1)[0]; } }
+  if(!dl)dl=_mk(_legdaySafeName('Deadlift',injuries),'','strength','',Math.round((parseFloat(sq.kg)||100)*1.2));
+  var dlSets=Math.min(LEGDAY_DL_MAX_SETS,Math.max(LEGDAY_DL_MIN_SETS,_legdaySetCount(dl)||2));
+  if(!_legdayRepsOk(dl.sets)||_legdaySetCount(dl)!==dlSets){
+    var _dr=_legdayRepsOk(dl.sets)?String(dl.sets).split('-')[0]:LEGDAY_STRENGTH_REPS;
+    var _out=[];for(var k=0;k<dlSets;k++)_out.push(_dr);
+    dl.sets=_out.join('-');
+  }
+  dl.tag='strength';
+  dl.fixed=true;
+  dl.scheme=dlSets+'×'+String(dl.sets).split('-')[0];
+  if(!(parseFloat(dl.kg)>0))dl.kg=Math.round((parseFloat(sq.kg)||100)*1.2);
+  exs.push(dl);
+
+  return day;
+}
+
+// Runs AFTER allocation, the ceiling trim, the balance guardrail, injury swaps and every other
+// structural pass — all of which can resize or reorder entries. Re-asserting here is what makes
+// the rule hold in the finished program rather than only at the moment it was applied.
+function _enforceLegDayFloor(day,goal,pw,injuries){
+  if(goal==='rehab')return day;
+  if(!_isLegDay(day))return day;
+  var exs=day.exercises||[];
+  // A day can CROSS the leg-dominance threshold during allocation — trim the upper work and
+  // what was an accessory day is suddenly leg-dominant. Re-running the rule (it is idempotent)
+  // is what stops a finished leg day from carrying neither lift.
+  var _hasSq=exs.some(function(e){return _isMainSquat(e.name);});
+  var _hasDl=exs.some(function(e){return _isMainDeadlift(e.name);});
+  if(!_hasSq||!_hasDl){_applyLegDayRule(day,pw,goal,injuries);exs=day.exercises||[];}
+  var si=-1,di=-1;
+  for(var i=0;i<exs.length;i++){
+    if(si<0&&_isMainSquat(exs[i].name))si=i;
+    if(_isMainDeadlift(exs[i].name))di=i;
+  }
+  if(si>=0){
+    var sq=exs[si];
+    var parts=String(sq.sets||'').split('-').filter(Boolean);
+    if(!_legdayRepsOk(sq.sets)){parts=[];for(var a=0;a<LEGDAY_SQUAT_MIN_SETS;a++)parts.push(LEGDAY_STRENGTH_REPS);}
+    while(parts.length<LEGDAY_SQUAT_MIN_SETS)parts.push(parts[parts.length-1]||LEGDAY_STRENGTH_REPS);
+    sq.sets=parts.join('-');
+    sq.tag='strength';
+    sq.scheme=parts.length+'×'+parts[0];
+    if(si>0)exs.unshift(exs.splice(si,1)[0]);
+  }
+  for(var j=0;j<exs.length;j++){if(_isMainDeadlift(exs[j].name)){di=j;break;}}
+  if(di>=0&&di!==exs.length-1)exs.push(exs.splice(di,1)[0]);
+  return day;
+}
 function tagForReps(r){
   var n=parseInt(r,10);
   if(!isFinite(n)||String(r).trim()==='')return null; // 'max' / AMRAP keeps whatever it had
@@ -1417,25 +1639,41 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
       var _seen={};day.exercises=(day.exercises||[]).filter(function(ex){if(_seen[ex.name])return false;_seen[ex.name]=1;return true;});
     });
   }
-  // Leg-day rules (2026-07-10): each Legs* day is EITHER a Squat day (Squat first, no
-  // conventional Deadlift) OR a Deadlift day (Deadlift last, 5-8 reps, no squat variants) —
-  // never both in one session (systemic load). Alternates, starting with a Squat day.
-  var _legIdx=0;
-  pool.forEach(function(day){if(!/legs/i.test(day.name))return;var exs=day.exercises;var _isSq=function(ex){return /squat/i.test(ex.name)&&!/split/i.test(ex.name);};
-    if(_legIdx++%2===0){
-      for(var _r1=exs.length-1;_r1>=0;_r1--){if(exs[_r1].name==='Deadlift')exs.splice(_r1,1);}
-      var si=-1;for(var _i2=0;_i2<exs.length;_i2++){if(_isSq(exs[_i2])){si=_i2;break;}}
-      if(si>0){exs.unshift(exs.splice(si,1)[0]);}else if(si<0){exs.unshift(pw('Squat','4×8-12','strength','8-8-8-8',80));}
-    }else{
-      for(var _r2=exs.length-1;_r2>=0;_r2--){if(_isSq(exs[_r2]))exs.splice(_r2,1);}
-      var dli=-1;for(var _j2=0;_j2<exs.length;_j2++){if(exs[_j2].name==='Deadlift'){dli=_j2;break;}}
-      var dlx;if(dli>=0){dlx=exs.splice(dli,1)[0];}else{dlx=pw('Deadlift','1×5-8','strength','6',Math.round(((exs[0]||{}).kg||80)*1.5));}
-      // The heavy Deadlift is a fixed prescription (2026-07-31): it is always present and keeps
-      // exactly the sets it was authored with. `fixed` exempts it from the volume allocator, the
-      // linear strength scaling, the 25-set ceiling trim and the balance guardrail — its sets are
-      // still counted as real volume, so everything else in the session is sized around it.
-      dlx.tag='strength';dlx.fixed=true;dlx.scheme=String(dlx.sets).split('-').length+'×5-8';exs.push(dlx);
-    }});
+  // ── LEG-DAY RULE (Henrik, 2026-08-21) — SUPERSEDES THE 2026-07-10 ALTERNATION ─────
+  // "every version of leg day MUST start with min 3 sets of squats in strenght rep range.
+  //  And every leg day must end with 1-3 sets if strenght rep range deadlifts. No exceptions"
+  //
+  // EVERY leg day now gets BOTH. The old rule made each Legs* day EITHER a squat day OR a
+  // deadlift day, alternating, on a systemic-load argument. That is the rule Henrik has
+  // overruled repeatedly; it is gone, not softened.
+  //
+  // Three separate reasons the old rule kept failing to deliver what he asked for, all fixed
+  // here — the alternation was only the most visible one:
+  //
+  //  1. IT ONLY MATCHED /legs/i. The generator authors leg days under many names: "Lower
+  //     Strength", "Lower Volume", "Lower A/B", "Lower Push", "Lower Pull", "Heavy Squat",
+  //     "Squat Volume", "Deadlift", "Quad & Glute", "Glute & Hamstring", "Glute
+  //     Specialization", "Knee Rehab", "Hip Hinge Rehab". NONE of those contain "legs", so the
+  //     rule skipped them silently and most generated programs never had it applied at all.
+  //     _isLegDay now decides by CONTENT — what the day actually trains — with the name only
+  //     as a tiebreak, so a new day name can never opt out of the rule again.
+  //  2. THE SQUAT WAS NOT FIXED. Even when injected it was left resizable, so the volume
+  //     allocator, the 25-set ceiling trim and the balance guardrail could all cut it back
+  //     below 3 sets. Both lifts are `fixed:true` now — that flag is honoured by every one of
+  //     those passes plus the setsPerMuscle scaling.
+  //  3. THE REPS WERE WRONG. The injected squat was authored '8-8-8-8' — tagged `strength`
+  //     while prescribing the VOLUME range. Both lifts are now written at LEGDAY_STRENGTH_REPS,
+  //     inside TAG_RANGES.strength, so applyTagFromReps confirms the tag instead of flipping it.
+  //
+  // Full-body days are NOT leg days: they deliberately rotate ONE main lower lift per session
+  // (rule 2026-07-24), and forcing squat+deadlift into all of them would make every session a
+  // leg session. If Henrik wants that too it is a one-line change to _isLegDay.
+  //
+  // Injury substitution runs AFTER this and still applies: a knees injury turns the opening
+  // Squat into Leg Press, a lower-back injury turns the closing Deadlift into Leg Press. That
+  // is the existing, deliberate safety layer — this rule sets the slot, the injury layer
+  // decides what is safe to put in it.
+  pool.forEach(function(day){ _applyLegDayRule(day, pw, goal, injuries); });
   var days=pool.slice(0,nDays).map(function(day,i){return Object.assign({},day,{name:'Day '+(i+1)+' — '+day.name.replace(/^Day \d+ — /,'')});});
   // Injuries (2026-07-10): substitutions are baked into the program permanently — the
   // aggravating exercise is replaced before allocation so volume redistributes correctly
@@ -1606,6 +1844,13 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries){
     var _pi=-1;for(var _i=0;_i<exs.length;_i++){if(isPullUpEx(exs[_i].name)){_pi=_i;break;}}
     if(_pi>0)exs.unshift(exs.splice(_pi,1)[0]);
   });
+  // LEG-DAY RULE, RE-ASSERTED (2026-08-21). Applying it once before allocation was not enough:
+  // the allocator, the 25-set ceiling trim, the balance guardrail, injury swaps, the Face Pull
+  // relocation and the pull-up hoist all resize or reorder entries afterwards, any of which
+  // could drop the squat under 3 sets or move a lift out of its slot. This pass runs last, so
+  // "squat first, min 3 sets / deadlift last, 1-3 sets" describes the program the user is
+  // actually handed rather than an intermediate state.
+  days.forEach(function(day){ _enforceLegDayFloor(day,goal,pw,injuries); });
   // Automatic tagging, last word: snap every prescription onto a rep count some range defines,
   // then label it from that count. Runs after allocation so the scheme's set prefix is already
   // final, and after the leg-day rule, which re-authors the heavy Deadlift's scheme.
