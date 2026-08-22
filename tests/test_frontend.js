@@ -5150,5 +5150,162 @@ console.log('\n── Swap keeps completed sets / blank-exercise save guard ─�
   }
 }
 
+// ── Section: history prefill (last logged set) + custom card position ────────
+// A card picked mid-workout starts on the weight from the LAST set actually logged
+// for that exercise, and a swapped-in / added exercise stays where it was put when
+// the draft is restored.
+console.log('\n── Prefill from last logged set / draft card position ──────');
+{
+  const _savedLogs = G.logs;
+  const _savedDeload = G._deloadActive;
+  const _savedUnit = G.localStorage.getItem('wkt-unit');
+
+  // getLastKgFromLogs — the last working set, not the heaviest
+  G.logs = [
+    { date: '2026-08-20', exercises: [
+      { name: 'Bench Press', sets: [{kg:60,reps:12},{kg:80,reps:8},{kg:70,reps:10}] },
+      { name: 'Pull-ups',    sets: [{kg:0,reps:10},{kg:0,reps:8}] },
+      { name: 'Weighted Pull-ups', sets: [{kg:10,reps:8},{kg:15,reps:5}] },
+      { name: 'Warmup Only', sets: [{kg:40,reps:0}] },
+    ]},
+    { date: '2026-08-13', exercises: [{ name: 'Bench Press', sets: [{kg:100,reps:3}] }] },
+  ];
+  check('getLastKgFromLogs defined', typeof G.getLastKgFromLogs === 'function');
+  check('getLastKgFromLogs returns the last logged set, not the heaviest',
+    G.getLastKgFromLogs('Bench Press') === 70, `got ${G.getLastKgFromLogs('Bench Press')}`);
+  check('getBestKgFromLogs still returns the heaviest (unchanged)',
+    G.getBestKgFromLogs('Bench Press') === 80, `got ${G.getBestKgFromLogs('Bench Press')}`);
+  check('getLastKgFromLogs reads the most recent session first',
+    G.getLastKgFromLogs('Bench Press') !== 100);
+  check('getLastKgFromLogs skips a set that was never performed (reps 0)',
+    G.getLastKgFromLogs('Warmup Only') === null);
+  check('getLastKgFromLogs on a pure bodyweight lift → null', G.getLastKgFromLogs('Pull-ups') === null);
+  check('getLastKgFromLogs on Weighted Pull-ups returns the added weight',
+    G.getLastKgFromLogs('Weighted Pull-ups') === 15);
+  check('getLastKgFromLogs on an unknown exercise → null', G.getLastKgFromLogs('Unknown XYZ') === null);
+  {
+    const _l = G.logs; G.logs = [];
+    check('getLastKgFromLogs with no logs → null', G.getLastKgFromLogs('Bench Press') === null);
+    G.logs = [{ date: '2026-08-20', notes: 'no exercises key' }];
+    check('getLastKgFromLogs tolerates a notes-only log', G.getLastKgFromLogs('Bench Press') === null);
+    G.logs = _l;
+  }
+
+  // _prefillKgFromHistory / _clearAutoPrefill
+  const mkKgCard = vals => {
+    const inputs = vals.map(v => ({ value: v, dataset: { type: 'kg' } }));
+    return { dataset: {}, _inputs: inputs, querySelectorAll: sel => (sel.includes('kg') ? inputs : []) };
+  };
+  {
+    const card = mkKgCard(['', '', '']);
+    G._prefillKgFromHistory(card, 'Bench Press');
+    check('_prefillKgFromHistory fills every empty kg box with the last logged weight',
+      card._inputs.every(i => i.value === '70'), JSON.stringify(card._inputs.map(i => i.value)));
+    check('_prefillKgFromHistory records what it filled in, so a re-pick can clear it',
+      card.dataset.prefillKg === '70', String(card.dataset.prefillKg));
+  }
+  {
+    const card = mkKgCard(['85', '']);
+    G._prefillKgFromHistory(card, 'Bench Press');
+    check('_prefillKgFromHistory never overwrites a weight the user typed',
+      card._inputs[0].value === '85' && card._inputs[1].value === '70');
+  }
+  {
+    const card = mkKgCard(['', '']);
+    G._prefillKgFromHistory(card, 'Pull-ups');
+    check('_prefillKgFromHistory leaves a bodyweight lift to the body-weight prefill',
+      card._inputs.every(i => i.value === '') && card.dataset.prefillKg === undefined);
+  }
+  {
+    const card = mkKgCard(['', '']);
+    G._prefillKgFromHistory(card, 'Never Done This');
+    check('_prefillKgFromHistory does nothing when the exercise has no history',
+      card._inputs.every(i => i.value === ''));
+  }
+  {
+    G._deloadActive = true;
+    const card = mkKgCard(['']);
+    G._prefillKgFromHistory(card, 'Bench Press');
+    check('_prefillKgFromHistory deloads the prefill when a deload is active',
+      card._inputs[0].value === String(G.roundBarbellKg(G._deloadKg(70))), card._inputs[0].value);
+    check('  …and rounds a barbell lift to a loadable weight',
+      G.roundBarbellKg(G._deloadKg(70)) === 45, String(G.roundBarbellKg(G._deloadKg(70))));
+    G._deloadActive = _savedDeload;
+  }
+  {
+    const card = mkKgCard(['70', '90']);
+    card.dataset.prefillKg = '70';
+    G._clearAutoPrefill(card);
+    check('_clearAutoPrefill clears only the boxes still holding the auto value',
+      card._inputs[0].value === '' && card._inputs[1].value === '90');
+    check('_clearAutoPrefill forgets the prefill marker', card.dataset.prefillKg === undefined);
+    const untouched = mkKgCard(['80']);
+    G._clearAutoPrefill(untouched);
+    check('_clearAutoPrefill is a no-op on a card that was never prefilled',
+      untouched._inputs[0].value === '80');
+  }
+
+  // Wiring: both ways of putting an exercise on a card get the prefill
+  {
+    const fn = String(G.onCustomExPicked || '');
+    check('onCustomExPicked prefills the picked exercise from history',
+      fn.includes('_prefillKgFromHistory(card,sel.value)'));
+    check('onCustomExPicked drops the previous auto-prefill before re-picking',
+      fn.indexOf('_clearAutoPrefill') < fn.indexOf('_prefillKgFromHistory'));
+    check('onCustomExPicked still refreshes the gear buttons',
+      fn.includes('_refreshCardGearBtns(card,sel.value)'));
+  }
+  {
+    const fn = String(G.swapExercise || '');
+    check('a rename-in-place swap prefills the new exercise too',
+      fn.includes('_prefillKgFromHistory(card,this.value)'));
+    check('…still after the old load is cleared, never before',
+      fn.indexOf('_swapResetWeights') < fn.indexOf('_prefillKgFromHistory'));
+  }
+
+  // Draft: a custom card keeps its position
+  {
+    const sd = String(G.saveDraft || '');
+    check('saveDraft records where each custom card sits', sd.includes('cd.pos=_pos'));
+    check('saveDraft indexes the custom card against ALL cards, not just the custom ones',
+      sd.includes("_allCards=Array.prototype.slice.call(c.querySelectorAll('.ex-card'))"));
+    const rd = String(G.restoreDraft || '');
+    check('restoreDraft puts each custom card back at its saved index',
+      rd.includes('_restoreCustomCardPos(c,card,cx.pos)'));
+  }
+  {
+    const mkNode = id => ({ id });
+    const mkContainer = nodes => ({
+      _nodes: nodes,
+      querySelectorAll: sel => (sel === '.ex-card' ? container._nodes : []),
+      insertBefore(node, ref) {
+        const cur = container._nodes.indexOf(node);
+        if (cur >= 0) container._nodes.splice(cur, 1);
+        const at = container._nodes.indexOf(ref);
+        container._nodes.splice(at < 0 ? container._nodes.length : at, 0, node);
+      },
+    });
+    const a = mkNode('tpl-a'), b = mkNode('tpl-b'), c3 = mkNode('tpl-c'), swapped = mkNode('swapped');
+    var container = mkContainer([a, b, c3, swapped]);
+    G._restoreCustomCardPos(container, swapped, 1);
+    check('_restoreCustomCardPos moves the card from the bottom back to its slot',
+      container._nodes.map(n => n.id).join(',') === 'tpl-a,swapped,tpl-b,tpl-c',
+      container._nodes.map(n => n.id).join(','));
+    const tail = mkNode('tail');
+    container = mkContainer([a, b, tail]);
+    G._restoreCustomCardPos(container, tail, 9);
+    check('_restoreCustomCardPos leaves the card at the end when its index is past the list',
+      container._nodes.map(n => n.id).join(',') === 'tpl-a,tpl-b,tail');
+    container = mkContainer([a, b, tail]);
+    G._restoreCustomCardPos(container, tail, undefined);
+    check('_restoreCustomCardPos leaves an older draft (no saved position) alone',
+      container._nodes.map(n => n.id).join(',') === 'tpl-a,tpl-b,tail');
+  }
+
+  G.logs = _savedLogs;
+  G._deloadActive = _savedDeload;
+  if (_savedUnit === null) G.localStorage.removeItem('wkt-unit'); else G.localStorage.setItem('wkt-unit', _savedUnit);
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
