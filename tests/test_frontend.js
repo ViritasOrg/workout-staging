@@ -5013,5 +5013,142 @@ console.log('\n── Session calorie estimate (from work, not the clock) ──
   G.weights = _savedW;
 }
 
+// ── Section: mid-workout exercise change + blank-exercise save guard ─────────
+// Swapping an exercise that already has completed sets must keep those sets on the
+// exercise that was actually performed, and put the replacement in its own card
+// directly underneath. Saving with an exercise left blank must ask first.
+console.log('\n── Swap keeps completed sets / blank-exercise save guard ───');
+{
+  const mkInput = v => ({ value: v, dataset: { type: 'reps' }, _focused: false, focus() { this._focused = true; } });
+  const mkCol = (reps, label) => {
+    const inp = mkInput(reps);
+    const col = {
+      _inp: inp,
+      firstElementChild: { textContent: label },
+      querySelector: sel => (sel.includes('reps') ? inp : null),
+      remove() { const i = col._parent.children.indexOf(col); if (i >= 0) col._parent.children.splice(i, 1); },
+      _parent: null,
+    };
+    return col;
+  };
+  const mkCard = (repsArr, ds) => {
+    const cols = repsArr.map((r, i) => mkCol(r, 'S' + (i + 1)));
+    const sr = { children: cols };
+    cols.forEach(c => { c._parent = sr; });
+    const card = {
+      dataset: ds || {},
+      _sr: sr,
+      _scrolled: false,
+      scrollIntoView() { card._scrolled = true; },
+      querySelector(sel) {
+        if (sel === '.sets-row') return sr;
+        if (sel.includes('custom-name')) return card._nameSel || null;
+        if (sel.includes('reps')) return sr.children.length ? sr.children[0]._inp : null;
+        if (sel.includes('data-ex-name')) return card._nameEl || null;
+        return null;
+      },
+    };
+    return card;
+  };
+
+  // _exCardName — where a card's name comes from
+  check('_exCardName reads the template name',
+    G._exCardName(mkCard(['', ''], { tplName: 'Squat' })) === 'Squat');
+  check('_exCardName prefers the swapped name over the template name',
+    G._exCardName(mkCard([''], { tplName: 'Squat', swappedName: 'Leg Press' })) === 'Leg Press');
+  {
+    const cc = mkCard(['', '', '']);
+    cc.dataset.custom = 'true';
+    cc._nameSel = { value: ' Lat Pulldown ' };
+    check('_exCardName reads a custom card from its picker', G._exCardName(cc) === 'Lat Pulldown');
+    cc._nameSel = { value: '' };
+    check('_exCardName returns "" for a custom card with nothing picked yet', G._exCardName(cc) === '');
+  }
+  check('_exCardName is a no-op on null', G._exCardName(null) === '');
+
+  // _cardHasCompletedSets — a set counts only when reps > 0
+  check('a card with a filled rep box has completed sets',
+    G._cardHasCompletedSets(mkCard(['8', '', ''], { tplName: 'Squat' })) === true);
+  check('a card with only blank rep boxes has none',
+    G._cardHasCompletedSets(mkCard(['', '', ''], { tplName: 'Squat' })) === false);
+  check('reps of 0 is not a completed set',
+    G._cardHasCompletedSets(mkCard(['0', '0'], { tplName: 'Squat' })) === false);
+
+  // _trimEmptySets — the swapped-from card keeps exactly what was done
+  {
+    const card = mkCard(['10', '', '8', ''], { tplName: 'Squat' });
+    const removed = G._trimEmptySets(card);
+    check('_trimEmptySets returns how many blank sets it dropped', removed === 2, String(removed));
+    check('_trimEmptySets keeps only the completed sets', card._sr.children.length === 2);
+    check('_trimEmptySets keeps the reps that were logged',
+      card._sr.children.map(c => c._inp.value).join(',') === '10,8');
+    check('_trimEmptySets renumbers the remaining set labels',
+      card._sr.children.map(c => c.firstElementChild.textContent).join(',') === 'S1,S2');
+  }
+  {
+    const card = mkCard(['', '', ''], { tplName: 'Squat' });
+    check('_trimEmptySets leaves an untouched card alone', G._trimEmptySets(card) === 0 && card._sr.children.length === 3);
+  }
+
+  // The swap handler itself
+  {
+    const fn = String(G.swapExercise || '');
+    check('swapExercise checks for completed sets before renaming the card',
+      fn.includes('_cardHasCompletedSets(card)') &&
+      fn.indexOf('_cardHasCompletedSets(card)') < fn.indexOf('_swapResetWeights'));
+    check('swapExercise trims the blank sets off the card it keeps',
+      fn.includes('_trimEmptySets(card)'));
+    check('swapExercise adds the replacement as its own card',
+      fn.includes('_addSwapCardAfter(card,'));
+    check('swapExercise persists the draft after a set-preserving swap',
+      fn.includes('scheduleDraft()'));
+    check('swapExercise still renames in place when nothing was completed yet',
+      fn.includes('card.dataset.swappedName=this.value'));
+  }
+  {
+    const fn = String(G._addSwapCardAfter || '');
+    check('_addSwapCardAfter inserts the new card directly under the current one',
+      fn.includes('card.nextSibling'));
+    check('_addSwapCardAfter pre-selects the replacement exercise',
+      fn.includes('onCustomExPicked(sel)'));
+    check('_addSwapCardAfter sizes the new card to the sets that were left',
+      fn.includes('addSetToCard(nc)'));
+  }
+
+  // _incompleteExCards / _focusFirstIncompleteEx
+  {
+    const done  = mkCard(['10', '10'], { tplName: 'Squat' });
+    const blank = mkCard(['', ''], { tplName: 'Leg Press' });
+    const unnamed = mkCard(['', '']); unnamed.dataset.custom = 'true'; unnamed._nameSel = { value: '' };
+    _idStore['structured-log'] = { querySelectorAll: sel => (sel === '.ex-card' ? [done, blank, unnamed] : []) };
+    const list = G._incompleteExCards();
+    check('_incompleteExCards flags only the exercise with no reps',
+      list.length === 1 && list[0] === blank, `got ${list.length}`);
+    check('_incompleteExCards ignores a custom card with no exercise picked',
+      list.indexOf(unnamed) < 0);
+    check('_focusFirstIncompleteEx returns true and scrolls to the first blank card',
+      G._focusFirstIncompleteEx() === true && blank._scrolled === true);
+    check('_focusFirstIncompleteEx focuses its first rep box',
+      blank._sr.children[0]._inp._focused === true);
+    _idStore['structured-log'] = { querySelectorAll: () => [done] };
+    check('_focusFirstIncompleteEx returns false when nothing is blank',
+      G._focusFirstIncompleteEx() === false);
+    delete _idStore['structured-log'];
+  }
+
+  // saveLog wiring
+  {
+    const fn = String(G.saveLog || '');
+    check('saveLog asks about exercises with no reps filled in',
+      fn.includes('_incompleteExCards()') && fn.includes('Is that intentional?'));
+    check('saveLog sends the user to the first blank exercise on Cancel',
+      fn.includes('_focusFirstIncompleteEx();return;'));
+    check('saveLog names the blank exercises in the prompt',
+      fn.includes('_blank.map(_exCardName)'));
+    check('saveLog asks before the overwrite/date prompts, not after the log is built',
+      fn.indexOf('_incompleteExCards()') < fn.indexOf('already saved. Overwrite it?'));
+  }
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
