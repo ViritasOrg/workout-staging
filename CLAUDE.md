@@ -492,6 +492,16 @@ pull-day placement.
   resizing (fixed prescription)
 - `Cable External Rotation` is a first-class catalogue exercise (`EXERCISE_SPLITS`
   shoulders:1); the dedicated rehab-shoulder pool opens its shoulder days with it
+- **Incline pressing substitutes to `Incline DB Press`, not to a machine (rule 2026-08-22).**
+  Henrik: *"Even the incline machine puts too much stress on the shoulder, DB incline press is
+  much better."* `REHAB_CONDITIONS.shoulders.suggest` returns `Incline DB Press` for any
+  incline variant; flat bench still goes to `Chest Machine Press` and overhead pressing to
+  `Landmine Press`. `detect` explicitly exempts `Incline DB Press` so the safe target is never
+  flagged as the aggravating movement it replaces.
+  - The old target, `Incline Machine Press`, existed **nowhere else in the app** — no
+    `EXERCISE_SPLITS` entry, not in `EX_OPTS_HTML` — so the substitution produced a name the
+    pickers could not offer and the group charts could not classify. Any name this table
+    suggests must be a first-class catalogue exercise; there is a test for it.
 
 ### Leg day rules — ALWAYS follow (rule replaced 2026-07-10)
 Every `Legs*` day is **EITHER** a Squat day **OR** a Deadlift day — never both in one
