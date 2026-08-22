@@ -64,6 +64,7 @@ const patched = rawScript
   .replace('const GROUP_COLORS=',    'var GROUP_COLORS=')
   .replace('const ONE_RM_MAX_REPS=', 'var ONE_RM_MAX_REPS=')
   .replace('const EX_OPTS_HTML=',    'var EX_OPTS_HTML=')
+  .replace('const REHAB_CONDITIONS=', 'var REHAB_CONDITIONS=')
   .replace('const DAYS=',            'var DAYS=')
   .replace('const DAY_TEMPLATES=',   'var DAY_TEMPLATES=')
   .replace('const THEMES=',          'var THEMES=')
@@ -3043,7 +3044,10 @@ console.log('\n── Injury substitutions (baked) ─────────�
   const allNames = (p) => p.days.flatMap(d => d.exercises.map(e => e.name));
   // Shoulders: no barbell/DB/smith presses anywhere; machine/landmine alternatives present
   const ps = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 10, ['shoulders']);
-  const shoulderBad = allNames(ps).filter(n => /^(Bench Press|Incline Bench Press|Overhead Press|Push Press|Arnold Press)$/i.test(n) || (/\b(barbell|dumbbell|\bdb\b|smith)\b/i.test(n) && /\bpress\b/i.test(n)));
+  // Incline DB Press is the exception (Henrik, 2026-08-22): it is what the shoulders condition
+  // substitutes incline pressing TO, so a DB incline in a shoulder-injury program is the fix,
+  // not a violation. Everything else barbell/DB/Smith is still aggravating.
+  const shoulderBad = allNames(ps).filter(n => !/^incline db press$/i.test(n) && (/^(Bench Press|Incline Bench Press|Overhead Press|Push Press|Arnold Press)$/i.test(n) || (/\b(barbell|dumbbell|\bdb\b|smith)\b/i.test(n) && /\bpress\b/i.test(n))));
   check('shoulders injury: no aggravating presses in program', shoulderBad.length === 0, shoulderBad.join(', '));
   // Arnold Press specifically (loaded internal rotation + elevation = impingement position)
   const pArn = G._generateWorkoutProgram('hypertrophy', 'upper', 7, 'T', 15, ['shoulders']);
@@ -5365,6 +5369,77 @@ console.log('\n── Pull days open with a pull-up variant ──────�
     check('the balanced 6-day pool authors Pull B with Weighted Pull-ups first',
       pullB.indexOf("pw('Weighted Pull-ups'") >= 0 &&
       pullB.indexOf("pw('Weighted Pull-ups'") < pullB.indexOf("pw('Cable Row'"));
+  }
+}
+
+// ── Section: a shoulder injury substitutes incline pressing to DUMBBELLS ─────
+// Henrik, 2026-08-22: "if Shoulder injury, replace Incline Machine Press with Incline DB
+// Press. Even the incline machine puts too much stress on the shoulder, DB incline press is
+// much better." The shoulders condition used to suggest 'Incline Machine Press' — a name that
+// existed nowhere else in the app (no catalogue entry, no splits), so the substitution also
+// produced an exercise the pickers could not offer.
+console.log('\n── Shoulders injury → Incline DB Press ────────────────────');
+{
+  const sh = (G.REHAB_CONDITIONS || []).find(c => c.id === 'shoulders');
+  check('the shoulders condition is defined', !!sh);
+
+  check('Incline Bench Press becomes Incline DB Press',
+    sh.suggest('Incline Bench Press') === 'Incline DB Press', sh.suggest('Incline Bench Press'));
+  check('any incline press variant goes to dumbbells',
+    ['Incline Barbell Press', 'Smith Incline Press', 'Incline DB Bench Press']
+      .every(n => sh.suggest(n) === 'Incline DB Press'));
+  check('nothing is substituted to the old orphan name',
+    !/Incline Machine Press/.test(rawScript));
+
+  // The safe target must never be treated as the aggravating movement
+  check('Incline DB Press is not detected as a shoulder aggravator',
+    sh.detect('Incline DB Press') === false);
+  check('…and it is left alone by the substitution helpers',
+    G._legdaySafeName('Incline DB Press', ['shoulders']) === 'Incline DB Press');
+  check('an incline barbell press is still detected',
+    sh.detect('Incline Bench Press') === true);
+
+  // The other mappings are untouched
+  check('flat bench still becomes Chest Machine Press',
+    sh.suggest('Bench Press') === 'Chest Machine Press');
+  check('overhead pressing still becomes Landmine Press',
+    sh.suggest('Overhead Press') === 'Landmine Press' && sh.suggest('Arnold Press') === 'Landmine Press');
+
+  // The substituted name must be a real catalogue exercise, unlike the one it replaced
+  check('Incline DB Press is offered by the exercise picker',
+    G.EX_OPTS_HTML.indexOf('<option>Incline DB Press</option>') >= 0);
+
+  // End to end through the generator
+  {
+    let machine = [], missingDb = [], dupes = [];
+    [['hypertrophy','balanced'], ['hypertrophy','upper'], ['strength','pure'], ['aesthetic','fullbody']]
+      .forEach(([goal, sub]) => {
+        [4, 6].forEach(nDays => {
+          const inj = G._generateWorkoutProgram(goal, sub, nDays, 'Inj', 16, ['shoulders']);
+          const clean = G._generateWorkoutProgram(goal, sub, nDays, 'Clean', 16, []);
+          const names = d => (d.exercises || []).map(e => e.name);
+          const injNames = inj.days.flatMap(names);
+          const where = `${goal}/${sub} ${nDays}d`;
+          if (injNames.some(n => /Incline Machine/i.test(n))) machine.push(where);
+          if (clean.days.flatMap(names).some(n => /^Incline (Bench|Barbell) Press$/i.test(n)) &&
+              !injNames.includes('Incline DB Press')) missingDb.push(where);
+          inj.days.forEach(d => { const n = names(d); if (new Set(n).size !== n.length) dupes.push(`${where} ${d.name}`); });
+        });
+      });
+    check('no shoulder-injury program is generated with a machine incline press',
+      machine.length === 0, machine.join(' ; '));
+    check('a pool that had an incline barbell press gets Incline DB Press instead',
+      missingDb.length === 0, missingDb.join(' ; '));
+    check('the substitution never collides into a duplicate on the same day',
+      dupes.length === 0, dupes.join(' ; '));
+  }
+
+  // Without the injury nothing changes
+  {
+    const clean = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'Clean', 16, []);
+    const names = clean.days.flatMap(d => (d.exercises || []).map(e => e.name));
+    check('without a shoulders injury the incline barbell press is untouched',
+      names.includes('Incline Bench Press'));
   }
 }
 
