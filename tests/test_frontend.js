@@ -5307,5 +5307,66 @@ console.log('\n── Prefill from last logged set / draft card position ──�
   if (_savedUnit === null) G.localStorage.removeItem('wkt-unit'); else G.localStorage.setItem('wkt-unit', _savedUnit);
 }
 
+// ── Section: every pull day opens with a pull-up variant ─────────────────────
+// Regression (2026-08-22): the 6-day `hypertrophy-balanced` pool authored Day 5 — Pull B
+// with no pull-up variant at all — it opened with Cable Row. The hoist in
+// _generateWorkoutProgram can only REORDER a pull-up that exists, so a pool that never
+// carried one silently shipped a pull day led by a row, against "Pull-ups lead every pull
+// day" (2026-08-08). Henrik hit it on 6-day hypertrophy, shoulder injury, 16 sets/week.
+console.log('\n── Pull days open with a pull-up variant ──────────────────');
+{
+  const isPullDayName = nm => /pull/i.test(nm) && !/push/i.test(nm) && !/legs|lower/i.test(nm);
+
+  // The exact program from the report
+  {
+    const prog = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'Repro', 16, ['shoulders']);
+    const pullB = (prog.days || []).find(d => /Pull B/.test(d.name || ''));
+    check('6-day balanced hypertrophy still has a Day 5 — Pull B', !!pullB);
+    const first = pullB && (pullB.exercises || [])[0];
+    check('Pull B opens with Weighted Pull-ups, not Cable Row',
+      !!first && first.name === 'Weighted Pull-ups', first && first.name);
+    check('the opening pull-up is a pull-up variant by isPullUpEx',
+      !!first && G.isPullUpEx(first.name));
+    check('it is prescribed in the strength band, so applyTagFromReps keeps the tag',
+      !!first && first.tag === 'strength' && /^[2-6](-[2-6])*$/.test(String(first.sets)),
+      first && `${first.tag} / ${first.sets}`);
+    check('a shoulder injury does not substitute the pull-up away',
+      (pullB.exercises || []).some(e => G.isPullUpEx(e.name)));
+  }
+
+  // It must survive every volume the allocator can be asked for — the low end drops
+  // exercises to fit, the high end resizes them, and neither may lose the pull-up.
+  {
+    let missing = [], notFirst = [];
+    [['hypertrophy','balanced'], ['hypertrophy','upper']].forEach(([goal, sub]) => {
+      [8, 10, 12, 16, 20, 25].forEach(spm => {
+        [[], ['shoulders']].forEach(inj => {
+          const prog = G._generateWorkoutProgram(goal, sub, 6, 'V', spm, inj);
+          (prog.days || []).forEach(day => {
+            if (!isPullDayName(day.name || '')) return;
+            const exs = day.exercises || [];
+            const where = `${sub} spm=${spm} inj=[${inj}] ${day.name}`;
+            if (!exs.some(e => G.isPullUpEx(e.name))) missing.push(where);
+            else if (!G.isPullUpEx(exs[0].name)) notFirst.push(`${where}: ${exs[0].name}`);
+          });
+        });
+      });
+    });
+    check('no pull day in a 6-day hypertrophy program is generated without a pull-up',
+      missing.length === 0, missing.slice(0, 3).join(' ; '));
+    check('…and the pull-up is always the first exercise on the day',
+      notFirst.length === 0, notFirst.slice(0, 3).join(' ; '));
+  }
+
+  // Guard the seed itself: a reordering edit to the pool must fail here, not in the app.
+  {
+    const seed = rawScript.slice(rawScript.indexOf("key==='hypertrophy-balanced'"));
+    const pullB = seed.slice(seed.indexOf("d('Day 5 — Pull B'"), seed.indexOf("d('Day 6 — Legs B'"));
+    check('the balanced 6-day pool authors Pull B with Weighted Pull-ups first',
+      pullB.indexOf("pw('Weighted Pull-ups'") >= 0 &&
+      pullB.indexOf("pw('Weighted Pull-ups'") < pullB.indexOf("pw('Cable Row'"));
+  }
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
