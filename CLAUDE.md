@@ -381,6 +381,17 @@ variant is the most demanding movement a pull session carries, so it is done fre
 - The seeded `6-Day Hypertrophy — Upper` Day 2 — Pull A was the trigger: it opened with
   Barbell Row. The seed now opens with Pull-ups; Day 5 — Pull B already opened with
   Weighted Pull-ups.
+- **The hoist can only REORDER a pull-up that exists — it cannot inject one.** A pool that
+  never authored a pull-up on a pull day shipped that day led by a row and the hoist was a
+  no-op. Found 2026-08-22 on `6-Day Hypertrophy — Balanced` Day 5 — Pull B (Cable Row first,
+  no pull-up anywhere on the day); that seed now opens with `Weighted Pull-ups 4×6-10`
+  (`strength`), like the Upper pool's Pull B. Covered by regression tests that generate the
+  program at 8/10/12/16/20/25 sets per muscle, with and without a shoulders injury, and
+  assert a pull-up leads every pull day.
+- **Still open (2026-08-22, not fixed — raise before touching):** the same gap exists in
+  `strength-hybrid` 5-day `Day 5 — Upper Pull B` and 6-day `Day 5 — Pull B` (both open with
+  Deadlift, no pull-up), and in `hypertrophy-upper` 7-day `Day 7 — Light Pull`. Left alone
+  because only the Balanced pool was reported — ask Henrik before editing those seeds.
 - **`_isPullDay` is deliberately narrow, matched on the day NAME** — `/pull/` and not
   `/push/`, and not `/legs|lower/`:
   - a mixed `Vertical Push/Pull` day is not a pull program, and hoisting there would
