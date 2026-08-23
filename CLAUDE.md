@@ -537,6 +537,14 @@ asks for that specific change in that conversation turn.
 - Note: once such a migration has already run on live data, removing the migration code
   does **not** undo what it added to stored programs — and undoing that is itself an edit
   to existing programs, so it also requires an explicit ask.
+- **The one sanctioned in-app edit (rule 2026-08-22):** swapping an exercise in Log Workout
+  **before any reps are entered** offers a pop-up — *"Save this swap to your program?"* —
+  naming the day and both exercises. On OK, `_offerProgramSubstitution` renames that one
+  entry in the active program's day and calls `savePrograms()` (localStorage + backend
+  together). This does not weaken the rule: the change is the **user's** explicit answer to a
+  prompt, per exercise, never a migration and never automatic. Cancel changes nothing beyond
+  today's session. Only template cards offer it — a card added mid-session is not in the
+  program — and only the name changes; sets, scheme and kg are left as authored.
 
 ### Reps entry — numeric keypad only, no free-text sets string (rule 2026-07-31)
 - **Every reps input uses `type="text" inputmode="numeric" pattern="[0-9]*"`** — Log Workout,
