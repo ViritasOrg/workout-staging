@@ -5534,5 +5534,65 @@ console.log('\n── Swap → save the substitution to the program ────
   delete _idStore['structured-log']; delete _idStore['log-day'];
 }
 
+// ── Section: Hip Adductor / Hip Abductor are catalogue leg exercises ─────────
+// Henrik, 2026-08-22: "Add Hip Adductor and Abductor to exercises legs. Also include in name
+// in and outside of hips" — the name has to say which is which, since adductor/abductor is
+// the pair people mix up.
+console.log('\n── Hip Adductor / Abductor ────────────────────────────────');
+{
+  const ADD = 'Hip Adductor (inside hips)';
+  const ABD = 'Hip Abductor (outside hips)';
+
+  check('the adductor name says it works the inside of the hips',
+    /adductor/i.test(ADD) && /inside/i.test(ADD));
+  check('the abductor name says it works the outside of the hips',
+    /abductor/i.test(ABD) && /outside/i.test(ABD));
+
+  // Both pickers offer them — Log Workout and the program editor
+  check('Log Workout offers Hip Adductor', G.EX_OPTS_HTML.includes('<option>' + ADD + '</option>'));
+  check('Log Workout offers Hip Abductor', G.EX_OPTS_HTML.includes('<option>' + ABD + '</option>'));
+  {
+    const legs = G.EX_OPTS_HTML.slice(G.EX_OPTS_HTML.indexOf('label="Legs"'), G.EX_OPTS_HTML.indexOf('label="Back"'));
+    check('…and both sit in the Legs group, not another one',
+      legs.includes(ADD) && legs.includes(ABD));
+  }
+  {
+    const fn = String(G._exOpts || '');
+    const legs = fn.slice(fn.indexOf("'Legs':"), fn.indexOf("'Back':"));
+    check('the program editor offers both under Legs',
+      legs.includes(ADD) && legs.includes(ABD), legs.slice(-90));
+  }
+
+  // Classification — charts, volume by group and colours all read these
+  check('Hip Adductor counts as legs volume',
+    JSON.stringify(G.getExSplits(ADD)) === JSON.stringify({ legs: 1 }), JSON.stringify(G.getExSplits(ADD)));
+  check('Hip Abductor counts as legs volume',
+    JSON.stringify(G.getExSplits(ABD)) === JSON.stringify({ legs: 1 }), JSON.stringify(G.getExSplits(ABD)));
+  check('both map to the legs muscle group',
+    G.getExGroup(ADD) === 'legs' && G.getExGroup(ABD) === 'legs',
+    `${G.getExGroup(ADD)} / ${G.getExGroup(ABD)}`);
+  check('a bare "Hip Adductor" without the hint still classifies as legs',
+    G.getExGroup('Hip Adductor') === 'legs' && G.getExGroup('Hip Abductor') === 'legs');
+
+  // They are machine leg work — not bodyweight, not cable, not a press
+  check('neither is treated as a bodyweight exercise',
+    !G.isBWExName(ADD) && !G.isBWExName(ABD));
+  check('neither is treated as a cable exercise (no cable gearing buttons)',
+    !G.isCableEx(ADD) && !G.isCableEx(ABD));
+  check('neither is mistaken for a pressing movement',
+    !G.isPressEx(ADD) && !G.isPressEx(ABD));
+
+  // Adding them must not have disturbed the exercises that were already there
+  check('the leg exercises already in the catalogue still classify as legs',
+    ['Squat', 'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raises', 'Lunges']
+      .every(n => G.getExGroup(n) === 'legs'));
+  // Hip Thrust is not in MUSCLE_MAP (pre-existing, unchanged here) — it gets its legs volume
+  // from its explicit EXERCISE_SPLITS entry instead, which must still be intact.
+  check('Hip Thrust still gets its legs volume from EXERCISE_SPLITS',
+    JSON.stringify(G.getExSplits('Hip Thrust')) === JSON.stringify({ legs: 1 }));
+  check('the substring keys did not swallow anything else',
+    G.getExGroup('Bench Press') === 'chest' && G.getExGroup('Lat Pulldown') === 'back');
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
