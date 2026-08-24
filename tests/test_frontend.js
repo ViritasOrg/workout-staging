@@ -5594,5 +5594,64 @@ console.log('\n── Hip Adductor / Abductor ───────────�
     G.getExGroup('Bench Press') === 'chest' && G.getExGroup('Lat Pulldown') === 'back');
 }
 
+// ── Section: standard gym machines are in the catalogue ─────────────────────
+// Henrik, 2026-08-22: "Add all outstanding standard machine exercises to the catalog."
+console.log('\n── Standard machine exercises ─────────────────────────────');
+{
+  const MACHINES = {
+    Legs:      ['Hack Squat', 'Seated Calf Raise'],
+    Back:      ['Chest-Supported Row', 'Assisted Pull-up Machine'],
+    Chest:     ['Pec Deck (chest fly machine)', 'Assisted Dip Machine'],
+    Shoulders: ['Shoulder Press Machine', 'Machine Lateral Raise'],
+    Arms:      ['Bicep Curl Machine', 'Tricep Extension Machine'],
+  };
+  const GROUP_OF = { Legs: 'legs', Back: 'back', Chest: 'chest', Shoulders: 'shoulders', Arms: 'arms' };
+  const optGroup = (label) => {
+    const start = G.EX_OPTS_HTML.indexOf('label="' + label + '"');
+    const end = G.EX_OPTS_HTML.indexOf('</optgroup>', start);
+    return G.EX_OPTS_HTML.slice(start, end);
+  };
+  const editorGroup = (label) => {
+    const fn = String(G._exOpts || '');
+    const start = fn.indexOf("'" + label + "':");
+    return fn.slice(start, fn.indexOf(']', start));
+  };
+
+  Object.keys(MACHINES).forEach(label => {
+    const seg = optGroup(label), ed = editorGroup(label);
+    MACHINES[label].forEach(name => {
+      check(`Log Workout offers ${name} under ${label}`, seg.includes('<option>' + name + '</option>'), seg.slice(-120));
+      check(`the program editor offers ${name} under ${label}`, ed.includes("'" + name + "'"), ed.slice(-120));
+      check(`${name} counts toward ${label.toLowerCase()}`,
+        G.getExSplits(name)[GROUP_OF[label]] > 0, JSON.stringify(G.getExSplits(name)));
+    });
+  });
+
+  // A selectorized machine is not a cable — the generic "lateral raise" key carries cable:1,
+  // which would have put cable-gearing buttons on the machine version.
+  check('Machine Lateral Raise is not treated as a cable exercise', !G.isCableEx('Machine Lateral Raise'));
+  check('…while the free-weight Lateral Raise keeps the behaviour it had',
+    G.isCableEx('Lateral Raise') && G.getExSplits('Lateral Raise').cable === 1);
+  check('the machine key is matched before the generic one',
+    G.EXERCISE_SPLITS.findIndex(e => e[0] === 'machine lateral raise') <
+    G.EXERCISE_SPLITS.findIndex(e => e[0] === 'lateral raise'));
+
+  // The assisted machines take the load off you, so they must not read as bodyweight cards
+  check('the assisted machines are not bodyweight cards (their stack is assistance, not load)',
+    !G.isBWExName('Assisted Pull-up Machine') && !G.isBWExName('Assisted Dip Machine'));
+
+  // Invariant for anything added to the catalogue from here on
+  {
+    const opts = [...G.EX_OPTS_HTML.matchAll(/<option>([^<]+)<\/option>/g)].map(m => m[1]);
+    // Skull Crushers has no EXERCISE_SPLITS entry — pre-existing gap, not touched here.
+    const unclassified = opts.filter(n => n !== 'Skull Crushers' &&
+      Object.keys(G.getExSplits(n)).filter(k => k !== 'cable' && k !== 'factor').length === 0);
+    check('every exercise in the picker resolves to a muscle group',
+      unclassified.length === 0, unclassified.join(', '));
+    check('the catalogue still holds everything it did before, plus the ten machines',
+      opts.length === 60, String(opts.length));
+  }
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
