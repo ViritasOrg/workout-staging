@@ -5653,5 +5653,65 @@ console.log('\n── Standard machine exercises ──────────�
   }
 }
 
+// ── Section: editing a session keeps that session's date ────────────────────
+// Bug (2026-08-24): editLog filled the header (date / day / body weight) and THEN called
+// prefillLog, which ends by resetting the date field to today — and calls restoreDraft, which
+// can write a draft's own date and weight over it too. Editing a three-week-old session
+// therefore saved it under today's date. Not cosmetic: saveLog matches an existing session BY
+// DATE, so the rewritten edit could overwrite the workout actually logged today.
+console.log('\n── Editing a log keeps its own date ───────────────────────');
+{
+  const mkField = (v) => ({ value: v });
+  const setFields = () => {
+    _idStore['log-date'] = mkField('2026-08-24');
+    _idStore['log-day'] = mkField('1');
+    _idStore['log-weight'] = mkField('');
+    return [_idStore['log-date'], _idStore['log-day'], _idStore['log-weight']];
+  };
+
+  check('editLog has a step that restores the session header', typeof G._editRestoreHeader === 'function');
+  if (typeof G._editRestoreHeader === 'function') {
+    const [d, day, w] = setFields();
+    G._editRestoreHeader({ id: 1, date: '2026-07-03', day: 4, weight: 88 });
+    check('the edited session keeps its own date, not today', d.value === '2026-07-03', d.value);
+    check('…its own program day', String(day.value) === '4', String(day.value));
+    check('…and its own body weight', String(w.value) === '88', String(w.value));
+  }
+  if (typeof G._editRestoreHeader === 'function') {
+    const [d, day, w] = setFields();
+    w.value = '90';
+    G._editRestoreHeader({ id: 2, date: '2026-07-03', day: 2 });
+    check('a session logged without a weight does not blank the field',
+      w.value === '90' && d.value === '2026-07-03');
+    check('a missing log is a no-op, not a throw',
+      (() => { try { G._editRestoreHeader(null); return true; } catch (e) { return false; } })());
+  }
+
+  // The ordering IS the fix — restoring before prefillLog is exactly the bug.
+  {
+    const fn = String(G.editLog || '');
+    check('editLog re-applies the log header after prefillLog',
+      fn.indexOf('prefillLog(') < fn.indexOf('_editRestoreHeader(log)') &&
+      fn.indexOf('_editRestoreHeader(log)') > 0);
+    check('prefillLog is still what sets up the cards for the edit', fn.includes('prefillLog(log.day)'));
+    check('editLog still marks the session as an edit before prefilling',
+      fn.indexOf("log-edit-id") < fn.indexOf('prefillLog('));
+  }
+  // The two ways the date got clobbered, both downstream of prefillLog
+  {
+    const pf = String(G.prefillLog || '');
+    check('prefillLog still resets the date to today for a NEW session',
+      pf.includes("document.getElementById('log-date').value=new Date().toISOString().split('T')[0]"));
+    check('…and still hands off to restoreDraft, which can also rewrite the date',
+      pf.includes('restoreDraft(') &&
+      String(G.restoreDraft || '').includes('dateEl.value=d.date'));
+  }
+  // Why it mattered: saveLog finds the session to replace by date
+  check('saveLog still matches an existing session by date (why a wrong date could clobber one)',
+    String(G.saveLog || '').includes('l.date===date'));
+
+  delete _idStore['log-date']; delete _idStore['log-day']; delete _idStore['log-weight'];
+}
+
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
 process.exit(failed === 0 ? 0 : 1);
