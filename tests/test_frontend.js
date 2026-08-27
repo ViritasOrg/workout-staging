@@ -1550,8 +1550,12 @@ check('pollPromoteStatus times out at attempt>100 (not 60 or 200)',
   rawScript.includes('attempt>100') && !rawScript.includes('attempt>60'));
 check('pollPromoteStatus re-enables button on timeout',
   /attempt>100\b[^}]*btn\.disabled=false/.test(rawScript));
-check('pollPromoteStatus shows red on timeout (#ef4444)',
-  rawScript.slice(rawScript.indexOf('attempt>100'), rawScript.indexOf('attempt>100')+400).includes('ef4444'));
+// The red now comes from _recordPushFailure, which both renders it and PERSISTS the
+// failure (2026-08-27) — the timeout path hands off to it instead of writing its own markup.
+check('pollPromoteStatus reports the timeout through the persisting failure path',
+  rawScript.slice(rawScript.indexOf('attempt>100'), rawScript.indexOf('attempt>100')+400).includes('_recordPushFailure'));
+check('…and that path renders in red (#ef4444)',
+  String(G._recordPushFailure || '').includes('ef4444'));
 check('pollPromoteStatus includes "Timed out" message',
   rawScript.includes('Timed out'));
 check('pollPromoteStatus resets _pollErrs=0 on successful response',
@@ -5794,6 +5798,76 @@ console.log('\n── Weight propagation on added cards / Cable Bicep Curl ─�
       G.isCableEx('Cable Bicep Curl'));
     check('the machine curl is still NOT a cable exercise', !G.isCableEx('Bicep Curl Machine'));
   }
+}
+
+// ── Section: a failed Push to Prod stays on screen ──────────────────────────
+// Henrik, 2026-08-27: "the text is only visible for a split second, could you write this to a
+// log or make it persist on screen?" The failure line carries GitHub's own status code, which
+// is the whole diagnosis — losing it to the next re-render made the failure undiagnosable.
+console.log('\n── Push to Prod failures persist ──────────────────────────');
+{
+  const _saved = G.localStorage.getItem('wk-last-push');
+  const mkEl = () => ({ _html: '', get innerHTML() { return this._html; }, set innerHTML(v) { this._html = v; } });
+
+  check('there is a failure-recording step at all', typeof G._recordPushFailure === 'function');
+  if (typeof G._recordPushFailure === 'function') {
+    const el = mkEl();
+    G._recordPushFailure('Failed', 'HTTP 401 — {"message":"Bad credentials"}', el);
+    const rec = JSON.parse(G.localStorage.getItem('wk-last-push') || 'null');
+    check('the failure is written to the persisted last-push record', !!rec && rec.conclusion === 'failure');
+    check('…with the full error text, status code and all',
+      !!rec && /HTTP 401/.test(rec.error) && /Bad credentials/.test(rec.error), rec && rec.error);
+    check('…and a timestamp, so a later look still says when it happened',
+      !!rec && !isNaN(Date.parse(rec.ts)));
+    check('the message is also shown immediately, in red',
+      el.innerHTML.includes('HTTP 401') && el.innerHTML.includes('ef4444'));
+    check('…and wraps rather than truncating a long GitHub body',
+      /white-space:pre-wrap/.test(el.innerHTML) && /word-break:break-word/.test(el.innerHTML));
+    check('…and can be selected to copy',  /user-select:text/.test(el.innerHTML));
+    check('the Actions link is offered alongside it', el.innerHTML.includes('/actions'));
+  }
+
+  // Rendered back from storage — this is what survives the re-render that used to wipe it
+  {
+    const el = mkEl();
+    _idStore['push-to-prod-last'] = el;
+    G.localStorage.setItem('wk-last-push', JSON.stringify({
+      ts: new Date().toISOString(), conclusion: 'failure',
+      error: 'Failed: HTTP 403 — {"message":"Resource not accessible by personal access token"}',
+      steps: [], prUrl: null, runUrl: null, stagingVer: '1.226', prodVer: null }));
+    G.buildLastPushDropdown();
+    check('a re-render brings the error back from storage',
+      el.innerHTML.includes('HTTP 403') && el.innerHTML.includes('not accessible'));
+    check('the row opens itself when the last push failed, so it is on screen unprompted',
+      /<details open>/.test(el.innerHTML), el.innerHTML.slice(0, 60));
+    check('it still marks the attempt as failed', el.innerHTML.includes('✗'));
+  }
+
+  // A successful push must not sprout an error row or force itself open
+  {
+    const el = mkEl();
+    _idStore['push-to-prod-last'] = el;
+    G.localStorage.setItem('wk-last-push', JSON.stringify({
+      ts: new Date().toISOString(), conclusion: 'success', steps: [{ name: 'promote', status: 'completed', conclusion: 'success' }],
+      prUrl: 'https://github.com/x/y/pull/1', runUrl: null, stagingVer: '1.226', prodVer: '1.217' }));
+    G.buildLastPushDropdown();
+    check('a successful push renders no error line', !/ef4444/.test(el.innerHTML));
+    check('…and stays collapsed as before', /<details>/.test(el.innerHTML));
+  }
+
+  // Every failure path routes through the persisting helper
+  {
+    check('a rejected dispatch persists its error',
+      String(G.pushToProd || '').includes("_recordPushFailure('Failed',e.message,statusEl)"));
+    const poll = String(G.pollPromoteStatus || '');
+    check('a timeout persists its error', poll.includes("_recordPushFailure('Timed out"));
+    check('a lost connection persists its error', poll.includes("_recordPushFailure('Connection lost'"));
+    check('no failure path writes throwaway text into the status element any more',
+      !/statusEl\.textContent='Failed: '/.test(rawScript));
+  }
+
+  if (_saved === null) G.localStorage.removeItem('wk-last-push'); else G.localStorage.setItem('wk-last-push', _saved);
+  delete _idStore['push-to-prod-last'];
 }
 
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
