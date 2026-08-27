@@ -5648,8 +5648,12 @@ console.log('\n── Standard machine exercises ──────────�
       Object.keys(G.getExSplits(n)).filter(k => k !== 'cable' && k !== 'factor').length === 0);
     check('every exercise in the picker resolves to a muscle group',
       unclassified.length === 0, unclassified.join(', '));
-    check('the catalogue still holds everything it did before, plus the ten machines',
-      opts.length === 60, String(opts.length));
+    // Exact count on purpose: adding or removing an exercise should be a conscious edit here.
+    check('the catalogue holds every exercise it is meant to (61)',
+      opts.length === 61, String(opts.length));
+    check('no exercise is listed twice in the picker',
+      new Set(opts).size === opts.length,
+      opts.filter((n, i) => opts.indexOf(n) !== i).join(', '));
   }
 }
 
@@ -5711,6 +5715,85 @@ console.log('\n── Editing a log keeps its own date ────────�
     String(G.saveLog || '').includes('l.date===date'));
 
   delete _idStore['log-date']; delete _idStore['log-day']; delete _idStore['log-weight'];
+}
+
+// ── Section: weight propagates on ADDED exercises too + Cable Bicep Curl ────
+// Henrik, 2026-08-25: "Adding an exercise doesn't fill all weight fields so I need to add
+// weight for each set. Prefill set 2-n once I added the first. Also a cable biceps curl isn't
+// in the exercise catalog."
+console.log('\n── Weight propagation on added cards / Cable Bicep Curl ───');
+{
+  // A card the way the app builds one: kg inputs live in .sets-row, and an ADDED card has no
+  // data-ex / data-set attributes at all — that is exactly why propagation used to miss it.
+  const mkCard = (vals, withAttrs) => {
+    const inputs = vals.map((v, i) => ({
+      value: String(v),
+      dataset: withAttrs ? { ex: '0', set: String(i), type: 'kg' } : { type: 'kg' },
+      closest: () => card,
+    }));
+    const sr = { querySelectorAll: sel => (sel.includes('kg') ? inputs : []) };
+    const card = { _inputs: inputs, querySelector: sel => (sel === '.sets-row' ? sr : null) };
+    return card;
+  };
+
+  {
+    const card = mkCard(['17.5', '', ''], false);   // the reported case
+    card._inputs[0].value = '17.5';
+    G.propagateWeight(card._inputs[0]);
+    check('typing the first weight on an added exercise fills the later sets',
+      card._inputs.map(i => i.value).join(',') === '17.5,17.5,17.5',
+      card._inputs.map(i => i.value).join(','));
+  }
+  {
+    const card = mkCard(['20', '20', '20'], false);
+    card._inputs[1].value = '25';
+    G.propagateWeight(card._inputs[1]);
+    check('a mid-set change still only fills forward on an added exercise',
+      card._inputs.map(i => i.value).join(',') === '20,25,25',
+      card._inputs.map(i => i.value).join(','));
+  }
+  {
+    const card = mkCard(['60', '60', '60'], true);  // a template card
+    card._inputs[0].value = '70';
+    G.propagateWeight(card._inputs[0]);
+    check('a template card propagates the same way', card._inputs.map(i => i.value).join(',') === '70,70,70');
+  }
+  {
+    const card = mkCard(['40'], false);
+    check('a single-set card does not throw',
+      (() => { try { G.propagateWeight(card._inputs[0]); return true; } catch (e) { return false; } })());
+    check('propagateWeight ignores a null input',
+      (() => { try { G.propagateWeight(null); return true; } catch (e) { return false; } })());
+  }
+
+  // The wiring: the boxes have to CALL it — an added card's three seeded boxes and every
+  // box created by "+ set".
+  {
+    const add = String(G.addCustomExercise || '');
+    check('an added exercise renders its kg boxes with the propagation handler',
+      /data-type="kg" oninput="propagateWeight\(this\)"/.test(add));
+    const addSet = String(G.addSetToCard || '');
+    check('a box created by "+ set" propagates too',
+      /data-type="kg" oninput="propagateWeight\(this\)"/.test(addSet));
+    check('"+ set" still seeds the new box from the last one',
+      addSet.includes("value=\"'+lastKg+'\""));
+  }
+
+  // Cable Bicep Curl
+  {
+    const arms = G.EX_OPTS_HTML.slice(G.EX_OPTS_HTML.indexOf('label="Arms"'));
+    check('Log Workout offers Cable Bicep Curl under Arms',
+      arms.includes('<option>Cable Bicep Curl</option>'));
+    const fn = String(G._exOpts || '');
+    check('the program editor offers it too',
+      fn.slice(fn.indexOf("'Arms':")).includes("'Cable Bicep Curl'"));
+    check('it counts as arm volume',
+      JSON.stringify(G.getExSplits('Cable Bicep Curl')) === JSON.stringify({ arms: 1 }),
+      JSON.stringify(G.getExSplits('Cable Bicep Curl')));
+    check('…and is recognised as a cable exercise, so it gets the cable gearing buttons',
+      G.isCableEx('Cable Bicep Curl'));
+    check('the machine curl is still NOT a cable exercise', !G.isCableEx('Bicep Curl Machine'));
+  }
 }
 
 console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
