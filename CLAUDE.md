@@ -249,6 +249,46 @@ in your reply — do NOT silently change it. Unsolicited "improvements" cause
 confusion, break things Henrik didn't intend to change, and waste debugging
 time. **One PR = one explicitly requested change.**
 
+## ⚠️ BUILD THE MVP — SUGGEST THE REST, DON'T SHIP IT ⚠️
+Henrik, 2026-09-03: *"not build features I haven't asked for. Pls suggest ideas
+and tweaks but always build mvp versions if new features. I do occasionally find
+bloated features and it makes the app seem confusing at times."*
+
+**Ship the smallest version that does what was asked, then stop.** Everything you
+thought of beyond that goes in the reply as a suggestion — never into the diff.
+
+This is the sibling of "ONLY FIX WHAT WAS ASKED" above. That rule is about not
+touching code *outside* the request; this one is about not inflating the thing
+*inside* it. A feature can be entirely on-topic and still ship three times bigger
+than what was asked for.
+
+**These are unrequested features, not thoroughness:**
+- A setting, toggle, filter or preference for something asked for as one fixed
+  behaviour
+- An extra panel, badge, summary line, empty state or chart added "while I was in
+  there"
+- Advice, guidance or explanatory copy nobody asked to be shown — especially
+  advice keyed on something the user has not actually configured
+- A second way to do something that already has one way
+- Handling a case that has not come up yet, in case it does
+
+**Each of those ships as a sentence, not as code:**
+> Built X. I could also add Y — want it?
+
+**Why: the cost is the screen, not the code.** Every element competes for attention
+with the ones that matter. A screen carrying three things nobody asked for reads as
+confusing rather than as generous, and bloat has been found in the shipped apps more
+than once. A feature that is hard to explain in one line is usually bigger than the
+request that produced it.
+
+**What this rule does NOT license:**
+- **Not an excuse to skip tests, error handling, or any other rule in this file.**
+  Minimal in SURFACE AREA, never in correctness.
+- **Not permission to delete existing features** you have decided are bloat. See
+  "MY FIX MADE IT REDUNDANT" below — say so in your reply and ask.
+- **Not permission to ask before doing the work itself.** Build the MVP and report
+  it; do not stop for approval on the thing you were just asked for.
+
 ## ⚠️ "MY FIX MADE IT REDUNDANT" IS NOT PERMISSION TO REMOVE IT ⚠️
 This is the single most common way the rule above gets bypassed — through internal reasoning rather than intent.
 
