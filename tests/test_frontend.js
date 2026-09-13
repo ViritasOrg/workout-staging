@@ -5721,14 +5721,14 @@ console.log('\n── Standard machine exercises ──────────�
   // Invariant for anything added to the catalogue from here on
   {
     const opts = [...G.EX_OPTS_HTML.matchAll(/<option>([^<]+)<\/option>/g)].map(m => m[1]);
-    // Skull Crushers has no EXERCISE_SPLITS entry — pre-existing gap, not touched here.
-    const unclassified = opts.filter(n => n !== 'Skull Crushers' &&
+    // No exceptions any more — Skull Crushers was the last unclassified name (fixed 2026-09-13).
+    const unclassified = opts.filter(n =>
       Object.keys(G.getExSplits(n)).filter(k => k !== 'cable' && k !== 'factor').length === 0);
     check('every exercise in the picker resolves to a muscle group',
       unclassified.length === 0, unclassified.join(', '));
     // Exact count on purpose: adding or removing an exercise should be a conscious edit here.
-    check('the catalogue holds every exercise it is meant to (63)',
-      opts.length === 63, String(opts.length));
+    check('the catalogue holds every exercise it is meant to (64)',
+      opts.length === 64, String(opts.length));
     check('no exercise is listed twice in the picker',
       new Set(opts).size === opts.length,
       opts.filter((n, i) => opts.indexOf(n) !== i).join(', '));
@@ -6062,6 +6062,65 @@ console.log('\n── Muscle Up / Assisted Muscle Up ─────────
   // It is a catalogue entry only — the pull-up hoist and the 1RM grouping are untouched
   check('a muscle-up is not treated as a pull-up variant by the hoist',
     G.isPullUpEx(MU) === false && G.isPullUpEx(AMU) === false);
+}
+
+// ── Section: Skull Crushers volume + Behind the Neck Press ─────────────────
+// Henrik, 2026-09-13: "Fix Skull crushers split, also add Behind the Neck Presses to catalog".
+// The split key was written "skullcrusher" while the catalogue name is "Skull Crushers", so the
+// name matched nothing: every set of them counted toward no muscle group at all.
+console.log('\n── Skull Crushers split / Behind the Neck Press ───────────');
+{
+  ['Skull Crushers', 'Skull Crusher', 'Skullcrusher', 'Skull-crusher'].forEach(n => {
+    check(`"${n}" counts as arm volume`,
+      JSON.stringify(G.getExSplits(n)) === JSON.stringify({ arms: 1 }), JSON.stringify(G.getExSplits(n)));
+    check(`"${n}" maps to the arms muscle group`, G.getExGroup(n) === 'arms', String(G.getExGroup(n)));
+  });
+  check('the catalogue name itself is the one that was broken, and is fixed',
+    G.EX_OPTS_HTML.includes('<option>Skull Crushers</option>') &&
+    Object.keys(G.getExSplits('Skull Crushers')).length > 0);
+  check('the other arm exercises are untouched',
+    ['Tricep Pushdown', 'Barbell Curl', 'Hammer Curl', 'Preacher Curl', 'Close Grip Press']
+      .every(n => Object.keys(G.getExSplits(n)).length > 0));
+
+  // Behind the Neck Press — catalogue entry, Shoulders
+  const BTN = 'Behind the Neck Press';
+  {
+    const sh = G.EX_OPTS_HTML.slice(G.EX_OPTS_HTML.indexOf('label="Shoulders"'), G.EX_OPTS_HTML.indexOf('label="Arms"'));
+    check('Log Workout offers Behind the Neck Press under Shoulders', sh.includes('<option>' + BTN + '</option>'));
+    const fn = String(G._exOpts || '');
+    const ed = fn.slice(fn.indexOf("'Shoulders':"), fn.indexOf("'Arms':"));
+    check('the program editor offers it under Shoulders', ed.includes("'" + BTN + "'"), ed.slice(-90));
+  }
+  check('it counts as shoulder volume, with the triceps getting their share',
+    G.getExSplits(BTN).shoulders > 0 && G.getExSplits(BTN).arms > 0, JSON.stringify(G.getExSplits(BTN)));
+  check('…shoulders being the largest share',
+    Object.keys(G.getExSplits(BTN)).every(k => G.getExSplits(BTN)[k] <= G.getExSplits(BTN).shoulders));
+  check('…and NOT falling through to the generic "press" key, which would call it a chest lift',
+    !G.getExSplits(BTN).chest, JSON.stringify(G.getExSplits(BTN)));
+  check('it maps to the shoulders muscle group', G.getExGroup(BTN) === 'shoulders', String(G.getExGroup(BTN)));
+  check('Overhead Press keeps the split it had', 
+    JSON.stringify(G.getExSplits('Overhead Press')) === JSON.stringify({ shoulders: 0.7, arms: 0.2, chest: 0.1 }));
+
+  // Catalogue only — Henrik chose to leave program generation alone (2026-09-13)
+  {
+    const subsFor = { hypertrophy: ['balanced', 'upper', 'lower'], strength: ['pure', 'hybrid'],
+                      aesthetic: ['fullbody', 'glutes', 'upper'], rehab: ['shoulder', 'back', 'knee'] };
+    let found = [];
+    Object.keys(subsFor).forEach(goal => subsFor[goal].forEach(sub => {
+      [3, 5, 6, 7].forEach(nDays => [10, 16, 22].forEach(spm => {
+        [[], ['shoulders']].forEach(inj => {
+          let prog; try { prog = G._generateWorkoutProgram(goal, sub, nDays, 'T', spm, inj); } catch (e) { return; }
+          (prog.days || []).forEach(d => (d.exercises || []).forEach(ex => {
+            if (/behind the neck/i.test(ex.name || '')) found.push(`${goal}/${sub} ${nDays}d ${d.name}`);
+          }));
+        });
+      }));
+    }));
+    check('no generated program prescribes it — including the shoulder-injury path',
+      found.length === 0, found.slice(0, 3).join(' ; '));
+    check('…and the shoulders injury still substitutes overhead pressing to Landmine Press',
+      (G.REHAB_CONDITIONS.find(c => c.id === 'shoulders') || {}).suggest('Overhead Press') === 'Landmine Press');
+  }
 }
 
 setImmediate(() => {
