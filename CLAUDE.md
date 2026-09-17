@@ -543,6 +543,39 @@ pull-day placement.
     pickers could not offer and the group charts could not classify. Any name this table
     suggests must be a first-class catalogue exercise; there is a test for it.
 
+### A machine that does not pass on the whole plate load carries a `factor` (rule 2026-09-17)
+`factor` in `EXERCISE_SPLITS` is **the share of the logged kg the lifter actually moves**. The
+kg field records what is written on the machine; `factor` turns it into load. It is applied
+everywhere effort is measured — group volume, per-exercise volume, the 1RM estimate and the
+session calorie estimate — so it must never be applied by hand at a call site.
+
+There are two reasons a movement needs one, and they are not interchangeable:
+- **Bodyweight lifts**, where the kg field *is* a body weight but only part of it is pressed
+  (`push-up` 0.64, `dip` 0.7). The load then comes from a weigh-in.
+- **Mechanical advantage**, where the kg field is a plate load and the machine only delivers a
+  fraction of it. These carry **`mechFactor:1`** alongside the factor, because nothing about
+  them depends on a weigh-in — `sessionWork` used to read *any* factor below 1 as
+  body-weight-derived, which would have made a sled session refuse to report calories on an
+  account with no weigh-ins.
+
+**`45° Leg Press` (2026-09-17)** is the first mechanical case. Henrik: *"you don't push the
+actual weight but a % of it."* The sled rides a ramp, so the force along the rail is
+`weight × sin45 = 0.71` of the plates — his 0.75 guess minus the rail friction nobody can
+know per machine. Shipped as **its own catalogue entry**, not a factor on the shared
+`leg press` key: both builds exist, the name is all the app can tell them apart by, and
+scaling the shared key would have retroactively rescaled every Leg Press session already
+logged. Range of motion stays the leg-press 0.45 (it is travel along the rail) so the factor
+is the only difference between the two.
+
+Consequences to keep in mind when adding the next one:
+- Key it **before** the generic name in `EXERCISE_SPLITS`, or the substring lookup resolves the
+  generic entry first and the factor is silently lost.
+- A split key that is not a muscle share must be added to `SPLIT_META_KEYS` in
+  `tests/test_frontend.js`, or the "fractions sum to 1.0" invariant fails.
+- The calorie figure follows the work only inside the Compendium power band. Heavy leg pressing
+  pins the MET at the vigorous ceiling either way, so a factor can change the *volume* and the
+  *work* while leaving the kcal number identical. That is the estimator working as designed.
+
 ### Leg day rules — ALWAYS follow (rule replaced 2026-07-10)
 Every `Legs*` day is **EITHER** a Squat day **OR** a Deadlift day — never both in one
 session (systemic/CNS load management). Supersedes the earlier "Squat always first AND
