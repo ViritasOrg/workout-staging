@@ -6763,10 +6763,62 @@ console.log('\n── Extending a program with a template ───────�
   check('the program day view puts it on the row', String(G.renderWorkout).includes('_tplChipHtml(ex)'));
   check('…and heads the day with a banner explaining the block',
     String(G.renderWorkout).includes('_dayTplBannerHtml(day,prog)'));
-  check('the program view groups the block instead of mixing it into the day',
-    String(G._renderProgOverlay).includes('_tplExs') && String(G._renderProgOverlay).includes('_ownExs'));
-  check('…and says at the top that the program is extended',
-    String(G._renderProgOverlay).includes('Extended with'));
+  // THE DEFECT, pinned directly and outside the feature guard so an affected build reports it:
+  // the read-only branch must hand body ONE finished string. Any html+= after the write is
+  // markup that is built, discarded and never seen — which is exactly how the Remove button
+  // shipped invisible in v1.238-v1.241.
+  {
+    const ro = String(G._renderProgOverlay);
+    const roBranch = ro.slice(ro.indexOf('if(_progReadOnly){'), ro.indexOf('// Edit mode'));
+    check('the program view builds no markup after writing it to the DOM',
+      roBranch.length > 0 && !/html\+=/.test(roBranch),
+      (roBranch.match(/body\.innerHTML=html;[\s\S]{0,90}/) || [''])[0]);
+    check('…it renders exactly what one pure builder returns',
+      /body\.innerHTML=_progViewHtml\(/.test(roBranch));
+  }
+
+  // Rendered, not grepped. The Remove button shipped invisible for three versions precisely
+  // because these were source-text checks: the markup was built, appended to `html` one line
+  // AFTER body.innerHTML=html had already been written, and discarded. The source said it was
+  // there; the DOM never saw it. Assert the string the user actually gets.
+  if (typeof G._progViewHtml === 'function') {
+    const _mk = (name, exs) => ({ name, warmup: false, exercises: exs });
+    const _plain = { name: 'Plain', days: [_mk('D1', [{ name: 'Squat', scheme: '3×8' }])] };
+    const _extd = {
+      name: 'PPL', extension: { templateId: 'muscle-up-power', name: 'Muscle-Up Power (RFD)', noun: 'Muscle Up' },
+      days: [_mk('Push A', [
+        { name: 'Pull-ups', scheme: '4×3', _tpl: 'muscle-up-power', _tplDay: 'Muscle Up A' },
+        { name: 'Bench Press', scheme: '4×8' }])]
+    };
+    const vExt = G._progViewHtml(_extd, false, 3);
+    const vPlain = G._progViewHtml(_plain, false, 0);
+
+    check('the program view groups the block instead of mixing it into the day',
+      vExt.includes('Muscle Up A') && vExt.indexOf('Pull-ups') < vExt.indexOf('Bench Press'),
+      vExt.slice(0, 120));
+    check('…and says at the top that the program is extended',
+      vExt.includes('Extended with') && vExt.includes('Muscle-Up Power (RFD)'));
+
+    // The ask this section exists for: a way to clear the template again.
+    check('the program view RENDERS a way to remove the template',
+      vExt.includes('removeProgramExtension('), 'the button is built but never reaches the DOM');
+    check('…wired to the program being viewed, not a slot position',
+      vExt.includes('removeProgramExtension(3)'), (vExt.match(/removeProgramExtension\(\d+\)/) || [''])[0]);
+    check('…naming what it removes', /Remove Muscle Up from this program/.test(vExt),
+      (vExt.match(/Remove [^<]*/) || [''])[0]);
+    check('…sitting with the banner that announced the extension',
+      vExt.indexOf('Extended with') < vExt.indexOf('removeProgramExtension(') &&
+      vExt.indexOf('removeProgramExtension(') < vExt.indexOf('Push A'),
+      'the way out belongs next to the thing it undoes');
+    check('…and marked as the destructive action it is', /var\(--danger\)/.test(vExt));
+    check('a program with no template offers no remove button',
+      !vPlain.includes('removeProgramExtension('), vPlain.slice(0, 100));
+    check('…and no extension banner either', !vPlain.includes('Extended with'));
+    check('the view escapes the program name, being user input into innerHTML',
+      G._progViewHtml({ name: '<img src=x>', days: [] }, false, 0).includes('&lt;img'));
+  } else {
+    check('the program view is a pure, assertable builder', false, '_progViewHtml missing');
+  }
   check('the editor marks an injected row too', String(G._renderProgOverlay).includes('_isTplEx(ex)'));
   check('the library card flags an extended program',
     String(G._programLibraryHtml || '').includes('_progExtension(prog)') &&
