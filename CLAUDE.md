@@ -594,6 +594,57 @@ Deadlift always last in every leg day" rule.
   user's own exercise edits (e.g. swapping Squat → Leg Press). Stored programs are the user's
   own and are left exactly as saved — consistent with "never mutate stored programs" (2026-07-15).
 
+### The program library and the template library (rule 2026-09-21)
+Henrik: *"Add support for a library of programs. Not just the 4 as today."* Two separate
+things live in the Program tab and must not be confused:
+
+**The program library** is `_programs` — the user's own programs, capped at `MAX_PROGRAMS`
+(20, a guard on the size of the blob every save pushes to the backend, not a UI limit).
+`PROG_CARD_SLOTS` (4) programs show as cards; the rest render as rows underneath.
+
+- **Order is recency, identity is the index.** `_programsByRecency()` returns *indices*, never
+  a reordered array — `_activeProgramIndex`, the overlay and the log's day lookup all address
+  programs by array position, so reordering `_programs` would silently repoint them. Every
+  `onclick` in the card must carry the array index, not the slot position. There is a test.
+- **`touchedAt` is written only on a user action** — creating, editing or activating a
+  program. It is **never backfilled on load**: a program that predates the field keeps its
+  array position and sorts after the stamped ones. This is the one narrow exception to "never
+  mutate stored programs", and it stays narrow because nothing writes it on a read path.
+- `_programLibraryHtml()` and `_templateLibraryHtml()` are **pure** — they return markup and
+  touch no DOM. `buildProgramSettingsCard()` is the only thing that writes `innerHTML`. Keep
+  it that way: the test harness stubs `innerHTML` as a getter that always reads `''`, so
+  anything rendered straight into an element cannot be asserted at all.
+- One activate control: `_progActivateToggle()` is shared by the cards and the library rows.
+  Do not grow a second affordance for the same action.
+
+**The template library** is `PROGRAM_TEMPLATES` — read-only blueprints that are never
+activated, edited or logged against. Picking one deep-copies it into `_programs` and from that
+moment the copy is an ordinary program.
+
+- **Copies and templates can never reach each other.** `_templateToProgram()` deep-clones, so
+  editing your copy cannot change the library and shipping a new template version cannot
+  change a copy already made. Tested in both directions.
+- It runs the copy through `applyTagFromReps`, the same pass generated programs get, so a
+  template can never ship a prescription the rest of the app considers illegal.
+- `desc`, `notes` and `id` are library metadata and deliberately do not travel onto the program.
+- Duplicate copies are **named apart** (`_uniqueProgramName`), not refused.
+- **Every exercise a template names must be a first-class catalogue exercise** — same rule the
+  rehab substitution table lives under, same test. A template naming something the pickers
+  cannot offer and the charts cannot classify is a broken prescription.
+
+**The 1RM Test moved into the library (2026-09-21)** and its Progress-tab button still works,
+now building from the template so there is one definition. The button was NOT removed: "move
+it into templates" is not permission to delete the way he already reaches it.
+
+**`Muscle-Up Power (RFD)` (2026-09-21)** — rate-of-force-development work, 2 days/week,
+everything 2-4 reps at maximal intent (inside `TAG_RANGES.strength`, so the tag is still
+derived from the reps). Bar-to-sternum and speed work are prescribed as `Pull-ups` and
+`Weighted Pull-ups` with the intent in the `scheme`, **not** as new "Explosive"/"Speed"
+exercise names — one movement, one 1RM (rule 2026-08-08), and a separate name would split the
+history of the very lift the program exists to move. Its programming rules (maximal intent,
+stop when speed drops >10%, 2-3 min rest, twice weekly before heavy work, the C-shape pull and
+the chest-over-bar transition) live in `notes`, which the day/exercise model cannot carry.
+
 ### NEVER edit existing (stored) programs unless Henrik explicitly asks (rule 2026-07-15)
 Henrik's saved programs are his own. **Do NOT mutate existing stored programs** — no
 migrations in `_ensurePrograms`, no "repair" helpers, no bulk edits — unless Henrik

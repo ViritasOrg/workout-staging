@@ -2554,11 +2554,14 @@ console.log('\n── Storage inspector ─────────────�
 // ── Section 60: Program card toggle switch ────────────────────────────────────
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const cardStart = src.indexOf('function buildProgramSettingsCard()');
+  const cardStart = src.indexOf('function _progActivateToggle(');
   const cardEnd = src.indexOf('function viewProgram(');
   const cardBody = cardStart >= 0 && cardEnd > cardStart ? src.slice(cardStart, cardEnd) : '';
   check('program card uses toggle switch div (not pill button) for activation',
     cardBody.includes('_activateProg') && !cardBody.includes('<button onclick="event.stopPropagation();_activateProg'));
+  check('there is ONE activate control, shared by the cards and the library rows',
+    (cardBody.match(/_progActivateToggle\(/g) || []).length >= 3,
+    String((cardBody.match(/_progActivateToggle\(/g) || []).length));
   check('program card toggle switch has knob that shifts position based on isActive',
     cardBody.includes("left:'+(isActive?'18px':'2px')+'"));
   check('program card toggle shows Active/Inactive label beside switch',
@@ -4074,7 +4077,7 @@ if (typeof G.createOneRmProgram === 'function') {
   check('it asks before creating', _fn.includes('confirm('));
   check('…and says the active program is not changed', _fn.includes('active program is not changed'));
   check('it refuses to create a second copy', _fn.includes('_findOneRmProgram()'));
-  check('it respects the 4-program cap', _fn.includes('_programs.length>=4'));
+  check('it respects the program cap', _fn.includes('_programs.length>=MAX_PROGRAMS'));
   check('it does NOT reassign the active program',
     !/_activeProgramIndex\s*=/.test(_fn), 'must not hijack the active program');
   // Duplicate guard, exercised rather than grepped
@@ -5730,8 +5733,8 @@ console.log('\n── Standard machine exercises ──────────�
     check('every exercise in the picker resolves to a muscle group',
       unclassified.length === 0, unclassified.join(', '));
     // Exact count on purpose: adding or removing an exercise should be a conscious edit here.
-    check('the catalogue holds every exercise it is meant to (66)',
-      opts.length === 66, String(opts.length));
+    check('the catalogue holds every exercise it is meant to (69)',
+      opts.length === 69, String(opts.length));
     check('no exercise is listed twice in the picker',
       new Set(opts).size === opts.length,
       opts.filter((n, i) => opts.indexOf(n) !== i).join(', '));
@@ -5964,7 +5967,7 @@ console.log('\n── Program cards: a long custom name cannot break the grid �
 {
   const _pcSrc = rawScript;
   const _pcCss = html;
-  const _pcFn = (_pcSrc.match(/function buildProgramSettingsCard\(\)\{[\s\S]*?\n\}/) || [''])[0];
+  const _pcFn = (_pcSrc.match(/function _programLibraryHtml\(\)\{[\s\S]*?\n\}/) || [''])[0];
   check('the program grid exists to assert against', _pcFn.length > 0);
 
   // All three are needed and none is sufficient: the track can only shrink if the
@@ -6352,6 +6355,374 @@ console.log('\n── 45° Leg Press (sled scales the plate load) ────�
     found.length === 0, found.slice(0, 3).join(' ; '));
   check('…and the knees injury still substitutes squats to the plain Leg Press',
     (G.REHAB_CONDITIONS.find(c => c.id === 'knees') || {}).suggest('Squat') === 'Leg Press');
+}
+
+// ── Section: program library + template library ──────────────────────────────
+// Henrik, 2026-09-21: "Add support for a library of programs. Not just the 4 as today. So
+// user sees 4 most recent programs presented as today. But under there is a list view of more
+// programs to pick. Also there should be prefilled templates under a Template heading, where a
+// user picks a template and 'copies' to their own programs. Move the 1RM max programs into
+// templates, also add this specific program for preparing for muscle ups."
+console.log('\n── Program library + templates ───────────────────────────');
+{
+  const _savedProgs = G._programs, _savedActive = G._activeProgramIndex;
+  const _savedConfirm = G.confirm, _savedAlert = G.alert;
+  // Guards, not decoration: run against a build that predates this feature the section has to
+  // report clean failures rather than throw on the first missing function (the pre-change run
+  // is how every change here is verified).
+  const HAVE = ['_programsByRecency', '_touchProgram', '_templateToProgram', '_uniqueProgramName',
+    'copyTemplate', '_findTemplate', '_programLibraryHtml', '_templateLibraryHtml', '_progActivateToggle']
+    .every(f => typeof G[f] === 'function') && Array.isArray(G.PROGRAM_TEMPLATES);
+  check('the program-library feature is present', HAVE,
+    'missing: ' + ['_programsByRecency', '_touchProgram', '_templateToProgram', '_uniqueProgramName',
+      'copyTemplate', '_findTemplate', '_programLibraryHtml', '_templateLibraryHtml', '_progActivateToggle']
+      .filter(f => typeof G[f] !== 'function').join(', ') + (Array.isArray(G.PROGRAM_TEMPLATES) ? '' : ' PROGRAM_TEMPLATES'));
+  if (HAVE) {
+
+  // ── The cap is no longer four ──────────────────────────────────────────────
+  check('the program cap is a shared constant, not a literal 4 in three places',
+    typeof G.MAX_PROGRAMS === 'number' && G.MAX_PROGRAMS > 4, String(G.MAX_PROGRAMS));
+  check('the card still shows exactly four slots at a glance',
+    G.PROG_CARD_SLOTS === 4, String(G.PROG_CARD_SLOTS));
+  ['createNewProgram', 'createOneRmProgram', '_progBuildManual'].forEach(fn => {
+    check(`${fn} caps on MAX_PROGRAMS, not on 4`,
+      String(G[fn]).includes('_programs.length>=MAX_PROGRAMS') &&
+      !String(G[fn]).includes('_programs.length>=4'), String(G[fn]).slice(0, 120));
+  });
+
+  // ── "4 most recent" ────────────────────────────────────────────────────────
+  // Recency is a VIEW over the array. Indices are the app's identity for a program
+  // (_activeProgramIndex, the overlay, the log's day lookup), so the sort returns indices and
+  // never reorders _programs itself.
+  const P = (name, touchedAt) => ({ name, days: [{ name: 'D1', warmup: false, exercises: [] }], touchedAt });
+  G._programs = [P('a', '2026-01-01T00:00:00Z'), P('b', '2026-05-01T00:00:00Z'), P('c', '2026-03-01T00:00:00Z')];
+  check('the most recently touched program sorts first',
+    G._programsByRecency().map(i => G._programs[i].name).join('') === 'bca',
+    G._programsByRecency().map(i => G._programs[i].name).join(''));
+  check('_programsByRecency returns indices, leaving the array untouched',
+    G._programs.map(p => p.name).join('') === 'abc');
+
+  // A library that predates touchedAt must not reshuffle itself just from opening the app.
+  G._programs = [P('a'), P('b', '2026-05-01T00:00:00Z'), P('c'), P('d')];
+  check('programs with no stamp keep their array order',
+    G._programsByRecency().map(i => G._programs[i].name).join('') === 'bacd',
+    G._programsByRecency().map(i => G._programs[i].name).join(''));
+  check('…and sort after every stamped one, never in front of it',
+    G._programsByRecency()[0] === 1);
+  check('the sort is total even when two stamps are identical',
+    (() => { G._programs = [P('a', 'T'), P('b', 'T')]; return G._programsByRecency().join(',') === '0,1'; })());
+
+  check('_touchProgram stamps the program it is given',
+    (() => { G._programs = [P('a'), P('b')]; G._touchProgram(1);
+      return !G._programs[0].touchedAt && !!G._programs[1].touchedAt; })());
+  check('…and is never called on load, so nothing is backfilled',
+    !String(G.loadAllData || '').includes('_touchProgram') &&
+    !String(G._ensurePrograms || '').includes('_touchProgram'));
+  check('activating a program marks it as the most recent',
+    String(G._activateProg).includes('_touchProgram(i)'));
+  check('saving an edit marks it too', String(G._saveProgEdit).includes('touchedAt=_nowStamp()'));
+  check('a wizard-built program is stamped on creation',
+    String(G._progWizGenerate).includes('prog.touchedAt=_nowStamp()'));
+  check('a hand-built program is stamped on creation',
+    String(G._progBuildManual).includes('touchedAt:_nowStamp()'));
+
+  // ── The card: four slots, then the list ────────────────────────────────────
+  const render = () => G._programLibraryHtml();
+  check('the card writes exactly what the two pure builders return',
+    /card\.innerHTML=_programLibraryHtml\(\)\+_templateLibraryHtml\(\)/.test(String(G.buildProgramSettingsCard)));
+  G._activeProgramIndex = 0;
+  G._programs = ['a', 'b', 'c'].map((n, i) => P(n, '2026-0' + (i + 1) + '-01T00:00:00Z'));
+  let out = render();
+  check('three programs still render as cards with an Add tile, no list',
+    out.includes('prog-card-empty') && !out.includes('More programs'), out.slice(0, 80));
+
+  G._programs = ['a', 'b', 'c', 'd', 'e', 'f'].map((n, i) => P(n, '2026-0' + (i + 1) + '-01T00:00:00Z'));
+  out = render();
+  check('past four, the rest appear in a list underneath',
+    out.includes('More programs'), 'no list rendered');
+  check('the list is counted so the user knows what is hidden',
+    /More programs · 2/.test(out), (out.match(/More programs[^<]*/) || [''])[0]);
+  check('the four newest are the cards', ['f', 'e', 'd', 'c'].every(n =>
+    out.indexOf('prog-card-name">' + n) >= 0));
+  check('…and the two oldest are the rows',
+    out.indexOf('prog-row-name">b') >= 0 && out.indexOf('prog-row-name">a') >= 0);
+  check('no program is both a card and a row',
+    !(out.indexOf('prog-card-name">a') >= 0) && !(out.indexOf('prog-row-name">f') >= 0));
+  check('every program in the library is reachable', ['a', 'b', 'c', 'd', 'e', 'f']
+    .every(n => out.includes('>' + n + '</div>')));
+
+  // The display order is recency, the onclick must still carry the ARRAY index — the bug this
+  // pins is a card opening or activating the wrong program once the two orders diverge.
+  check('a card opens the program it shows, not the one at its slot position',
+    out.includes('onclick="viewProgram(5)"') && out.includes('onclick="viewProgram(0)"'),
+    'indices are positional, not array-real');
+  check('a row opens the program it shows too',
+    new RegExp('viewProgram\\(1\\)[^>]*>\\s*<div class="prog-row-main"><div class="prog-row-name">b').test(out) ||
+    out.includes('viewProgram(1)'));
+
+  // The "+" tile only exists while a slot is empty, so a full library needs its own way in.
+  check('a full grid still offers a way to add a program',
+    out.includes('createNewProgram()'), 'no add affordance once all four slots are filled');
+
+  // ── Templates ──────────────────────────────────────────────────────────────
+  check('there is a template library', Array.isArray(G.PROGRAM_TEMPLATES) && G.PROGRAM_TEMPLATES.length >= 2,
+    String((G.PROGRAM_TEMPLATES || []).length));
+  check('every template has an id, a name, a description and days',
+    G.PROGRAM_TEMPLATES.every(t => t.id && t.name && t.desc && Array.isArray(t.days) && t.days.length));
+  check('template ids are unique',
+    new Set(G.PROGRAM_TEMPLATES.map(t => t.id)).size === G.PROGRAM_TEMPLATES.length);
+  const tpl = G._templateLibraryHtml();
+  check('the Templates heading is its own section', tpl.includes('Templates') && tpl.includes('s-sec-hdr'),
+    tpl.slice(0, 80));
+  check('every template is listed', G.PROGRAM_TEMPLATES.every(t => tpl.includes(t.name)));
+  check('each template offers a Copy button',
+    (tpl.match(/copyTemplate\(/g) || []).length >= G.PROGRAM_TEMPLATES.length,
+    String((tpl.match(/copyTemplate\(/g) || []).length));
+  check('…and opens a preview when tapped', tpl.includes('previewTemplate('));
+  check('the Templates section is separate from the programs card',
+    !render().includes('previewTemplate('));
+
+  // ── The 1RM program moved here, unchanged ──────────────────────────────────
+  const t1 = G._findTemplate('1rm-test');
+  check('the 1RM test program is a template now', !!t1);
+  check('…still named "1RM Test"', t1.name === G.ONE_RM_PROGRAM_NAME, t1.name);
+  check('…still three days', t1.days.length === 3, String(t1.days.length));
+  check('…still two lifts a day', t1.days.every(d => d.exercises.length === 2));
+  check('…still one top set of three', t1.days.every(d => d.exercises.every(e => e.sets === '3' && e.tag === 'strength')));
+  check('…still warming up first', t1.days.every(d => d.warmup === true));
+  check('…still seeds no loads (GDPR: never seed one person’s weights)',
+    t1.days.every(d => d.exercises.every(e => e.kg === 0)));
+  check('…still covers exactly the six testable lifts',
+    JSON.stringify(t1.days.flatMap(d => d.exercises.map(e => e.name)).sort()) ===
+    JSON.stringify([...G.ONE_RM_TESTABLE].sort()));
+  check('…and still never pairs Squat with a conventional Deadlift',
+    !t1.days.some(d => d.exercises.some(e => e.name === 'Squat') && d.exercises.some(e => e.name === 'Deadlift')));
+  // Moving the definition must not break the Progress-tab button that used it.
+  check('the Progress-tab 1RM button still builds the same program',
+    typeof G._oneRmTestProgram === 'function' && G._oneRmTestProgram().name === G.ONE_RM_PROGRAM_NAME);
+  check('…and still goes through the template, so there is one definition',
+    String(G._oneRmTestProgram).includes("_findTemplate('1rm-test')"));
+  check('…and the Progress tab still offers it', html.includes('createOneRmProgram()'));
+
+  // ── The muscle-up power template ───────────────────────────────────────────
+  const mu = G._findTemplate('muscle-up-power');
+  check('the muscle-up power template exists', !!mu);
+  check('it runs twice a week, as prescribed', mu.days.length === 2, String(mu.days.length));
+  const muEx = mu.days.flatMap(d => d.exercises);
+  check('every prescription is legal and tagged from its reps',
+    muEx.every(e => String(e.sets).split('-').every(r => G.REPS_LEGAL.includes(parseInt(r, 10)))),
+    muEx.map(e => e.sets).join(' | '));
+  check('no rep count above 12 anywhere (the rehab tag is the only exception, unused here)',
+    muEx.every(e => String(e.sets).split('-').every(r => parseInt(r, 10) <= 12)));
+  check('the explosive work sits in the strength band (2-6), where power reps belong',
+    muEx.every(e => e.tag === 'strength'), muEx.map(e => e.name + ':' + e.tag).join(', '));
+  check('pull reps are 2-4, per "keep reps per set between 2 and 4"',
+    muEx.filter(e => /pull-?ups?$/i.test(e.name)).every(e =>
+      String(e.sets).split('-').every(r => parseInt(r, 10) >= 2 && parseInt(r, 10) <= 4)),
+    muEx.filter(e => /pull-?ups?$/i.test(e.name)).map(e => e.name + ' ' + e.sets).join(', '));
+  check('every day opens with an explosive pull, "at the start of your workout when fresh"',
+    mu.days.every(d => /pull-?ups?$/i.test(d.exercises[0].name)),
+    mu.days.map(d => d.exercises[0].name).join(' / '));
+  check('both days warm up first', mu.days.every(d => d.warmup === true));
+  check('it seeds no loads either', muEx.every(e => e.kg === 0));
+
+  // Bar-to-sternum and speed work are the SAME movements as Pull-ups / Weighted Pull-ups with
+  // the intent in the scheme. A separate "Explosive Pull-ups" name would split the history of
+  // the very lift this program exists to move (one exercise, one 1RM — rule 2026-08-08).
+  check('the explosive pull is prescribed as Pull-ups, not a second pull-up movement',
+    muEx.some(e => e.name === 'Pull-ups') &&
+    !muEx.some(e => /^(explosive|speed)/i.test(e.name)), muEx.map(e => e.name).join(', '));
+  check('…with the intent carried in the scheme the user reads',
+    muEx.filter(e => e.name === 'Pull-ups').every(e => /explosive|intent/i.test(e.scheme)),
+    muEx.filter(e => e.name === 'Pull-ups').map(e => e.scheme).join(' | '));
+  check('the speed work is Weighted Pull-ups and names the +10-20% load',
+    muEx.some(e => e.name === 'Weighted Pull-ups' && /10-20% BW/.test(e.scheme)));
+  check('…and the slow eccentric', muEx.some(e => e.name === 'Weighted Pull-ups' && /2-3s down/.test(e.scheme)));
+  check('straight-arm shoulder extension is in there', muEx.some(e => e.name === 'Straight-Arm Lat Pushdown'));
+  check('so is the plyometric CNS primer', muEx.some(e => e.name === 'Clapping Pull-ups'));
+  check('and the transition practice the whole thing is for',
+    muEx.some(e => /muscle up/i.test(e.name)));
+
+  // The rules that the day/exercise model cannot carry.
+  const notes = (mu.notes || []).join(' ');
+  check('the template carries the rules the days cannot', (mu.notes || []).length >= 5, String((mu.notes || []).length));
+  check('…maximal intent on every rep', /maximal intent/i.test(notes));
+  check('…stop the set when speed drops', /speed drops/i.test(notes));
+  check('…2-3 minutes rest for CNS recovery', /2-3 minutes/i.test(notes) && /CNS/i.test(notes));
+  check('…twice a week, before any heavy or volume work', /twice a week/i.test(notes) && /heavy or volume/i.test(notes));
+  check('…the C-shape pull curve', /C-shape/i.test(notes));
+  check('…and the chest-and-head drive over the bar at the top',
+    /chest and head forward/i.test(notes) && /false\/top grip/i.test(notes));
+
+  // ── Copying ────────────────────────────────────────────────────────────────
+  // A template is a blueprint. The copy is the user's program; neither can reach the other.
+  G._programs = [];
+  const copy = G._templateToProgram(mu);
+  check('a copy carries the days across', copy.days.length === mu.days.length);
+  check('a copy is stamped, so it lands in the four most recent', !!copy.touchedAt);
+  check('a copy records where it came from', copy.fromTemplate === 'muscle-up-power');
+  check('library metadata does not travel onto the program',
+    copy.desc === undefined && copy.notes === undefined && copy.id === undefined);
+  copy.days[0].exercises[0].name = 'MUTATED';
+  copy.days[0].name = 'MUTATED';
+  check('editing your copy cannot reach the template',
+    mu.days[0].exercises[0].name !== 'MUTATED' && mu.days[0].name !== 'MUTATED');
+  check('…and a second copy is unaffected by the first',
+    G._templateToProgram(mu).days[0].exercises[0].name !== 'MUTATED');
+  check('the copy runs through the same tagging pass generated programs get, so a template'
+    + ' can never ship an illegal prescription',
+    String(G._templateToProgram).includes('applyTagFromReps'));
+
+  check('two copies of one template are named apart, not refused',
+    (() => { G._programs = [P('1RM Test')]; return G._uniqueProgramName('1RM Test') === '1RM Test 2'; })());
+  check('…and a third', (() => { G._programs = [P('1RM Test'), P('1RM Test 2')];
+    return G._uniqueProgramName('1RM Test') === '1RM Test 3'; })());
+  check('a free name is left alone',
+    (() => { G._programs = [P('Other')]; return G._uniqueProgramName('1RM Test') === '1RM Test'; })());
+
+  G._programs = []; G._activeProgramIndex = 0;
+  const alerts = []; G.confirm = () => true; G.alert = (m) => alerts.push(m);
+  G.copyTemplate('muscle-up-power');
+  check('copying adds the program', G._programs.length === 1 && G._programs[0].name === mu.name,
+    JSON.stringify(G._programs.map(p => p.name)));
+  check('…and persists it to the BACKEND, not just localStorage',
+    String(G.copyTemplate).includes('savePrograms()'));
+  check('…without changing which program is active', G._activeProgramIndex === 0 && G._programs.length === 1);
+  check('…and says so before it does anything',
+    String(G.copyTemplate).includes('confirm(') && String(G.copyTemplate).includes('active program is not changed'));
+  G.copyTemplate('muscle-up-power');
+  check('copying the same template twice names the second one apart',
+    G._programs.length === 2 && G._programs[1].name === mu.name + ' 2',
+    G._programs.map(p => p.name).join(' | '));
+  G.confirm = () => false;
+  G.copyTemplate('1rm-test');
+  check('declining the confirm copies nothing', G._programs.length === 2);
+  G.confirm = () => true;
+  G._programs = new Array(G.MAX_PROGRAMS).fill(0).map((_, i) => P('p' + i));
+  G.copyTemplate('1rm-test');
+  check('a full library refuses the copy rather than silently dropping it',
+    G._programs.length === G.MAX_PROGRAMS && /Maximum/.test(alerts[alerts.length - 1] || ''),
+    alerts[alerts.length - 1] || '');
+  check('an unknown template id is a no-op, not a throw',
+    (() => { G._programs = []; G.copyTemplate('nope'); return G._programs.length === 0; })());
+
+  G._programs = _savedProgs; G._activeProgramIndex = _savedActive;
+  G.confirm = _savedConfirm; G.alert = _savedAlert;
+
+  // ── The preview ────────────────────────────────────────────────────────────
+  // Rendered into plain capture objects: the harness's tracking elements define innerHTML as
+  // a getter that always reads '', so nothing written to a real one can be asserted.
+  if (typeof G._renderTemplateOverlay === 'function') {
+    const cap = () => ({ innerHTML: '', textContent: '' });
+    // Same escaping the app applies on the way into innerHTML.
+    const _esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    G.PROGRAM_TEMPLATES.forEach(t => {
+      const title = cap(), body = cap(), footer = cap();
+      G._progTemplateId = t.id;
+      G._renderTemplateOverlay(title, body, footer);
+      check(`the ${t.id} preview shows every day`,
+        t.days.every(d => body.innerHTML.includes(_esc(d.name))), t.id);
+      check(`  …every exercise and its prescription`,
+        t.days.every(d => d.exercises.every(e =>
+          body.innerHTML.includes(_esc(e.name)) && body.innerHTML.includes(_esc(e.scheme)))), t.id);
+      check(`  …and the rules for running it`,
+        (t.notes || []).every(n => body.innerHTML.includes(_esc(n))), t.id);
+      check(`  …labelled a template, not a program you already own`,
+        /Template/i.test(body.innerHTML) && !/\bACTIVE\b/.test(body.innerHTML), t.id);
+      check(`  …with a copy button wired to this template`,
+        footer.innerHTML.includes("copyTemplate('" + t.id + "')"), footer.innerHTML.slice(0, 100));
+      check(`  …and a way out that copies nothing`, footer.innerHTML.includes('closeProgramOverlay()'));
+    });
+    // A template has no index in _programs, so it must never fall through to the read-only
+    // path, which reads _programs[_progEditIdx] and would throw or show someone else's program.
+    check('the overlay routes a template to its own renderer before anything else',
+      /_progTemplateId!==null\)\{_renderTemplateOverlay/.test(String(G._renderProgOverlay)));
+    check('a deleted template id closes the overlay instead of throwing',
+      (() => { G._progTemplateId = 'gone';
+        try { G._renderTemplateOverlay(cap(), cap(), cap()); } catch (e) { return false; }
+        return G._progTemplateId === null; })());
+    check('closing a preview clears it, and does NOT run the new-program cleanup',
+      String(G.closeProgramOverlay).includes('_progTemplateId!==null') &&
+      String(G.closeProgramOverlay).indexOf('_progTemplateId!==null') <
+      String(G.closeProgramOverlay).indexOf('_progIsNew'));
+    G._progTemplateId = null;
+  } else {
+    check('the overlay can preview a template', false, '_renderTemplateOverlay missing');
+  }
+  }
+  // ── Every exercise a template names must be a real catalogue exercise ──────
+  // Same rule the rehab table already lives under: a name the app hands you that the pickers
+  // cannot offer and the charts cannot classify is a broken prescription.
+  const picker = [...G.EX_OPTS_HTML.matchAll(/<option>([^<]+)<\/option>/g)].map(m => m[1]);
+  const templateNames = [...new Set((G.PROGRAM_TEMPLATES || []).flatMap(t => t.days.flatMap(d => d.exercises.map(e => e.name))))];
+  const missing = templateNames.filter(n => !picker.includes(n));
+  check('every exercise named by a template is in the Log Workout picker',
+    missing.length === 0, missing.join(', '));
+  const editorAll = String(G._exOpts || '');
+  const missingEd = templateNames.filter(n => !editorAll.includes("'" + n + "'"));
+  check('…and in the program editor picker', missingEd.length === 0, missingEd.join(', '));
+  const unclassified = templateNames.filter(n => !G.getExGroup(n));
+  check('…and every one of them resolves to a muscle group', unclassified.length === 0, unclassified.join(', '));
+}
+
+// ── Section: the three movements the muscle-up template needs ────────────────
+console.log('\n── Straight-Arm Lat Pushdown / plyo pair ─────────────────');
+{
+  // A straight-arm lat pushdown is a LAT exercise — shoulder extension with the elbows locked.
+  // Its name ends in "pushdown", which both lookup tables key to the triceps, so without a
+  // specific key ahead of that one every set would have counted as arm volume.
+  const sa = 'Straight-Arm Lat Pushdown';
+  check('Log Workout offers it under Back',
+    G.EX_OPTS_HTML.slice(G.EX_OPTS_HTML.indexOf('<optgroup label="Back"'),
+      G.EX_OPTS_HTML.indexOf('</optgroup>', G.EX_OPTS_HTML.indexOf('<optgroup label="Back"')))
+      .includes('<option>' + sa + '</option>'));
+  check('the program editor offers it under Back', String(G._exOpts).includes("'Drape Pulldowns','" + sa + "'"));
+  check('it counts as back volume, not arm volume', G.getExSplits(sa).back > 0.5,
+    JSON.stringify(G.getExSplits(sa)));
+  check('  …with the arms taking no share at all — the elbows do not bend',
+    !G.getExSplits(sa).arms, JSON.stringify(G.getExSplits(sa)));
+  check('  …and it maps to the back muscle group, NOT arms via "pushdown"',
+    G.getExGroup(sa) === 'back', String(G.getExGroup(sa)));
+  check('the split key is matched before the triceps "pushdown" key',
+    G.EXERCISE_SPLITS.findIndex(e => e[0] === 'straight-arm lat') <
+    G.EXERCISE_SPLITS.findIndex(e => e[0] === 'pushdown'));
+  check('it is a cable/band exercise, so it gets the gearing controls', G.isCableEx(sa));
+  check('it is not a bodyweight card', !G.isBWExName(sa));
+  check('its long straight-arm arc is not the short triceps pushdown ROM',
+    G.exerciseRom(sa) === 0.65 && G.exerciseRom(sa) > G.exerciseRom('Tricep Pushdown'),
+    `${G.exerciseRom(sa)} vs ${G.exerciseRom('Tricep Pushdown')}`);
+  check('the triceps pushdown is untouched',
+    G.getExGroup('Tricep Pushdown') === 'arms' && G.getExSplits('Tricep Pushdown').arms === 1);
+
+  // The two plyometrics classify off the pull-up / push-up keys already in the tables, so only
+  // the picker entries are new. Both are bodyweight: the kg field is the body.
+  check('Clapping Pull-ups is offered', G.EX_OPTS_HTML.includes('<option>Clapping Pull-ups</option>') &&
+    String(G._exOpts).includes("'Clapping Pull-ups'"));
+  check('  …counts as back volume', G.getExGroup('Clapping Pull-ups') === 'back');
+  check('  …and is a bodyweight lift, so a set is not logged as zero work',
+    G.isBWExName('Clapping Pull-ups'));
+  check('Plyo Push-ups is offered', G.EX_OPTS_HTML.includes('<option>Plyo Push-ups</option>') &&
+    String(G._exOpts).includes("'Plyo Push-ups'"));
+  check('  …counts as chest volume', G.getExGroup('Plyo Push-ups') === 'chest');
+  check('  …is a bodyweight lift', G.isBWExName('Plyo Push-ups'));
+  check('  …and keeps the push-up factor, only part of you is pressed',
+    G.getExSplits('Plyo Push-ups').factor === 0.64);
+
+  // Catalogue-only, like every addition since the muscle-up itself. The generator must not
+  // start prescribing plyometrics or a straight-arm pulldown to anyone.
+  const found = [];
+  ['strength', 'hypertrophy', 'rehab'].forEach(goal => ['balanced', 'upper', 'lower', 'hybrid', 'aesthetics'].forEach(sub => {
+    [3, 5, 6, 7].forEach(nDays => [10, 16, 22].forEach(spm => {
+      [[], ['shoulders'], ['knees']].forEach(inj => {
+        let prog; try { prog = G._generateWorkoutProgram(goal, sub, nDays, 'T', spm, inj); } catch (e) { return; }
+        (prog.days || []).forEach(d => (d.exercises || []).forEach(ex => {
+          if (/clapping|plyo|straight-arm/i.test(ex.name || '')) found.push(`${goal}/${sub} ${nDays}d: ${ex.name}`);
+        }));
+      });
+    }));
+  }));
+  check('no generated program prescribes any of the three', found.length === 0, found.slice(0, 3).join(' ; '));
 }
 
 setImmediate(() => {
