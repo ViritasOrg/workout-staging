@@ -645,6 +645,47 @@ history of the very lift the program exists to move. Its programming rules (maxi
 stop when speed drops >10%, 2-3 min rest, twice weekly before heavy work, the C-shape pull and
 the chest-over-bar transition) live in `notes`, which the day/exercise model cannot carry.
 
+### Extending a program with a template block (rule 2026-09-24)
+Henrik: *"every day program starts with a muscle up prep program day … So PushA starts with
+Muscle Up A, then Pull A gets Muscle Up B first etc."*
+
+A template marked **`extendable:true`** can be bolted onto the front of another program's days.
+Host day `i` takes template day `i % nTemplateDays`, so a 6-day push/pull/legs against the
+2-day muscle-up template reads A, B, A, B, A, B. Only `muscle-up-power` is extendable — the
+1RM Test is a standalone program and prepending a limit single to every day is nonsense, so
+the attempt is refused with a message, not silently performed.
+
+**The exercises are spliced in for real**, not overlaid at render time: the log, the volume
+charts, the 1RM charts and the editor then all see ordinary exercises and need no plumbing.
+What makes them removable and visible is the marker each injected exercise carries:
+`_tpl` (template id) and `_tplDay` (the day's `short` label, e.g. "Muscle Up A"). An extendable
+template MUST give every day a `short` — that label is the whole explanation the user gets.
+
+- **The extension record is derived, never trusted alone.** `_progExtension(prog)` returns
+  `prog.extension` only if some exercise still carries a marker, so deleting the injected rows
+  by hand in the editor cannot leave a phantom badge behind.
+- **Re-extending replaces, it never stacks.** `_extendDaysWithTemplate` filters existing
+  markers out before prepending, and `extendProgramWithTemplate` strips first as well.
+- **Removing restores the program byte-for-byte.** Tested by comparing against the pre-extend
+  days, not by counting.
+- Extending or removing **clears the draft** when the program is the active one: an
+  in-progress draft's cards no longer line up with the day's exercises.
+- The block is visible in four places, and all four are tested: the Log Workout card chip, the
+  Program-tab day view (chip + a banner naming the template and the day), the program view
+  (the block grouped under its own label, plus "Extended with …" at the top and a Remove
+  button), and the editor (a marked row). The chip is **`#7cc4ff`**, deliberately not the
+  rehab chip's `#ff9b3c` — the two must never read as the same thing.
+- The chip is a `<span>` appended **after** the name's text node, because `_exCardName` reads
+  only that first text node. Same contract the rehab and bodyweight chips already rely on.
+
+**Known tension, left as Henrik specified:** the muscle-up template's own notes say to run
+explosive pull work *twice a week*, and extending a 6-day program puts it on all six. He asked
+for every day. If a cadence option is ever added, it belongs here, not in the template.
+
+**Leg days:** extending puts the template block before the squat, so an extended leg day no
+longer opens with one. The leg-day rule is enforced only at generation time and explicitly
+never re-applied to stored programs, so nothing fights over it at runtime.
+
 ### NEVER edit existing (stored) programs unless Henrik explicitly asks (rule 2026-07-15)
 Henrik's saved programs are his own. **Do NOT mutate existing stored programs** — no
 migrations in `_ensurePrograms`, no "repair" helpers, no bulk edits — unless Henrik
