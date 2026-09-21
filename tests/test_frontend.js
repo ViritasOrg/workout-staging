@@ -6637,7 +6637,8 @@ console.log('\n── Program library + templates ──────────
     // A template has no index in _programs, so it must never fall through to the read-only
     // path, which reads _programs[_progEditIdx] and would throw or show someone else's program.
     check('the overlay routes a template to its own renderer before anything else',
-      /_progTemplateId!==null\)\{_renderTemplateOverlay/.test(String(G._renderProgOverlay)));
+      /_progTemplateId!==null\)\{[\s\S]{0,120}_renderTemplateOverlay/.test(String(G._renderProgOverlay)),
+      'a template must never reach the read-only path, which reads _programs[_progEditIdx]');
     check('a deleted template id closes the overlay instead of throwing',
       (() => { G._progTemplateId = 'gone';
         try { G._renderTemplateOverlay(cap(), cap(), cap()); } catch (e) { return false; }
@@ -6723,6 +6724,244 @@ console.log('\n── Straight-Arm Lat Pushdown / plyo pair ──────�
     }));
   }));
   check('no generated program prescribes any of the three', found.length === 0, found.slice(0, 3).join(' ; '));
+}
+
+// ── Section: extending a program with a template ────────────────────────────
+// Henrik, 2026-09-24: "Add ability to extend an existing program with the muscle up template,
+// ie every day program starts with a muscle up prep program day. Make it visible in the
+// program view that the first exercise(s) is from a separate template. So during Log Workout
+// you see why you see these exercises in the normal program. So a 6 day push/pull/legs get the
+// templated muscle up 'pull days' on every other day. So PushA starts with Muscle Up A, then
+// Pull A gets Muscle Up B first etc."
+console.log('\n── Extending a program with a template ───────────────────');
+{
+  const HAVE2 = ['_extendDaysWithTemplate', '_stripProgramExtension', '_progExtension', '_isTplEx',
+    '_tplChipHtml', '_tplDayShort', 'extendProgramWithTemplate', 'removeProgramExtension',
+    '_renderTplPick', '_dayTplBannerHtml'].every(f => typeof G[f] === 'function');
+  check('the extend-with-template feature is present', HAVE2,
+    'missing: ' + ['_extendDaysWithTemplate', '_stripProgramExtension', '_progExtension', '_isTplEx',
+      '_tplChipHtml', '_tplDayShort', 'extendProgramWithTemplate', 'removeProgramExtension',
+      '_renderTplPick', '_dayTplBannerHtml'].filter(f => typeof G[f] !== 'function').join(', '));
+
+  // ── What the old build lacks, stated so it fails there rather than hiding ──
+  // Only a template that makes sense as a prepended block may be one, and the chip/banner
+  // wiring is asserted on functions every build has, so this whole group reports against a
+  // build that predates the feature.
+  const _mu0 = G._findTemplate ? G._findTemplate('muscle-up-power') : null;
+  check('the muscle-up template declares itself extendable', !!(_mu0 && _mu0.extendable === true));
+  check('the 1RM test does NOT — a limit single is not a warm-up block',
+    !!(G._findTemplate && !G._findTemplate('1rm-test').extendable));
+  check('every extendable template labels its days for the badge',
+    (G.PROGRAM_TEMPLATES || []).filter(t => t.extendable).length > 0 &&
+    (G.PROGRAM_TEMPLATES || []).filter(t => t.extendable).every(t => t.days.every(d => d.short)));
+  check('…and they are the labels Henrik named them by',
+    !!_mu0 && _mu0.days.map(d => d.short).join(' / ') === 'Muscle Up A / Muscle Up B',
+    _mu0 ? _mu0.days.map(d => d.short).join(' / ') : 'no template');
+  check('Log Workout puts the chip on the card', String(G.prefillLog).includes('_tplChipHtml(ex)'));
+  check('the program day view puts it on the row', String(G.renderWorkout).includes('_tplChipHtml(ex)'));
+  check('…and heads the day with a banner explaining the block',
+    String(G.renderWorkout).includes('_dayTplBannerHtml(day,prog)'));
+  check('the program view groups the block instead of mixing it into the day',
+    String(G._renderProgOverlay).includes('_tplExs') && String(G._renderProgOverlay).includes('_ownExs'));
+  check('…and says at the top that the program is extended',
+    String(G._renderProgOverlay).includes('Extended with'));
+  check('the editor marks an injected row too', String(G._renderProgOverlay).includes('_isTplEx(ex)'));
+  check('the library card flags an extended program',
+    String(G._programLibraryHtml || '').includes('_progExtension(prog)') &&
+    String(G._programLibraryHtml || '').includes('_progExtension(rp)'));
+
+  if (HAVE2) {
+  const _savedProgs = G._programs, _savedActive = G._activeProgramIndex;
+  const _savedConfirm = G.confirm, _savedAlert = G.alert;
+  const mu = G._findTemplate('muscle-up-power');
+
+  // ── The cycling, on his own example ───────────────────────────────────────
+  const ppl = ['Push A', 'Pull A', 'Legs A', 'Push B', 'Pull B', 'Legs B']
+    .map(n => ({ name: n, warmup: false, exercises: [{ name: 'Squat', scheme: '3×8', tag: 'volume', sets: '8-8-8', kg: 0 }] }));
+  const out = G._extendDaysWithTemplate(ppl, mu);
+  check('a 6-day push/pull/legs keeps all six days', out.length === 6);
+  check('Push A starts with Muscle Up A', out[0].exercises[0]._tplDay === 'Muscle Up A',
+    out[0].exercises[0]._tplDay);
+  check('…then Pull A gets Muscle Up B first', out[1].exercises[0]._tplDay === 'Muscle Up B',
+    out[1].exercises[0]._tplDay);
+  check('…and it keeps cycling A, B, A, B, A, B',
+    out.map(d => d.exercises[0]._tplDay).join(',') === 'Muscle Up A,Muscle Up B,Muscle Up A,Muscle Up B,Muscle Up A,Muscle Up B',
+    out.map(d => d.exercises[0]._tplDay).join(','));
+  check('every day gets the whole template day, not just its first exercise',
+    out.every((d, i) => d.exercises.filter(G._isTplEx).length === mu.days[i % 2].exercises.length),
+    out.map(d => d.exercises.filter(G._isTplEx).length).join(','));
+  check('the template block goes FIRST, the program’s own work after it',
+    out.every(d => {
+      const own = d.exercises.findIndex(e => !G._isTplEx(e));
+      return own === d.exercises.filter(G._isTplEx).length;
+    }));
+  check('the program’s own exercises are all still there, in order',
+    out.every(d => d.exercises.filter(e => !G._isTplEx(e)).map(e => e.name).join() === 'Squat'));
+  check('the day names are untouched',
+    out.map(d => d.name).join() === ppl.map(d => d.name).join());
+
+  // A template shorter or longer than the host program still lands cleanly.
+  check('a 1-day program takes only the first template day',
+    G._extendDaysWithTemplate([{ name: 'D', exercises: [] }], mu)[0].exercises[0]._tplDay === 'Muscle Up A');
+  check('a 7-day program wraps round to A on day 7',
+    G._extendDaysWithTemplate(new Array(7).fill(0).map((_, i) => ({ name: 'D' + i, exercises: [] })), mu)[6]
+      .exercises[0]._tplDay === 'Muscle Up A');
+  check('a program with no days is not a crash',
+    Array.isArray(G._extendDaysWithTemplate([], mu)) && G._extendDaysWithTemplate([], mu).length === 0);
+
+  // ── Every injected exercise is marked, tagged and load-free ───────────────
+  const injected = out.flatMap(d => d.exercises.filter(G._isTplEx));
+  check('every injected exercise records which template it came from',
+    injected.every(e => e._tpl === 'muscle-up-power'));
+  check('…and which template day, so the badge can name it',
+    injected.every(e => /^Muscle Up [AB]$/.test(e._tplDay)));
+  check('…and is tagged from its reps like anything else',
+    injected.every(e => e.tag === 'strength'), injected.map(e => e.tag).join(','));
+  check('…and seeds no loads', injected.every(e => e.kg === 0));
+  check('the source template is not mutated by extending with it',
+    mu.days[0].exercises.every(e => e._tpl === undefined && e._tplDay === undefined));
+  check('…and two extends produce independent copies',
+    (() => { const a = G._extendDaysWithTemplate(ppl, mu); a[0].exercises[0].name = 'MUTATED';
+      return G._extendDaysWithTemplate(ppl, mu)[0].exercises[0].name !== 'MUTATED'; })());
+  check('extending does not mutate the days handed to it',
+    ppl.every(d => d.exercises.length === 1 && d.exercises[0].name === 'Squat'));
+
+  // ── Re-extending replaces, it does not stack ──────────────────────────────
+  const twice = G._extendDaysWithTemplate(out, mu);
+  check('extending an already-extended program does not pile blocks up',
+    twice.every((d, i) => d.exercises.filter(G._isTplEx).length === mu.days[i % 2].exercises.length),
+    twice.map(d => d.exercises.filter(G._isTplEx).length).join(','));
+  check('…and the program’s own exercises survive that too',
+    twice.every(d => d.exercises.filter(e => !G._isTplEx(e)).map(e => e.name).join() === 'Squat'));
+
+  // ── Removing it puts the program back exactly as it was ───────────────────
+  const host = { name: 'PPL', days: JSON.parse(JSON.stringify(ppl)), extension: null };
+  host.days = G._extendDaysWithTemplate(host.days, mu);
+  host.extension = { templateId: 'muscle-up-power', name: mu.name, noun: 'Muscle Up' };
+  check('an extended program reports its extension', !!G._progExtension(host));
+  const removed = G._stripProgramExtension(host);
+  check('removing takes out every injected exercise', removed === injected.length, String(removed));
+  check('…and leaves the program byte-for-byte what it was',
+    JSON.stringify(host.days.map(d => d.exercises)) === JSON.stringify(ppl.map(d => d.exercises)),
+    JSON.stringify(host.days[0].exercises));
+  check('…and clears the extension record', host.extension === undefined);
+  check('stripping a program that was never extended is a no-op',
+    G._stripProgramExtension({ name: 'x', days: JSON.parse(JSON.stringify(ppl)) }) === 0);
+  check('a null program does not throw', G._stripProgramExtension(null) === 0);
+
+  // The record is DERIVED: an extension nothing carries a marker for is not an extension, so
+  // deleting the injected rows by hand in the editor cannot leave a phantom badge behind.
+  const phantom = { name: 'p', days: [{ name: 'D', exercises: [{ name: 'Squat' }] }],
+    extension: { templateId: 'muscle-up-power', name: mu.name } };
+  check('an extension with no exercises left to show is not reported', G._progExtension(phantom) === null);
+  check('a program with no extension field reports none',
+    G._progExtension({ name: 'p', days: [{ name: 'D', exercises: [] }] }) === null);
+  check('a null program reports none', G._progExtension(null) === null);
+
+  // ── It is visible everywhere the exercises show up ────────────────────────
+  const chip = G._tplChipHtml(injected[0]);
+  check('an injected exercise renders a chip', chip.length > 0);
+  check('…naming which template day it belongs to', chip.includes('Muscle Up A'), chip);
+  check('…and saying, on hover, that it is not from this program',
+    /title="[^"]*template[^"]*"/.test(chip), chip);
+  check('…in a colour of its own, not the rehab orange',
+    chip.includes('#7cc4ff') && !chip.includes('#ff9b3c'));
+  check('an ordinary exercise renders no chip', G._tplChipHtml({ name: 'Squat' }) === '');
+  // The chip rides INSIDE the name element, after the name's text node. _exCardName reads
+  // that first text node, so a chip must never be the thing a swap or a save picks up as the
+  // exercise name — same contract the rehab chip and the bodyweight chip already rely on.
+  check('the chip is a span appended after the name, not part of it', /^<span /.test(chip), chip.slice(0, 30));
+  check('…and _exCardName still reads only the leading text node',
+    /firstChild[\s\S]{0,60}nodeType===3/.test(String(G._exCardName)), String(G._exCardName).slice(0, 160));
+
+  const banner = G._dayTplBannerHtml(out[0], { name: 'PPL' });
+  check('the banner names the template day', banner.includes('Muscle Up A'), banner.slice(0, 120));
+  check('…the template it came from', banner.includes(mu.name));
+  check('…the host program it did NOT come from', banner.includes('PPL'));
+  check('…how many exercises it accounts for',
+    banner.includes(String(mu.days[0].exercises.length) + ' exercise'), banner.slice(0, 200));
+  check('…and which ones', mu.days[0].exercises.every(e => banner.includes(e.name)));
+  check('a day with no template block has no banner',
+    G._dayTplBannerHtml({ name: 'D', exercises: [{ name: 'Squat' }] }, { name: 'P' }) === '');
+  // ── The whole flow, through the real entry point ──────────────────────────
+  const alerts = []; G.alert = (m) => alerts.push(m); G.confirm = () => true;
+  G._programs = [{ name: 'PPL', days: JSON.parse(JSON.stringify(ppl)) }];
+  G._activeProgramIndex = 0;
+  G.extendProgramWithTemplate(0, 'muscle-up-power');
+  check('extending through the entry point injects the block',
+    G._programs[0].days.every(d => d.exercises.filter(G._isTplEx).length > 0));
+  check('…records the extension on the program',
+    (G._programs[0].extension || {}).templateId === 'muscle-up-power');
+  check('…stamps it as recently touched, so it surfaces in the four cards',
+    !!G._programs[0].touchedAt);
+  check('…persists to the BACKEND, not just localStorage',
+    String(G.extendProgramWithTemplate).includes('savePrograms()'));
+  check('…drops the in-progress draft, whose cards no longer match the day',
+    String(G.extendProgramWithTemplate).includes('clearDraft()'));
+  check('…and told the user what it did', /added to the front of every day/.test(alerts.join(' ')));
+
+  const beforeReExtend = G._programs[0].days.map(d => d.exercises.length);
+  G.extendProgramWithTemplate(0, 'muscle-up-power');
+  check('extending twice through the entry point replaces rather than stacks',
+    JSON.stringify(G._programs[0].days.map(d => d.exercises.length)) === JSON.stringify(beforeReExtend),
+    G._programs[0].days.map(d => d.exercises.length).join(','));
+
+  G.removeProgramExtension(0);
+  check('removing through the entry point strips the block',
+    G._programs[0].days.every(d => d.exercises.every(e => !G._isTplEx(e))));
+  check('…and restores the original day exactly',
+    JSON.stringify(G._programs[0].days.map(d => d.exercises)) === JSON.stringify(ppl.map(d => d.exercises)));
+  check('…and persists that too', String(G.removeProgramExtension).includes('savePrograms()'));
+
+  G.confirm = () => false;
+  G.extendProgramWithTemplate(0, 'muscle-up-power');
+  check('declining the confirm changes nothing',
+    G._programs[0].days.every(d => d.exercises.every(e => !G._isTplEx(e))));
+  G.confirm = () => true;
+
+  // A standalone program is not a block. Refusing beats prepending a 3-rep max to every day.
+  const before1rm = JSON.stringify(G._programs[0].days);
+  G.extendProgramWithTemplate(0, '1rm-test');
+  check('a non-extendable template is refused, not silently prepended',
+    JSON.stringify(G._programs[0].days) === before1rm &&
+    /standalone program/.test(alerts[alerts.length - 1] || ''), alerts[alerts.length - 1] || '');
+  check('an unknown template id is a no-op',
+    (() => { const b = JSON.stringify(G._programs[0].days);
+      G.extendProgramWithTemplate(0, 'nope'); return JSON.stringify(G._programs[0].days) === b; })());
+  check('an unknown program index is a no-op',
+    (() => { try { G.extendProgramWithTemplate(99, 'muscle-up-power'); } catch (e) { return false; } return true; })());
+
+  // ── The picker ────────────────────────────────────────────────────────────
+  const cap2 = () => ({ innerHTML: '', textContent: '' });
+  G._programs = [{ name: 'PPL', days: JSON.parse(JSON.stringify(ppl)), touchedAt: '2026-01-02T00:00:00Z' },
+                 { name: 'Other', days: [{ name: 'D', exercises: [] }], touchedAt: '2026-01-01T00:00:00Z' }];
+  G._progTemplateId = 'muscle-up-power'; G._progTplPick = true;
+  const pt = cap2(), pb = cap2(), pf = cap2();
+  G._renderTplPick(pt, pb, pf);
+  check('the picker lists every program you could extend',
+    pb.innerHTML.includes('PPL') && pb.innerHTML.includes('Other'));
+  check('…each wired to its ARRAY index, not its row position',
+    pb.innerHTML.includes("extendProgramWithTemplate(0,'muscle-up-power')") &&
+    pb.innerHTML.includes("extendProgramWithTemplate(1,'muscle-up-power')"));
+  check('…and explains the cycling before you commit',
+    pb.innerHTML.includes('Muscle Up A') && pb.innerHTML.includes('Muscle Up B'));
+  check('the picker offers a way back that changes nothing', pf.innerHTML.includes('_tplCancelPick()'));
+  check('an empty library says so instead of showing an empty list',
+    (() => { G._programs = []; const b = cap2(); G._renderTplPick(cap2(), b, cap2());
+      return /no programs yet/i.test(b.innerHTML); })());
+  check('the preview offers the extend action for an extendable template',
+    (() => { G._progTplPick = false; const f = cap2();
+      G._renderTemplateOverlay(cap2(), cap2(), f); return f.innerHTML.includes('_tplStartPick()'); })());
+  check('…and does NOT offer it for a standalone one',
+    (() => { G._progTemplateId = '1rm-test'; const f = cap2();
+      G._renderTemplateOverlay(cap2(), cap2(), f); return !f.innerHTML.includes('_tplStartPick()'); })());
+  check('closing the overlay clears the picker as well as the preview',
+    String(G.closeProgramOverlay).includes('_progTplPick=false'));
+  G._progTemplateId = null; G._progTplPick = false;
+
+  G._programs = _savedProgs; G._activeProgramIndex = _savedActive;
+  G.confirm = _savedConfirm; G.alert = _savedAlert;
+  }
 }
 
 setImmediate(() => {
