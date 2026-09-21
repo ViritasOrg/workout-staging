@@ -1367,8 +1367,11 @@ function _renderTplPick(title,body,footer){
   if(!t){_progTplPick=false;_progTemplateId=null;closeProgramOverlay();return;}
   if(title)title.textContent='ADD TO A PROGRAM';
   var html='<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;">'+_escP(t.name)+'</div>';
-  html+='<div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:18px;">Pick a program. Every one of its days will start with a '+_escP(t.extendNoun||t.name)+' block, cycling through the template\u2019s '+t.days.length+' days \u2014 '+
-    t.days.map(function(d,i){return _escP(_tplDayShort(d,i));}).join(', ')+', and round again. Your own exercises stay where they are, underneath.</div>';
+  var _where=t.extendOn==='push-legs'?'push and leg day':'day';
+  html+='<div style="font-size:13px;color:var(--muted);line-height:1.55;margin-bottom:18px;">Pick a program. Each of its '+_where+'s will start with a '+_escP(t.extendNoun||t.name)+' block, cycling through the template\u2019s '+t.days.length+' days \u2014 '+
+    t.days.map(function(d,i){return _escP(_tplDayShort(d,i));}).join(', ')+', and round again.'+
+    (t.extendOn==='push-legs'?' Pull days are left alone: the block is explosive pulling, so it goes where it does not stack onto more pulling.':'')+
+    ' Your own exercises stay where they are, underneath.</div>';
   if(!_programs.length){
     html+='<div style="font-size:13px;color:var(--muted);">You have no programs yet. Copy a template or build one first.</div>';
   }else{
@@ -1377,7 +1380,9 @@ function _renderTplPick(title,body,footer){
       var p=_programs[i];var ext=_progExtension(p);
       html+='<div class="prog-row" onclick="extendProgramWithTemplate('+i+',\''+t.id+'\')">';
       html+='<div class="prog-row-main"><div class="prog-row-name">'+_escP(p.name)+'</div>';
+      var _hits=_extendPlan(p.days,t).filter(function(x){return x.label;}).length;
       html+='<div class="prog-row-meta">'+p.days.length+' day'+(p.days.length!==1?'s':'')+
+        ' \u00b7 '+(_hits?(_hits+' would get the block'):'no push or leg day')+
         (ext?' \u00b7 \u26a1 already extended with '+_escP(ext.name):'')+
         (i===_activeProgramIndex?' \u00b7 active':'')+'</div></div>';
       html+='<span style="color:#7cc4ff;font-size:18px;flex-shrink:0;">\u203a</span>';
@@ -1483,7 +1488,7 @@ function _renderProgOverlay(){
     html+='<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:20px;">'+_escP(prog.name)+'</div>';
     var _ext=_progExtension(prog);
     if(_ext)html+='<div style="border:1px solid rgba(124,196,255,0.35);background:rgba(124,196,255,0.07);border-radius:10px;padding:10px 12px;margin-bottom:18px;font-size:12px;color:var(--muted);line-height:1.5;">'+
-      '<span style="color:#7cc4ff;font-weight:700;">\u26a1 Extended with '+_escP(_ext.name)+'</span><br>Every day starts with a block from that template. The rest of the program is unchanged.</div>';
+      '<span style="color:#7cc4ff;font-weight:700;">\u26a1 Extended with '+_escP(_ext.name)+'</span><br>The marked days start with a block from that template. The rest of the program is unchanged.</div>';
     prog.days.forEach(function(day,i){
       html+='<div style="margin-bottom:16px;">';
       html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;">Day '+(i+1)+(day.warmup?' 🔥':'')+'</div>';
@@ -1729,7 +1734,7 @@ var PROGRAM_TEMPLATES=[
   // program's days (Henrik, 2026-09-24), which is why its days carry a short label: that label
   // is what the program view and the log card show to explain where the exercises came from.
   {id:'muscle-up-power',name:MUSCLE_UP_PROGRAM_NAME,goal:'strength',extendable:true,
-   extendNoun:'Muscle Up',
+   extendNoun:'Muscle Up',extendOn:'push-legs',
    desc:'Rate-of-force-development work for the muscle-up. Two sessions a week, explosive pulls first while fresh, every rep at maximum speed.',
    notes:['Maximal intent: every concentric rep at maximum speed. If speed drops more than ~10%, the set is over.',
           'Low reps only — 2 to 4. Higher reps turn a power stimulus into metabolic fatigue.',
@@ -1802,6 +1807,41 @@ function _tplChipHtml(ex){
   var full=(t?t.name:'a template');
   return '<span data-tpl-chip="1" style="color:#7cc4ff;font-size:10px;font-weight:600;margin-left:6px;white-space:nowrap;" title="From the '+_escP(full)+' template, not from this program">\u26a1 '+_escP(ex._tplDay||'template')+'</span>';
 }
+// IS THIS A PUSH DAY? DECIDED BY CONTENT, NOT BY NAME — same principle as _isLegDay, and for
+// the same reason: the generator authors push days called "Upper Push", "Chest & Shoulders",
+// "Push A", "Day 3 — Push" and plain "Day 3", and a name test misses most of them.
+//
+// Chest and shoulders together must DOMINATE at 0.6, the same bar legs clear. A real push day
+// sits at 0.8-0.95; an upper day that pairs a bench press with rows lands near 0.5 and is
+// correctly NOT a push day — it already has pulling in it, which is exactly what this filter
+// exists to avoid stacking onto.
+function _isPushDay(day){
+  if(!day)return false;
+  var nm=String(day.name||'');
+  if(/full\s*body|full\s*light|—\s*full\s*$/i.test(nm))return false;
+  var exs=day.exercises||[];
+  if(!exs.length)return false;
+  var pushVol=0,totVol=0;
+  exs.forEach(function(ex){
+    var sp=(typeof getExSplits==='function')?getExSplits(ex.name):{};
+    var n=String(ex.sets||'').split('-').filter(Boolean).length||1;
+    ['legs','back','chest','shoulders','arms'].forEach(function(g){
+      var f=sp[g]||0;if(!f)return;
+      totVol+=n*f;
+      if(g==='chest'||g==='shoulders')pushVol+=n*f;
+    });
+  });
+  if(totVol>0)return pushVol/totVol>0.6;
+  // Only when nothing in the day can be classified does the name get a vote.
+  return /push|chest/i.test(nm);
+}
+// Henrik, 2026-09-24: "I'd rather only add it to push and leg days." The block is explosive
+// PULLING, so putting it on a pull day means pulling twice in one session; on push and leg
+// days it spreads the pull volume across the week instead of stacking it.
+function _tplDayEligible(day,mode){
+  if(mode==='push-legs')return _isPushDay(day)||_isLegDay(day);
+  return true;
+}
 function _tplDayShort(day,i){return (day&&day.short)||(day&&day.name)||('Day '+(i+1));}
 function _isTplEx(ex){return !!(ex&&ex._tpl);}
 // Derived, never trusted from the stored field alone: editing a program can delete the last
@@ -1825,14 +1865,31 @@ function _stripProgramExtension(prog){
 // Pure so it can be asserted directly: returns the days a host program would end up with.
 function _extendDaysWithTemplate(days,t){
   if(!t||!t.days||!t.days.length)return days;
-  return days.map(function(day,i){
-    var td=t.days[i%t.days.length];
-    var label=_tplDayShort(td,i%t.days.length);
+  // The cycle advances per PLACED block, not per host day: skipping the pull days of a
+  // push/pull/legs split must still alternate A, B, A, B across the days that DO get one,
+  // not repeat A because the host indices happen to share a parity.
+  var placed=0;
+  return days.map(function(day){
+    var rest=(day.exercises||[]).filter(function(ex){return !_isTplEx(ex);});
+    if(!_tplDayEligible(Object.assign({},day,{exercises:rest}),t.extendOn))return Object.assign({},day,{exercises:rest});
+    var k=placed%t.days.length;placed++;
+    var td=t.days[k];
+    var label=_tplDayShort(td,k);
     var injected=JSON.parse(JSON.stringify(td.exercises||[])).map(function(ex){
       applyTagFromReps(ex);ex._tpl=t.id;ex._tplDay=label;return ex;
     });
-    var rest=(day.exercises||[]).filter(function(ex){return !_isTplEx(ex);});
     return Object.assign({},day,{exercises:injected.concat(rest)});
+  });
+}
+// What extending WOULD do, as a list the confirm dialog and the picker can show. Same walk as
+// above, so neither can ever promise a placement the splice does not make.
+function _extendPlan(days,t){
+  var placed=0;
+  return (days||[]).map(function(day){
+    var own=Object.assign({},day,{exercises:(day.exercises||[]).filter(function(ex){return !_isTplEx(ex);})});
+    if(!_tplDayEligible(own,t.extendOn))return{name:day.name,label:null};
+    var k=placed%t.days.length;placed++;
+    return{name:day.name,label:_tplDayShort(t.days[k],k)};
   });
 }
 function extendProgramWithTemplate(progIdx,templateId){
@@ -1840,10 +1897,17 @@ function extendProgramWithTemplate(progIdx,templateId){
   if(!t||!prog)return;
   if(!t.extendable){alert('"'+t.name+'" is a standalone program, not a block you bolt onto another one. Copy it instead.');return;}
   var had=_progExtension(prog);
-  var plan=prog.days.map(function(d,i){return _tplDayShort(t.days[i%t.days.length],i%t.days.length)+' → '+d.name;});
-  var msg='Start every day of "'+prog.name+'" with '+t.name+'?\n\n'+plan.join('\n')+
-    '\n\nThe '+t.name+' exercises go first on each day and stay marked as coming from the template, so you can see why they are there and remove them in one go later.';
-  if(had)msg='"'+prog.name+'" already starts with '+had.name+'.\n\nReplace that with '+t.name+'?\n\n'+plan.join('\n');
+  var plan=_extendPlan(prog.days,t);
+  var hits=plan.filter(function(p){return p.label;});
+  if(!hits.length){
+    alert('No day in "'+prog.name+'" is a push or leg day, so there is nowhere to put the '+t.name+' block.\n\nIt goes on push and leg days only — the work is explosive pulling, and stacking it onto a pull day means pulling twice in one session.');
+    return;
+  }
+  var lines=plan.map(function(p){return p.label?(p.label+' → '+p.name):('— skipped → '+p.name);});
+  var msg='Start the push and leg days of "'+prog.name+'" with '+t.name+'?\n\n'+lines.join('\n')+
+    '\n\n'+hits.length+' of '+plan.length+' days. Pull days are left alone — the block is explosive pulling, so it goes where it does not stack onto more pulling.'+
+    '\n\nThe exercises go first on each of those days and stay marked as coming from the template, so you can see why they are there and remove them in one go later.';
+  if(had)msg='"'+prog.name+'" already starts with '+had.name+'.\n\nReplace that with '+t.name+'?\n\n'+lines.join('\n');
   if(!confirm(msg))return;
   _stripProgramExtension(prog);
   prog.days=_extendDaysWithTemplate(prog.days,t);
@@ -1852,7 +1916,7 @@ function extendProgramWithTemplate(progIdx,templateId){
   savePrograms();rebuildDayGrid();rebuildLogDaySelect();buildProgramSettingsCard();
   if(progIdx===_activeProgramIndex){clearDraft();_refreshActiveProgramViews();}
   closeProgramOverlay();
-  alert(t.name+' added to the front of every day in "'+prog.name+'".');
+  alert(t.name+' added to the front of '+hits.length+' day'+(hits.length!==1?'s':'')+' in "'+prog.name+'".');
 }
 function removeProgramExtension(progIdx){
   var prog=_programs[progIdx];var ext=prog&&_progExtension(prog);if(!ext)return;
