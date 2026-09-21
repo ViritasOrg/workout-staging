@@ -693,6 +693,17 @@ template MUST give every day a `short` — that label is the whole explanation t
   days, not by counting.
 - Extending or removing **clears the draft** when the program is the active one: an
   in-progress draft's cards no longer line up with the day's exercises.
+- **Removing it is reachable from the program view**, in the extension banner itself — the
+  banner announces the extension, so it carries the way out. `removeProgramExtension(idx)`
+  takes the ARRAY index, like every other program action.
+- **A render function must hand its element ONE finished string.** The Remove button shipped
+  invisible in v1.238-v1.241 because its markup was appended to `html` on the line *after*
+  `body.innerHTML=html` had already run: built, discarded, never in the DOM. The source-text
+  tests passed the whole time, which is the real lesson — `_progViewHtml()` is now a pure
+  builder so the view can be asserted as the string the user actually gets, and a test pins
+  that the read-only branch contains no `html+=` at all. Applies to every render path here:
+  the harness stubs `innerHTML` as a getter that always reads `''`, so markup written straight
+  into an element is markup no test can see.
 - The block is visible in four places, and all four are tested: the Log Workout card chip, the
   Program-tab day view (chip + a banner naming the template and the day), the program view
   (the block grouped under its own label, plus "Extended with …" at the top and a Remove
