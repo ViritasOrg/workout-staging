@@ -650,10 +650,33 @@ Henrik: *"every day program starts with a muscle up prep program day … So Push
 Muscle Up A, then Pull A gets Muscle Up B first etc."*
 
 A template marked **`extendable:true`** can be bolted onto the front of another program's days.
-Host day `i` takes template day `i % nTemplateDays`, so a 6-day push/pull/legs against the
-2-day muscle-up template reads A, B, A, B, A, B. Only `muscle-up-power` is extendable — the
-1RM Test is a standalone program and prepending a limit single to every day is nonsense, so
-the attempt is refused with a message, not silently performed.
+Only `muscle-up-power` is extendable — the 1RM Test is a standalone program and prepending a
+limit single to every day is nonsense, so that attempt is refused with a message, not silently
+performed.
+
+**Where the block lands is the template's call: `extendOn`.** The muscle-up template carries
+`extendOn:'push-legs'` (Henrik, 2026-09-24: *"I'd rather only add it to push and leg days"*).
+The block is explosive PULLING, so putting it on a pull day means pulling twice in one
+session; on push and leg days it spreads the pull volume across the week instead of stacking
+it. A 6-day push/pull/legs therefore gets it on 4 of its 6 days.
+
+- **Days are classified by CONTENT, not by name** — `_isPushDay` mirrors `_isLegDay` exactly,
+  including the 0.6 dominance bar, the full-body exclusion and the name-only tiebreak for a day
+  whose exercises cannot be classified. A name test would miss "Upper Push", "Chest &
+  Shoulders" and plain "Day 3", which is the same trap `_isLegDay` was rewritten to escape.
+  An upper day that pairs pressing WITH rowing lands near 0.5 and is correctly not a push day:
+  it already has pulling in it, which is what this filter exists to avoid.
+- **Eligibility is judged on the day's OWN exercises**, with any existing template markers
+  stripped first. The block is four pull movements, so a push day already carrying one stops
+  looking like a push day — grading the whole day would make re-extending quietly place
+  nothing. There is a test.
+- **The cycle advances per PLACED block, not per host day.** Skipping the pull days of a
+  push/pull/legs split must still alternate A, B, A, B across the days that do get one; a
+  host-index cycle would repeat A because the eligible days share a parity. There is a test.
+- `_extendPlan()` is the single walk the confirm dialog and the picker both render, so neither
+  can promise a placement the splice does not make.
+- **No eligible day is a thing to say, not a silent no-op**: a program of nothing but pull days
+  gets an explanation of why there is nowhere to put the block.
 
 **The exercises are spliced in for real**, not overlaid at render time: the log, the volume
 charts, the 1RM charts and the editor then all see ordinary exercises and need no plumbing.
@@ -678,9 +701,10 @@ template MUST give every day a `short` — that label is the whole explanation t
 - The chip is a `<span>` appended **after** the name's text node, because `_exCardName` reads
   only that first text node. Same contract the rehab and bodyweight chips already rely on.
 
-**Known tension, left as Henrik specified:** the muscle-up template's own notes say to run
-explosive pull work *twice a week*, and extending a 6-day program puts it on all six. He asked
-for every day. If a cadence option is ever added, it belongs here, not in the template.
+**Cadence:** the muscle-up template's own notes say to run explosive pull work *twice a week*;
+push+legs on a 6-day split is 4. Henrik chose the day filter over a hard cap (he asked for
+"max 3 times per week" and then replaced it with "only push and leg days" in the same turn).
+If a cap is ever added it belongs alongside `extendOn`, not in the template's notes.
 
 **Leg days:** extending puts the template block before the squat, so an extended leg day no
 longer opens with one. The leg-day rule is enforced only at generation time and explicitly

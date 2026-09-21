@@ -6737,11 +6737,11 @@ console.log('\n── Extending a program with a template ───────�
 {
   const HAVE2 = ['_extendDaysWithTemplate', '_stripProgramExtension', '_progExtension', '_isTplEx',
     '_tplChipHtml', '_tplDayShort', 'extendProgramWithTemplate', 'removeProgramExtension',
-    '_renderTplPick', '_dayTplBannerHtml'].every(f => typeof G[f] === 'function');
+    '_renderTplPick', '_dayTplBannerHtml', '_isPushDay', '_tplDayEligible', '_extendPlan'].every(f => typeof G[f] === 'function');
   check('the extend-with-template feature is present', HAVE2,
     'missing: ' + ['_extendDaysWithTemplate', '_stripProgramExtension', '_progExtension', '_isTplEx',
       '_tplChipHtml', '_tplDayShort', 'extendProgramWithTemplate', 'removeProgramExtension',
-      '_renderTplPick', '_dayTplBannerHtml'].filter(f => typeof G[f] !== 'function').join(', '));
+      '_renderTplPick', '_dayTplBannerHtml', '_isPushDay', '_tplDayEligible', '_extendPlan'].filter(f => typeof G[f] !== 'function').join(', '));
 
   // ── What the old build lacks, stated so it fails there rather than hiding ──
   // Only a template that makes sense as a prepended block may be one, and the chip/banner
@@ -6757,6 +6757,8 @@ console.log('\n── Extending a program with a template ───────�
   check('…and they are the labels Henrik named them by',
     !!_mu0 && _mu0.days.map(d => d.short).join(' / ') === 'Muscle Up A / Muscle Up B',
     _mu0 ? _mu0.days.map(d => d.short).join(' / ') : 'no template');
+  check('the muscle-up block goes on push and leg days only',
+    !!_mu0 && _mu0.extendOn === 'push-legs', _mu0 ? String(_mu0.extendOn) : 'no template');
   check('Log Workout puts the chip on the card', String(G.prefillLog).includes('_tplChipHtml(ex)'));
   check('the program day view puts it on the row', String(G.renderWorkout).includes('_tplChipHtml(ex)'));
   check('…and heads the day with a banner explaining the block',
@@ -6775,37 +6777,81 @@ console.log('\n── Extending a program with a template ───────�
   const _savedConfirm = G.confirm, _savedAlert = G.alert;
   const mu = G._findTemplate('muscle-up-power');
 
-  // ── The cycling, on his own example ───────────────────────────────────────
-  const ppl = ['Push A', 'Pull A', 'Legs A', 'Push B', 'Pull B', 'Legs B']
-    .map(n => ({ name: n, warmup: false, exercises: [{ name: 'Squat', scheme: '3×8', tag: 'volume', sets: '8-8-8', kg: 0 }] }));
+  // ── Where the block lands ─────────────────────────────────────────────────
+  // Henrik, 2026-09-24: "I'd rather only add it to push and leg days." Days are classified by
+  // CONTENT, the same way _isLegDay already does it — a fixture of six days that all contain
+  // nothing but squats is six LEG days however the names read, so the split below is built
+  // from exercises that actually belong to each session.
+  const ex = (n, sets) => ({ name: n, scheme: '3×8', tag: 'volume', sets: sets || '8-8-8', kg: 0 });
+  const day = (n, exs) => ({ name: n, warmup: false, exercises: exs });
+  const PUSH = () => [ex('Bench Press'), ex('Overhead Press'), ex('Cable Fly'), ex('Tricep Pushdown')];
+  const PULL = () => [ex('Pull-ups'), ex('Barbell Row'), ex('Lat Pulldown'), ex('Barbell Curl')];
+  const LEGS = () => [ex('Squat'), ex('Leg Press'), ex('Leg Curl'), ex('Calf Raises')];
+  const ppl = [day('Push A', PUSH()), day('Pull A', PULL()), day('Legs A', LEGS()),
+               day('Push B', PUSH()), day('Pull B', PULL()), day('Legs B', LEGS())];
+
+  check('a push day is recognised from what it trains', G._isPushDay(ppl[0]), 'Push A');
+  check('a leg day still is too', G._isLegDay(ppl[2]), 'Legs A');
+  check('a pull day is neither', !G._isPushDay(ppl[1]) && !G._isLegDay(ppl[1]), 'Pull A');
+  check('an upper day that mixes pressing WITH rowing is not a push day',
+    !G._isPushDay(day('Upper', [ex('Bench Press'), ex('Overhead Press'), ex('Barbell Row'), ex('Pull-ups')])),
+    'it already has pulling in it, which is what the filter exists to avoid');
+  check('a full-body day is excluded by name, as it is for legs',
+    !G._isPushDay(day('Day 1 — Full Body', PUSH())));
+  check('an empty day is not a push day', !G._isPushDay(day('Push', [])));
+  check('a null day is not a crash', !G._isPushDay(null));
+  check('a day whose exercises cannot be classified falls back to its name',
+    G._isPushDay(day('Push A', [ex('Something Unclassifiable')])));
+
   const out = G._extendDaysWithTemplate(ppl, mu);
   check('a 6-day push/pull/legs keeps all six days', out.length === 6);
-  check('Push A starts with Muscle Up A', out[0].exercises[0]._tplDay === 'Muscle Up A',
-    out[0].exercises[0]._tplDay);
-  check('…then Pull A gets Muscle Up B first', out[1].exercises[0]._tplDay === 'Muscle Up B',
-    out[1].exercises[0]._tplDay);
-  check('…and it keeps cycling A, B, A, B, A, B',
-    out.map(d => d.exercises[0]._tplDay).join(',') === 'Muscle Up A,Muscle Up B,Muscle Up A,Muscle Up B,Muscle Up A,Muscle Up B',
-    out.map(d => d.exercises[0]._tplDay).join(','));
-  check('every day gets the whole template day, not just its first exercise',
-    out.every((d, i) => d.exercises.filter(G._isTplEx).length === mu.days[i % 2].exercises.length),
-    out.map(d => d.exercises.filter(G._isTplEx).length).join(','));
+  const got = out.map(d => (d.exercises.filter(G._isTplEx)[0] || {})._tplDay || null);
+  check('Push A starts with Muscle Up A', got[0] === 'Muscle Up A', String(got[0]));
+  check('Pull A is left alone — the block is explosive pulling', got[1] === null, String(got[1]));
+  check('Legs A gets Muscle Up B', got[2] === 'Muscle Up B', String(got[2]));
+  check('…and it keeps alternating across the days that DO get one',
+    got.join(',') === 'Muscle Up A,,Muscle Up B,Muscle Up A,,Muscle Up B', got.join(','));
+  check('four of the six days get a block', got.filter(Boolean).length === 4, String(got.filter(Boolean).length));
+  check('a pull day is byte-for-byte what it was',
+    JSON.stringify(out[1].exercises) === JSON.stringify(PULL()) &&
+    JSON.stringify(out[4].exercises) === JSON.stringify(PULL()));
+  check('every day that gets one gets the whole template day',
+    out.filter(d => d.exercises.some(G._isTplEx)).every((d, k) =>
+      d.exercises.filter(G._isTplEx).length === mu.days[k % 2].exercises.length));
   check('the template block goes FIRST, the program’s own work after it',
     out.every(d => {
       const own = d.exercises.findIndex(e => !G._isTplEx(e));
       return own === d.exercises.filter(G._isTplEx).length;
     }));
   check('the program’s own exercises are all still there, in order',
-    out.every(d => d.exercises.filter(e => !G._isTplEx(e)).map(e => e.name).join() === 'Squat'));
-  check('the day names are untouched',
-    out.map(d => d.name).join() === ppl.map(d => d.name).join());
+    out.every((d, i) => d.exercises.filter(e => !G._isTplEx(e)).map(e => e.name).join() ===
+      ppl[i].exercises.map(e => e.name).join()));
+  check('the day names are untouched', out.map(d => d.name).join() === ppl.map(d => d.name).join());
 
-  // A template shorter or longer than the host program still lands cleanly.
-  check('a 1-day program takes only the first template day',
-    G._extendDaysWithTemplate([{ name: 'D', exercises: [] }], mu)[0].exercises[0]._tplDay === 'Muscle Up A');
-  check('a 7-day program wraps round to A on day 7',
-    G._extendDaysWithTemplate(new Array(7).fill(0).map((_, i) => ({ name: 'D' + i, exercises: [] })), mu)[6]
+  // The cycle must advance per PLACED block. Advancing per host index would give A, _, A, B,
+  // _, B here, because the eligible days happen to share a parity — the bug this pins.
+  check('the cycle counts blocks placed, not days walked past',
+    got.filter(Boolean).join(',') === 'Muscle Up A,Muscle Up B,Muscle Up A,Muscle Up B',
+    got.filter(Boolean).join(','));
+
+  // ── The plan the dialog shows is the placement that happens ───────────────
+  const plan = G._extendPlan(ppl, mu);
+  check('the plan covers every day, skipped ones included', plan.length === 6);
+  check('…naming each day', plan.map(p => p.name).join() === ppl.map(d => d.name).join());
+  check('…and matching the splice exactly', plan.map(p => p.label).join(',') === got.join(','),
+    plan.map(p => p.label).join(','));
+  check('a program with no push or leg day plans nothing',
+    G._extendPlan([day('Pull A', PULL()), day('Pull B', PULL())], mu).every(p => p.label === null));
+
+  // Template shorter/longer than the eligible set still lands cleanly.
+  check('a single push day takes the first template day',
+    G._extendDaysWithTemplate([day('Push', PUSH())], mu)[0].exercises[0]._tplDay === 'Muscle Up A');
+  check('a fifth eligible day wraps round to A',
+    G._extendDaysWithTemplate(new Array(5).fill(0).map((_, i) => day('Push ' + i, PUSH())), mu)[4]
       .exercises[0]._tplDay === 'Muscle Up A');
+  check('a program of nothing but pull days gets no block at all',
+    G._extendDaysWithTemplate([day('Pull A', PULL()), day('Pull B', PULL())], mu)
+      .every(d => d.exercises.every(e => !G._isTplEx(e))));
   check('a program with no days is not a crash',
     Array.isArray(G._extendDaysWithTemplate([], mu)) && G._extendDaysWithTemplate([], mu).length === 0);
 
@@ -6824,15 +6870,24 @@ console.log('\n── Extending a program with a template ───────�
     (() => { const a = G._extendDaysWithTemplate(ppl, mu); a[0].exercises[0].name = 'MUTATED';
       return G._extendDaysWithTemplate(ppl, mu)[0].exercises[0].name !== 'MUTATED'; })());
   check('extending does not mutate the days handed to it',
-    ppl.every(d => d.exercises.length === 1 && d.exercises[0].name === 'Squat'));
+    JSON.stringify(ppl.map(d => d.exercises.map(e => e.name))) ===
+    JSON.stringify([PUSH(), PULL(), LEGS(), PUSH(), PULL(), LEGS()].map(x => x.map(e => e.name))));
 
   // ── Re-extending replaces, it does not stack ──────────────────────────────
+  // Re-extending has to judge eligibility on the day's OWN exercises. The block is four pull
+  // movements, so a push day carrying one stops looking like a push day — grading the whole
+  // day would quietly place nothing the second time round.
   const twice = G._extendDaysWithTemplate(out, mu);
   check('extending an already-extended program does not pile blocks up',
-    twice.every((d, i) => d.exercises.filter(G._isTplEx).length === mu.days[i % 2].exercises.length),
+    JSON.stringify(twice.map(d => d.exercises.filter(G._isTplEx).length)) ===
+    JSON.stringify(out.map(d => d.exercises.filter(G._isTplEx).length)),
     twice.map(d => d.exercises.filter(G._isTplEx).length).join(','));
+  check('…and still lands on the same four days',
+    twice.map(d => (d.exercises.filter(G._isTplEx)[0] || {})._tplDay || '').join(',') === got.join(','),
+    twice.map(d => (d.exercises.filter(G._isTplEx)[0] || {})._tplDay || '').join(','));
   check('…and the program’s own exercises survive that too',
-    twice.every(d => d.exercises.filter(e => !G._isTplEx(e)).map(e => e.name).join() === 'Squat'));
+    twice.every((d, i) => d.exercises.filter(e => !G._isTplEx(e)).map(e => e.name).join() ===
+      ppl[i].exercises.map(e => e.name).join()));
 
   // ── Removing it puts the program back exactly as it was ───────────────────
   const host = { name: 'PPL', days: JSON.parse(JSON.stringify(ppl)), extension: null };
@@ -6888,8 +6943,11 @@ console.log('\n── Extending a program with a template ───────�
   G._programs = [{ name: 'PPL', days: JSON.parse(JSON.stringify(ppl)) }];
   G._activeProgramIndex = 0;
   G.extendProgramWithTemplate(0, 'muscle-up-power');
-  check('extending through the entry point injects the block',
-    G._programs[0].days.every(d => d.exercises.filter(G._isTplEx).length > 0));
+  check('extending through the entry point injects the block on the push and leg days',
+    [0, 2, 3, 5].every(i => G._programs[0].days[i].exercises.filter(G._isTplEx).length > 0),
+    G._programs[0].days.map(d => d.exercises.filter(G._isTplEx).length).join(','));
+  check('…and leaves the pull days alone',
+    [1, 4].every(i => G._programs[0].days[i].exercises.every(e => !G._isTplEx(e))));
   check('…records the extension on the program',
     (G._programs[0].extension || {}).templateId === 'muscle-up-power');
   check('…stamps it as recently touched, so it surfaces in the four cards',
@@ -6898,7 +6956,8 @@ console.log('\n── Extending a program with a template ───────�
     String(G.extendProgramWithTemplate).includes('savePrograms()'));
   check('…drops the in-progress draft, whose cards no longer match the day',
     String(G.extendProgramWithTemplate).includes('clearDraft()'));
-  check('…and told the user what it did', /added to the front of every day/.test(alerts.join(' ')));
+  check('…and told the user how many days it landed on',
+    /added to the front of 4 days/.test(alerts.join(' ')), alerts.join(' | '));
 
   const beforeReExtend = G._programs[0].days.map(d => d.exercises.length);
   G.extendProgramWithTemplate(0, 'muscle-up-power');
@@ -6918,6 +6977,18 @@ console.log('\n── Extending a program with a template ───────�
   check('declining the confirm changes nothing',
     G._programs[0].days.every(d => d.exercises.every(e => !G._isTplEx(e))));
   G.confirm = () => true;
+
+  // Nowhere to put it is a thing to SAY, not a silent no-op.
+  G._programs = [{ name: 'Pull only', days: [day('Pull A', PULL()), day('Pull B', PULL())] }];
+  const beforePullOnly = JSON.stringify(G._programs[0].days);
+  G.extendProgramWithTemplate(0, 'muscle-up-power');
+  check('a program with no push or leg day is told so, not silently skipped',
+    JSON.stringify(G._programs[0].days) === beforePullOnly &&
+    /no push or leg day|nowhere to put/i.test(alerts[alerts.length - 1] || ''),
+    alerts[alerts.length - 1] || '(no alert)');
+  check('…and the reason is given, not just the refusal',
+    /explosive pulling/i.test(alerts[alerts.length - 1] || ''), alerts[alerts.length - 1] || '');
+  G._programs = [{ name: 'PPL', days: JSON.parse(JSON.stringify(ppl)) }];
 
   // A standalone program is not a block. Refusing beats prepending a 3-rep max to every day.
   const before1rm = JSON.stringify(G._programs[0].days);
@@ -6945,6 +7016,11 @@ console.log('\n── Extending a program with a template ───────�
     pb.innerHTML.includes("extendProgramWithTemplate(1,'muscle-up-power')"));
   check('…and explains the cycling before you commit',
     pb.innerHTML.includes('Muscle Up A') && pb.innerHTML.includes('Muscle Up B'));
+  check('…says it goes on push and leg days only',
+    /push and leg day/i.test(pb.innerHTML) && /[Pp]ull days are left alone/.test(pb.innerHTML),
+    pb.innerHTML.slice(0, 200));
+  check('…and how many of each program\u2019s days would actually get it',
+    /would get the block/.test(pb.innerHTML), pb.innerHTML.slice(0, 300));
   check('the picker offers a way back that changes nothing', pf.innerHTML.includes('_tplCancelPick()'));
   check('an empty library says so instead of showing an empty list',
     (() => { G._programs = []; const b = cap2(); G._renderTplPick(cap2(), b, cap2());
