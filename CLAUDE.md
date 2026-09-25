@@ -576,6 +576,41 @@ Consequences to keep in mind when adding the next one:
   pins the MET at the vigorous ceiling either way, so a factor can change the *volume* and the
   *work* while leaving the kcal number identical. That is the estimator working as designed.
 
+### The calorie estimate uses the recorded duration when it is believable (rule 2026-09-25)
+`estimateSessionKcal` = `MET x 3.5 x kg / 200 x minutes` (ACSM), where MET is chosen between the
+two Compendium anchors (3.5 light/moderate, 6.0 vigorous) by the session's mechanical power.
+**The number is GROSS** — it already includes the resting burn, so it compares against an Apple
+Watch's *total*, never its *active*.
+
+**`minutes` comes from `sessionDurationMin()`, not `sessionMinutes()`.** The stamp is used when
+it falls in `KCAL_DUR_MIN..KCAL_DUR_MAX` (30..240); otherwise the fitted `sessionMinutes()`
+estimate takes over.
+
+- **Why the gate, and why those numbers.** Of 206 logged sessions, 84 carry a stamp: 11 junk
+  (1, 1, 1, 1, 1, 1, 2, 2, 3, 7, 7 min) and 73 real (30–176 min), with **nothing between 8 and
+  29**. The floor sits in that gap. The ceiling is 240 rather than the observed 176 so a
+  genuinely long session survives; past four hours a stamp is likelier a forgotten timer.
+- **Do not re-drop the clock.** Ignoring it entirely (2026-08-21) was an overcorrection for one
+  0:01 session that reported ~6 kcal. It made every long session wrong the other way: kcal is
+  linear in minutes, so Henrik's 2026-09-25 session — 132 min by his watch, 118 recorded — was
+  being estimated at 72 min and scored 440 instead of 616. The gate keeps the 0:01 bug fixed;
+  the tests pin both halves using his real junk values.
+- **The correction is not a uniform inflation.** Across the 73 affected sessions the after/before
+  ratio runs 0.69 to 1.97, median 1.06: the fitted estimate was pulling every session toward a
+  middling duration, so long ones went up and short ones came down.
+- **Longer duration does not scale the answer linearly — power self-corrects.** watts =
+  joules / (min x 60), so more minutes means less power and a lower MET. The 2026-09-25 session
+  drops to 5.8 W on its real clock, below `KCAL_POWER_LO`, pinning MET at the 3.5 floor; that is
+  why it lands at 616 and not the ~830 a naive linear scaling predicts.
+- `SESSION_PACE` (1.74) is now only the **fallback** path. Leave `sessionMinutes()` alone — it is
+  still what an unstamped session runs on, and a test pins that it never reads `duration_min`.
+
+**Against a wrist tracker:** the remaining gap is the MET, not the duration. An Apple Watch
+derives active energy from heart rate, which over-reports lifting (the pressor response and
+breath-holding keep HR up without matching oxygen uptake). Henrik's watch implied ~6.4 MET on
+that session — above the 6.0 Compendium ceiling for "power lifting or body building, vigorous
+effort" that this estimator will ever use. Do not chase it by widening the band.
+
 ### Leg day rules — ALWAYS follow (rule replaced 2026-07-10)
 Every `Legs*` day is **EITHER** a Squat day **OR** a Deadlift day — never both in one
 session (systemic/CNS load management). Supersedes the earlier "Squat always first AND

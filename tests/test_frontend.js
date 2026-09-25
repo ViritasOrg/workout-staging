@@ -4984,19 +4984,69 @@ console.log('\n── Session calorie estimate (from work, not the clock) ──
   const S = (n, kg, reps) => ({name:n, sets:reps.map(r => ({kg, reps:r}))});
   const one = (n, kg, reps) => ({date:'2026-08-21', exercises:[S(n, kg, reps)]});
 
-  // THE CLOCK MUST NOT MATTER. Same session, three wildly different stamped durations —
-  // including the 0:01 and 2:56 that started this — must produce the same number.
+  // THE CLOCK COUNTS WHEN IT IS BELIEVABLE (revised 2026-09-25). Dropping it entirely fixed
+  // the 0:01 session that reported ~6 kcal and broke every session that ran long: kcal scales
+  // linearly with minutes, so a 132-minute session estimated at 72 came out at half. The gate
+  // is what keeps both right, and the two populations in Henrik's 206 logs do not overlap —
+  // junk stamps are 1-7 min, real ones 30-176.
   const _sess = ex => ({date:'2026-08-21', exercises:ex});
   const _ex = [S('Squat',100,[5,6,8,8]), S('Leg Press',180,[12,12,12])];
   const noDur = G.estimateSessionKcal(_sess(_ex));
   const oneSec = G.estimateSessionKcal(Object.assign(_sess(_ex), {duration_min:0.017}));
   const threeHr = G.estimateSessionKcal(Object.assign(_sess(_ex), {duration_min:176}));
   check('a session with load and reps gets an estimate', noDur > 0, String(noDur));
-  check('a 0:01 stamp gives the SAME number as no stamp at all', oneSec === noDur,
-    `${oneSec} vs ${noDur}`);
-  check('  …and so does a 2:56 one', threeHr === noDur, `${threeHr} vs ${noDur}`);
-  check('the estimator never reads duration_min',
-    String(G.estimateSessionKcal).indexOf('duration_min') < 0);
+  check('a 0:01 stamp is still ignored — the bug that dropped the clock stays fixed',
+    oneSec === noDur, `${oneSec} vs ${noDur}`);
+  check('  …but a believable 2:56 is now used, not thrown away',
+    threeHr !== noDur && threeHr > noDur, `${threeHr} vs ${noDur}`);
+  check('  …and it is the recorded minutes the estimate runs on',
+    Math.abs(threeHr - G.sessionMet(G.sessionWork(_sess(_ex)).joules / (176 * 60)) * 3.5 * 89 / 200 * 176) < 1,
+    String(threeHr));
+
+  // ── The plausibility gate ────────────────────────────────────────────────
+  // Guarded so a build that predates the gate reports clean failures instead of throwing on
+  // the first call to a function it does not have.
+  check('the gate exists', typeof G.sessionDurationMin === 'function');
+  if (typeof G.sessionDurationMin === 'function') {
+  const dur = (d) => G.sessionDurationMin(Object.assign(_sess(_ex), d === null ? {} : {duration_min:d}));
+  const derived = G.sessionMinutes(_sess(_ex));
+  check('no stamp at all falls back to the fitted estimate', dur(null) === derived);
+  check('every junk stamp Henrik has actually logged is rejected',
+    [1, 1, 2, 2, 3, 7, 7, 0.017].every(v => dur(v) === derived),
+    'these are the real values from his 206 sessions');
+  check('  …and every real one is accepted',
+    [30, 43, 79, 84, 90, 118, 155, 176].every(v => dur(v) === v),
+    'the observed range of genuine sessions');
+  check('the bounds are where the two populations separate',
+    G.KCAL_DUR_MIN === 30 && G.KCAL_DUR_MAX === 240,
+    `${G.KCAL_DUR_MIN}-${G.KCAL_DUR_MAX}`);
+  check('  …rejecting just below the floor', dur(29.9) === derived);
+  check('  …accepting exactly on it', dur(30) === 30);
+  check('  …accepting exactly on the ceiling', dur(240) === 240);
+  check('  …and rejecting a forgotten timer above it', dur(241) === derived && dur(600) === derived);
+  check('garbage in the field falls back rather than throwing',
+    dur('abc') === derived && dur(null) === derived && dur(-5) === derived && dur(0) === derived);
+  check('a string of digits is still a duration, as JSON round-trips can produce one',
+    dur('118') === 118, String(dur('118')));
+  check('sessionMinutes itself is untouched — it is still the fallback',
+    String(G.sessionMinutes).indexOf('duration_min') < 0);
+
+  // The whole point, on the session that prompted it: 17 sets, 8.9 t, 118 recorded minutes.
+  // Estimated at 72 min it scored 440; on its own clock it scores meaningfully more.
+  {
+    const real = {date:'2026-09-25', duration_min:118, exercises:[
+      S('Landmine Press',60,[15,14,15,15]), S('Incline DB Press',25,[10,10,12]),
+      S('Overhead Tricep Cable',55,[12,11,13]), S('Chest Machine Press',77,[8,9,9]),
+      S('Front Raise',8,[8,10]), S('Cable External Rotation',15,[15,15])]};
+    const was = G.sessionMinutes(real), now = G.sessionDurationMin(real);
+    check('the 2026-09-25 session was being estimated at ~72 minutes',
+      Math.abs(was - 72) < 3, String(Math.round(was)));
+    check('  …and now runs on the 118 it actually took', now === 118);
+    check('  …which raises its estimate, not lowers it',
+      G.estimateSessionKcal(real) > G.estimateSessionKcal(Object.assign({}, real, {duration_min:null})),
+      `${G.estimateSessionKcal(real)} vs ${G.estimateSessionKcal(Object.assign({}, real, {duration_min:null}))}`);
+  }
+  }
 
   // MECHANICAL WORK: W = load x g x ROM x reps. It no longer sets the magnitude on its own —
   // it decides where in the Compendium band the session sits — but the physics must still be
