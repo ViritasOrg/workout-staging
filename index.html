@@ -2464,11 +2464,35 @@ function sessionWork(log){
 // estimate came out at ~41 min against a real 106. It reproduces those 18 sessions to a median
 // error of ~21 min, which is the right accuracy to claim for a "~" figure.
 //
-// Fitted from the clock, evaluated once — NOT read from any individual log. A session stamped
-// 0:01 and the same session stamped 2:56 both estimate the same duration, because neither
-// stamp is consulted.
+// Fitted from the clock, evaluated once. It is the FALLBACK duration: what a session must be
+// estimated at when its own stamp is missing or impossible (see sessionDurationMin below).
 var SESSION_PACE = 1.74;
 var SEC_PER_REP = 3;
+// HOW LONG THE SESSION TOOK: THE STAMP IF IT IS BELIEVABLE, THE ESTIMATE IF NOT.
+//
+// Dropping the clock entirely (2026-08-21) overcorrected for a real bug: a session stamped
+// 0:01 reported ~6 kcal, so no stamp was ever consulted again. That made every estimate wrong
+// in the other direction whenever a session ran long. Henrik, 2026-09-25, against an Apple
+// Watch reading 2:11:50 on a session the estimator scored at 72 minutes: "Workout tracker says
+// 440kcal my Apple Watch more than double?" kcal scales linearly with minutes, so inventing
+// the duration halved the number.
+//
+// The two populations do not overlap, so a plausibility gate separates them cleanly. Across
+// the 206 logged sessions, 84 carry a stamp:
+//   11 are junk    — 1, 1, 1, 1, 1, 1, 2, 2, 3, 7, 7 minutes (timer never started, or reset)
+//   73 are real    — 30 to 176 minutes
+//   0 sit between 8 and 29 minutes, and none exceeds 176.
+// KCAL_DUR_MIN is set at 30: every junk stamp is below it by a factor of four, every real one
+// is at or above it. KCAL_DUR_MAX is 240 rather than the observed 176 so a genuinely long
+// session is not thrown away; past four hours a stamp is more likely a forgotten timer.
+//
+// Out of band, the fitted estimate takes over — so the 0:01 bug stays fixed.
+var KCAL_DUR_MIN = 30, KCAL_DUR_MAX = 240;
+function sessionDurationMin(log){
+  var d=log&&parseFloat(log.duration_min);
+  if(isFinite(d)&&d>=KCAL_DUR_MIN&&d<=KCAL_DUR_MAX)return d;
+  return sessionMinutes(log);
+}
 function sessionMinutes(log){
   var sec=0;
   (log&&log.exercises||[]).forEach(function(ex){
@@ -2515,7 +2539,7 @@ function sessionMet(watts){
 function estimateSessionKcal(log){
   var w=sessionWork(log);
   if(!w||!w.haveW)return null;      // no body weight logged: the ACSM equation has no mass term
-  var min=sessionMinutes(log);
+  var min=sessionDurationMin(log);
   if(!(min>0))return null;
   var watts=w.joules/(min*60);
   return Math.round(sessionMet(watts)*3.5*w.bw/200*min);
