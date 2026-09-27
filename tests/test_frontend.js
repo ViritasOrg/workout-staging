@@ -804,6 +804,15 @@ console.log('\n── Key functions ──────────────�
   '_nextTrainingDay', 'rebuildDayGrid', 'rebuildLogDaySelect', 'getDayLabel',
 ].forEach(fn => check(`${fn} defined`, typeof G[fn] === 'function'));
 
+// Henrik 2026-09-27: "hide banners in general" — no automatic "New version available"
+// banner at startup (PWA or iOS app). Updates are checked from Settings → Check for updates.
+(function(){
+  const calls = (html.match(/checkAppVersion\(\)/g) || []).length;
+  const defs  = (html.match(/function checkAppVersion\(\)/g) || []).length;
+  check('nothing calls checkAppVersion (no automatic update banner)', calls === defs, `found ${calls - defs} call(s)`);
+  check('Settings still has a manual Check for updates', /onclick="checkForUpdate\(\)"/.test(html));
+})();
+
 // ── 22. _nextTrainingDay / _selectedProgramDay ────────────────────────────────
 console.log('\n── _nextTrainingDay / _selectedProgramDay ─────────────────');
 check('_nextTrainingDay defined', typeof G._nextTrainingDay === 'function');
