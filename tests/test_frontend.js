@@ -813,6 +813,31 @@ console.log('\n── Key functions ──────────────�
   check('Settings still has a manual Check for updates', /onclick="checkForUpdate\(\)"/.test(html));
 })();
 
+// Henrik 2026-09-28, on a fresh install: "Backup logs in backend? ... the app has zero logs"
+// and then "Sync local data to new backend ... there is nothing to sync?". The two legacy
+// migration banners only offer to upload data this device holds; with none, neither shows.
+(function(){
+  const lines = html.split('\n').filter(l => /^if\(!localStorage\.getItem\('(sync_done_fly|workout_logs_synced_fly)'\)/.test(l));
+  check('both legacy backup banners are found', lines.length === 2, String(lines.length));
+  const run = (store) => {
+    const shown = [];
+    const ctx = vm.createContext({
+      localStorage: { getItem: k => (k in store ? store[k] : null) },
+      getData: (k, d) => { try { return JSON.parse(store[k]) || d; } catch (e) { return d; } },
+      document: { createElement: () => ({ style: {} }), body: { appendChild: el => shown.push(el.innerHTML) } },
+    });
+    vm.runInContext(lines.join('\n'), ctx);
+    return shown;
+  };
+  check('fresh install (no local logs or weights): no backup banner', run({}).length === 0, JSON.stringify(run({})).slice(0, 120));
+  check('local logs not yet backed up: the logs banner still shows',
+    run({ workout_logs: JSON.stringify([{ id: 1 }]) }).some(h => /Backup workout logs/.test(h)));
+  check('local weights not yet synced: the weights banner still shows',
+    run({ weight_log: JSON.stringify([{ date: '2026-01-01', weight: 80 }]) }).some(h => /Sync local data/.test(h)));
+  check('already backed up: no banner even with local data',
+    run({ workout_logs: '[{"id":1}]', weight_log: '[{"date":"2026-01-01"}]', sync_done_fly: '1', workout_logs_synced_fly: '1' }).length === 0);
+})();
+
 // ── 22. _nextTrainingDay / _selectedProgramDay ────────────────────────────────
 console.log('\n── _nextTrainingDay / _selectedProgramDay ─────────────────');
 check('_nextTrainingDay defined', typeof G._nextTrainingDay === 'function');
