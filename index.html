@@ -188,6 +188,10 @@
   .s-chev{font-size:18px;color:var(--muted);transition:transform 0.2s;}
   .s-sec-hdr.open .s-chev{transform:rotate(180deg);}
   .s-sec-body.collapsed{display:none;}
+  /* Log Workout card controls (rest timer, gear toggles, DB, - set, + set) stay on ONE line
+     (Henrik 2026-09-29): tighter padding/font, and the buttons may shrink rather than wrap. */
+  .card-btn-row{flex-wrap:nowrap!important;gap:3px!important;}
+  .card-btn-row>button{white-space:nowrap;flex:0 1 auto;min-width:0;padding:4px 6px!important;font-size:11px!important;}
 </style>
 </head>
 <body class="login-locked">

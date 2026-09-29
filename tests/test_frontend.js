@@ -813,6 +813,20 @@ console.log('\n── Key functions ──────────────�
   check('Settings still has a manual Check for updates', /onclick="checkForUpdate\(\)"/.test(html));
 })();
 
+// Henrik 2026-09-29: "make sure choices for cable gears and sets are on one line not
+// breaking". Every Log Workout card's control row (timer, ½ gear, 2× cable, DB, − set, + set)
+// is a .card-btn-row, and the stylesheet keeps that row from wrapping; its buttons shrink
+// instead (measured in Chromium at iPhone width: 6 buttons fit 285px with no text clipped).
+(function(){
+  const rows = (html.match(/class="card-btn-row" style="[^"]*"/g) || []);
+  check('both Log card builders use the .card-btn-row control row', rows.length === 2, String(rows.length));
+  const rule = (html.match(/\.card-btn-row\{[^}]*\}/) || [''])[0];
+  check('the control row never wraps (stylesheet beats the inline flex-wrap)', /flex-wrap:nowrap!important/.test(rule), rule);
+  const btn = (html.match(/\.card-btn-row>button\{[^}]*\}/) || [''])[0];
+  check('its buttons keep their label on one line and may shrink',
+    /white-space:nowrap/.test(btn) && /flex:0 1 auto/.test(btn) && /min-width:0/.test(btn), btn);
+})();
+
 // Henrik 2026-09-28, on a fresh install: "Backup logs in backend? ... the app has zero logs"
 // and then "Sync local data to new backend ... there is nothing to sync?". The two legacy
 // migration banners only offer to upload data this device holds; with none, neither shows.
