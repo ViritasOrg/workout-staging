@@ -793,8 +793,8 @@ date is its own log.
   `wk-dedup-dates-v1` startup migrations were removed: their guard was a localStorage flag, so
   they re-ran on every fresh install or wiped cache (the iOS app, a reinstalled PWA) and
   deleted same-date sessions from the phone and the backend.
-- `claude-agent-backend`'s `POST /workout-logs/dedup-dates` still exists but has no caller.
-  Do not call it.
+- `claude-agent-backend`'s `POST /workout-logs/dedup-dates` was **removed** the same day
+  (backend #306, Henrik: *"Remove that function"*); a backend test asserts it stays gone.
 
 ### NEVER edit existing (stored) programs unless Henrik explicitly asks (rule 2026-07-15)
 Henrik's saved programs are his own. **Do NOT mutate existing stored programs** — no
