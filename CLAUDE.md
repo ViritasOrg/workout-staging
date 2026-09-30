@@ -784,6 +784,18 @@ Everything else keeps it:
 Tests pin every one of these; `clearDraft()` appearing more than its definition plus the two
 calls above is a failing test, not an oversight.
 
+### More than one session a day (rule 2026-09-30)
+Henrik: *"one need to be able to train more than once a day."* A second session on the same
+date is its own log.
+- `saveLog` never replaces another log by date. There is no "already saved. Overwrite it?"
+  prompt; changing an existing session is what History → edit (`editId`) is for.
+- **Never reintroduce a "one log per date" cleanup.** The one-time `workout_dedup_v1` and
+  `wk-dedup-dates-v1` startup migrations were removed: their guard was a localStorage flag, so
+  they re-ran on every fresh install or wiped cache (the iOS app, a reinstalled PWA) and
+  deleted same-date sessions from the phone and the backend.
+- `claude-agent-backend`'s `POST /workout-logs/dedup-dates` still exists but has no caller.
+  Do not call it.
+
 ### NEVER edit existing (stored) programs unless Henrik explicitly asks (rule 2026-07-15)
 Henrik's saved programs are his own. **Do NOT mutate existing stored programs** — no
 migrations in `_ensurePrograms`, no "repair" helpers, no bulk edits — unless Henrik
