@@ -813,6 +813,31 @@ console.log('\n── Key functions ──────────────�
   check('Settings still has a manual Check for updates', /onclick="checkForUpdate\(\)"/.test(html));
 })();
 
+// Henrik 2026-09-30: "I saved a Push day yesterday, but it isnt in history". The backend
+// held nothing after 27 Sep: pushWorkoutLogToAgent ignored the response and swallowed errors,
+// so a save that never reached the account looked exactly like one that did. A failed upload
+// now returns its reason, and saveLog tells the user at once.
+(function(){
+  const sv = {alert: G.alert}; const alerts = [];
+  G.alert = (m) => alerts.push(m);
+  // fetch is read synchronously by the call, so swap it only around the call and put back
+  // whatever is there now (other async blocks install their own stubs meanwhile).
+  const run = (resp) => { const cur = G.fetch; G.fetch = async () => { if (resp instanceof Error) throw resp; return resp; }; const p = G._pushSavedLog({id: 1, date: '2026-09-29'}); G.fetch = cur; return p; };
+  run({ok: false, status: 401}).then(function(err){
+    check('a rejected upload reports its status', err === 'HTTP 401', String(err));
+    check('…and the user is told the workout did not reach the account',
+      alerts.length === 1 && /did NOT reach your account \(HTTP 401\)/.test(alerts[0]) && /Settings/.test(alerts[0]), alerts.join(' | '));
+    return run(new Error('Load failed'));
+  }).then(function(err){
+    check('a network failure is reported too', err === 'Load failed' && alerts.length === 2, String(err));
+    return run({ok: true, status: 200});
+  }).then(function(err){
+    check('a successful upload says nothing', err === '' && alerts.length === 2, String(err));
+    G.alert = sv.alert;
+  });
+  check('saveLog uploads through the reporting path', /_logStartedAt=null;_pushSavedLog\(newLog\);/.test(html));
+})();
+
 // Henrik 2026-09-29: "make sure choices for cable gears and sets are on one line not
 // breaking". Every Log Workout card's control row (timer, ½ gear, 2× cable, DB, − set, + set)
 // is a .card-btn-row, and the stylesheet keeps that row from wrapping; its buttons shrink
