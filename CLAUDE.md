@@ -726,8 +726,9 @@ template MUST give every day a `short` — that label is the whole explanation t
   markers out before prepending, and `extendProgramWithTemplate` strips first as well.
 - **Removing restores the program byte-for-byte.** Tested by comparing against the pre-extend
   days, not by counting.
-- Extending or removing **clears the draft** when the program is the active one: an
-  in-progress draft's cards no longer line up with the day's exercises.
+- Extending or removing **keeps the in-progress workout** (superseded 2026-09-30, see "The
+  in-progress workout is never deleted" below). It restores by exercise name, so logged sets
+  land on the same exercises after the program changes.
 - **Removing it is reachable from the program view**, in the extension banner itself — the
   banner announces the extension, so it carries the way out. `removeProgramExtension(idx)`
   takes the ARRAY index, like every other program action.
@@ -755,6 +756,33 @@ If a cap is ever added it belongs alongside `extendOn`, not in the template's no
 **Leg days:** extending puts the template block before the squat, so an extended leg day no
 longer opens with one. The leg-day rule is enforced only at generation time and explicitly
 never re-applied to stored programs, so nothing fights over it at runtime.
+
+### The in-progress workout is never deleted until its log is on the backend (rule 2026-09-30)
+Henrik, at the gym after an app update wiped a session: *"I want in progress logs to be saved
+in backend as well and remembered and recovered if app is updated, and never deleted until the
+final Log is saved permanently."*
+
+The draft (`wkt-draft`, mirrored to `PUT /workout-draft` on every change) is deleted in exactly
+two places, both after the finished log is safely on the backend:
+- `_pushSavedLog` once the upload of that log succeeded (`_clearSavedDraft(log.id)`);
+- `syncWorkoutLogsFromAgent` when the backend's list already holds the saved log.
+
+Everything else keeps it:
+- **Saving on the phone only marks it** (`savedLogId`). A marked draft never restores again,
+  but it is still there if the upload fails.
+- **An empty page never deletes it.** Every reload rebuilds the Log page (`prefillLog` ends
+  with `saveDraft()`), and before the draft is restored the page has no reps; clearing there
+  was the wipe. `saveDraft` with no reps now writes nothing.
+- **No same-date gate.** An unsaved workout restores whatever day it was started, onto its own
+  date.
+- **The Log page opens on the draft's day** (`rebuildDayGrid` prefers `_activeDraft().day`
+  over the next training day), so the restore actually lands.
+- **The newer copy wins** between phone and backend (`updatedAt`), so a phone that lost its
+  copy — an update, a wiped cache — gets it back from the backend.
+- Switching the active program or extending it no longer deletes it.
+
+Tests pin every one of these; `clearDraft()` appearing more than its definition plus the two
+calls above is a failing test, not an oversight.
 
 ### NEVER edit existing (stored) programs unless Henrik explicitly asks (rule 2026-07-15)
 Henrik's saved programs are his own. **Do NOT mutate existing stored programs** — no
