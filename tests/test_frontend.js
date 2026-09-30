@@ -883,6 +883,16 @@ console.log('\n── Key functions ──────────────�
   check('the Log page opens on the in-progress workout\'s day', /var _ad=_activeDraft\(\);if\(_ad\)\{var _adn=parseInt\(_ad\.day\)/.test(html));
 })();
 
+// Henrik 2026-09-30: "one need to be able to train more than once a day". A second session on
+// the same date is its own log: saveLog no longer offers to overwrite the first, and the two
+// one-time "one log per date" cleanups (which re-ran on every fresh install or wiped cache and
+// deleted same-date sessions from the phone AND the backend) are gone.
+(function(){
+  const fn = String(G.saveLog || '');
+  check('saving never replaces another log on the same date', !/already saved\. Overwrite/.test(fn) && !/logs\.splice\(existingIdx/.test(fn));
+  check('no startup cleanup deletes same-date logs', !/workout_dedup_v1/.test(html) && !/dedup-dates/.test(html));
+})();
+
 // Henrik 2026-09-29: "make sure choices for cable gears and sets are on one line not
 // breaking". Every Log Workout card's control row (timer, ½ gear, 2× cable, DB, − set, + set)
 // is a .card-btn-row, and the stylesheet keeps that row from wrapping; its buttons shrink
@@ -5411,8 +5421,8 @@ console.log('\n── Swap keeps completed sets / blank-exercise save guard ─�
       fn.includes('_focusFirstIncompleteEx();return;'));
     check('saveLog names the blank exercises in the prompt',
       fn.includes('_blank.map(_exCardName)'));
-    check('saveLog asks before the overwrite/date prompts, not after the log is built',
-      fn.indexOf('_incompleteExCards()') < fn.indexOf('already saved. Overwrite it?'));
+    check('saveLog asks before the date prompt, not after the log is built',
+      fn.indexOf('_incompleteExCards()') < fn.indexOf('Save anyway?'));
   }
 }
 
@@ -5972,9 +5982,10 @@ console.log('\n── Editing a log keeps its own date ────────�
       pf.includes('restoreDraft(') &&
       String(G.restoreDraft || '').includes('dateEl.value=d.date'));
   }
-  // Why it mattered: saveLog finds the session to replace by date
-  check('saveLog still matches an existing session by date (why a wrong date could clobber one)',
-    String(G.saveLog || '').includes('l.date===date'));
+  // Why it mattered: saveLog used to find a session to replace by date. Since 2026-09-30
+  // (more than one session a day) it never does, so a wrong date can no longer clobber one.
+  check('saveLog no longer replaces a session by date (a wrong date cannot clobber one)',
+    !String(G.saveLog || '').includes('l.date===date'));
 
   delete _idStore['log-date']; delete _idStore['log-day']; delete _idStore['log-weight'];
 }
