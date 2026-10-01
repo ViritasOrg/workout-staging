@@ -921,6 +921,47 @@ console.log('\n── Key functions ──────────────�
   });
 })();
 
+// Henrik 2026-10-01: "when I start the pwa app yesterdays almost complete log is still in
+// progress even though it is saved in history". His 30 Sep log (started_at 10:56:08.410Z) was on
+// the backend; the draft of that same session came back. Draft requests were independent, so a
+// slow autosave PUT could land after the post-save DELETE. Now: a draft sharing a saved log's
+// start time IS that log and never restores, and draft requests go out strictly in order.
+(function(){
+  const st = '2026-09-30T10:56:08.410Z';
+  const d = { v: 2, day: '2', date: '2026-09-30', startedAt: st, updatedAt: 1, tmpl: { 'Pull-ups': { kg: ['85.2'], reps: ['12'] } }, custom: [] };
+  const sv = { logs: G.logs };
+  G.logs = [{ id: 1790769301363, date: '2026-09-30', day: 2, started_at: st, exercises: [] }];
+  G.setData('wkt-draft', d);
+  check('a draft whose session is already a saved log is not in progress', G._activeDraft() === null);
+  check('…and is recognised as that log', (G._draftLog(d) || {}).id === 1790769301363);
+  G.logs = [{ id: 5, date: '2026-09-30', day: 2, started_at: '2026-09-30T09:00:00.000Z', exercises: [] }];
+  check('a different session on the same day does not hide it', G._activeDraft() !== null);
+  check('a log with no start time never matches', G._draftLog(Object.assign({}, d, { startedAt: undefined })) === null);
+  G.logs = sv.logs; G.localStorage.removeItem('wkt-draft');
+  globalThis.__uploadChecks = globalThis.__uploadChecks.then(function(){
+    // Ordering: the first PUT is slow; the DELETE must not start until it has finished.
+    const seen = []; let release; const cur = G.fetch;
+    G.fetch = (u, o) => { seen.push(o.method + ':start'); if (o.method === 'PUT') return new Promise(r => { release = () => { seen.push('PUT:end'); r({ ok: true }); }; }); seen.push(o.method + ':end'); return Promise.resolve({ ok: true }); };
+    G._draftNet(d); const last = G._draftNet(null);
+    return new Promise(r => setTimeout(r, 5)).then(function(){
+      check('a later draft request waits for the earlier one', seen.join(',') === 'PUT:start', seen.join(','));
+      release(); return last;
+    }).then(function(){
+      check('…and then runs, in order', seen.join(',') === 'PUT:start,PUT:end,DELETE:start,DELETE:end', seen.join(','));
+      // The real case: the stale draft is on the phone, the log arrives from the backend.
+      const calls = [];
+      G.setData('wkt-draft', d);
+      const keep = { logs: G.logs, stored: G.getData('workout_logs', []) };
+      G.fetch = async (u, o) => { calls.push((o && o.method) || 'GET'); return (o && o.method) ? { ok: true } : { ok: true, json: async () => [{ id: 1790769301363, date: '2026-09-30', day: 2, started_at: st, exercises: [] }] }; };
+      const p = G.syncWorkoutLogsFromAgent(); G.fetch = cur;
+      return p.then(() => G._draftQ).then(function(){
+        check('the backend holding the saved session deletes the stale draft', G.getData('wkt-draft', null) === null && calls.indexOf('DELETE') >= 0, calls.join(','));
+        G.fetch = cur; G.logs = keep.logs; G.setData('workout_logs', keep.stored);
+      });
+    });
+  });
+})();
+
 // Henrik 2026-09-29: "make sure choices for cable gears and sets are on one line not
 // breaking". Every Log Workout card's control row (timer, ½ gear, 2× cable, DB, − set, + set)
 // is a .card-btn-row, and the stylesheet keeps that row from wrapping; its buttons shrink
