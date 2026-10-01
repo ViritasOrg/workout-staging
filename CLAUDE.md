@@ -780,6 +780,12 @@ Everything else keeps it:
 - **The newer copy wins** between phone and backend (`updatedAt`), so a phone that lost its
   copy — an update, a wiped cache — gets it back from the backend.
 - Switching the active program or extending it no longer deletes it.
+- **A draft IS the saved log with the same start time** (`_draftLog`: `d.startedAt ===
+  log.started_at`, which saveLog stamps from the draft). Such a draft never restores, and the
+  log sync deletes it once the backend holds that log (2026-10-01: a saved session came back
+  as "in progress" on the next launch).
+- **Draft requests go out one at a time, in order** (`_draftNet`). Independent requests let a
+  slow autosave PUT land after the post-save DELETE and resurrect the session on the backend.
 
 Tests pin every one of these; `clearDraft()` appearing more than its definition plus the two
 calls above is a failing test, not an oversight.
