@@ -158,6 +158,47 @@ loses to it when they disagree.
   backup, never just copy. See `claude-agent-backend/CLAUDE.md` for the mechanics and
   the guard that stops a re-run overwriting a richer backup.
 
+## ⚠️ SAVE NEVER FAILS IN SILENCE ⚠️
+Henrik, 2026-10-08: *"Yesterday's log isnt in history and is still half filled in in
+the Log view. But I saved it yesterday after training."*
+
+`saveLog()` rebuilt the exercise list from the **active program's** day and returned —
+no alert, nothing written, the form left as full as before — whenever that day was
+missing. `#structured-log`'s `dataset.logDay` outlives the program it was prefilled
+from, so `getActiveProgramDay()` legitimately returns null with a finished workout on
+screen: another program was activated, a day was removed, or a program list arrived
+from the backend (`syncProgramsFromAgent` skips re-prefilling *because* reps are
+already entered). Save looked like it had worked and the workout was gone.
+
+- **A finished workout is never discarded because the program moved under it.** The
+  cards on screen carry the name, the swap, the gear and every set — `_cardsAsTemplate()`
+  rebuilds the list from them, indexed by `data-ex-idx`, which is what `saveLog` reads
+  inputs by. The program is a convenience, not the only source.
+- **No path out of a save may be both empty-handed and silent.** Every `return` before
+  the log is written either tells the user why, or is a confirm they themselves
+  cancelled. A bare `if(!x)return;` in a save path is a data-loss bug.
+- The same applies to `prefillLog`: its early return leaves the previous day's filled-in
+  cards on screen, which is what "still half filled in" was. That is deliberate — it is
+  better than wiping an in-progress workout — but it means the form and the active
+  program can disagree, so the save path must cope with it.
+
+## ⚠️ kg:0 MEANS "NO WEIGHT SET YET", NOT "BODYWEIGHT" ⚠️
+Henrik, 2026-10-08: *"rear delt flys has my bodyweight as dumbbell weight?"* — 85.2 kg
+prefilled into all three boxes of a dumbbell exercise.
+
+`prefillLog` read `ex.kg===0` as "this is a bodyweight exercise" and filled in his body
+weight. But `kg:0` is what **every program-building path** writes for a weight that has
+not been set yet: `_progAddEx`, `_progBuildManual`, `_tplEx` (so every exercise copied
+from a template) and `_seedDefaultProgram`'s `t.kg!==undefined?t.kg:0`. And it was
+self-sustaining: a card flagged bodyweight (`dataset.bw='1'`) is deliberately kept out
+of `template_weights_dayN` by `saveLog`, so the real weight could never be learned and
+replace it — it came back every single session.
+
+**`isBWExName(name)` is the only authority on whether an exercise is bodyweight.** A
+weight of 0 says nothing about what the exercise is. Every genuinely bodyweight entry in
+the shipped programs (Pull-ups, Push-ups, Dips) is matched by name, and a test asserts
+that invariant so a new kg:0 template entry cannot quietly rely on the old behaviour.
+
 ## ⚠️ localStorage IS A CACHE — NEVER THE SOURCE OF TRUTH ⚠️
 localStorage is a read cache for performance only. It is NEVER the source of truth.
 
