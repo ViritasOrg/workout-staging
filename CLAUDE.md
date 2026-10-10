@@ -1,5 +1,9 @@
 # Workout Staging — Claude Instructions
 
+## Answer first (Henrik, 2026-10-10)
+
+- **Answer first, then say what you will do before doing it** ("You're right. I'll answer first and say what I'm doing before I start."). A question gets its answer in the first lines, before any tool call. Before starting any work (a workflow, a PR, a deploy, waiting on CI), say in one line what you are about to do and why; never disappear into tool calls on a simple question.
+
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
 **The free-T / plasma curve is always in pmol/L. There is no second unit and there must
 never be one.** Missing or incomplete data changes the **confidence** of a number, never
