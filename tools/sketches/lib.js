@@ -137,11 +137,19 @@ function _skHipMachine(open){var H=[0,32];
 SK['Hip Abductor (outside hips)']=function(){var p=_skHipMachine(true);return _skX(p[0],p[1],['front'],'Sit tall, pads on the outside of the knees. Push the knees apart as far as you can, pause, return slowly.');};
 SK['Hip Adductor (inside hips)']=function(){var p=_skHipMachine(false);return _skX(p[0],p[1],['front'],'Sit tall, pads on the inside of the knees. Squeeze the knees together, pause, open slowly.');};
 // ── Leg presses ──────────────────────────────────────────────────────────────
-function _skLegPress(deg){var H=[0,26],t=deg===45?-58:-25;var dir=deg===45?[Math.cos(Math.PI/4),Math.sin(Math.PI/4)]:[1,0.12];
-  function mk(dist){var A=[H[0]+dir[0]*dist,H[1]+dir[1]*dist+(deg===45?0:-3)];var J=_skHipAnkle({torso:t,neck:t+10,upper:175,fore:150},H,A);
-    var px=J.tR[0]+1,py=J.tR[1];var n=deg===45?[0.7,-0.7]:[0,-1];
-    var plat={t:'slab',a:[A[0]+2-n[0]*12,A[1]+(deg===45?-10:-8)],b:[A[0]+2+n[0]*10,A[1]+(deg===45?12:14)],z:[-14,14],w:4,c:SK_C.ac};
-    var e=_skSeat(H,t).concat([plat]);if(deg===45)e.push({t:'line',a:[H[0]+6,4,0],b:[H[0]+70,62,0],w:2});return{J:J,eq:e};}
+function _skLegPress(deg){var H=[0,26],t=deg===45?-58:-25;
+  // The platform is square to the sled's travel (Henrik, 2026-10-12: "weight is not in 90° against legs so it
+  // looks off") and the soles sit flat on it: the foot points along the platform, toes up.
+  var d=deg===45?[Math.SQRT1_2,Math.SQRT1_2]:[1,0];var n=Math.sqrt(d[0]*d[0]+d[1]*d[1]);d=[d[0]/n,d[1]/n];
+  var pp=[-d[1],d[0]],footP=Math.atan2(pp[0],pp[1])*180/Math.PI;
+  function mk(dist){var A=[H[0]+d[0]*dist,H[1]+d[1]*dist+(deg===45?0:-4)];
+    var J=_skHipAnkle({torso:t,neck:t+10,upper:175,fore:150,foot:footP},H,A);
+    var c=[A[0]+d[0]*2.5+pp[0]*3,A[1]+d[1]*2.5+pp[1]*3];
+    var plat={t:'slab',a:[c[0]-pp[0]*12,c[1]-pp[1]*12],b:[c[0]+pp[0]*12,c[1]+pp[1]*12],z:[-14,14],w:4,c:SK_C.ac};
+    var e=_skSeat(H,t).concat([plat]);
+    if(deg===45)e.push({t:'line',a:[H[0]+8,H[1]-20,0],b:[H[0]+8+d[0]*80,H[1]-20+d[1]*80,0],w:2});
+    else e.push({t:'line',a:[c[0]+3,0,0],b:[c[0]+3,c[1]-12,0],w:2.4});
+    return{J:J,eq:e};}
   return[mk(deg===45?24:25),mk(deg===45?47:46)];}
 SK['Leg Press']=function(){var p=_skLegPress(0);return _skX(p[0],p[1],['side'],'Back flat on the pad, feet shoulder width on the platform. Lower until the knees are near 90°, press back without locking the knees.');};
 SK['Bilateral Leg Press']=SK['Leg Press'];
