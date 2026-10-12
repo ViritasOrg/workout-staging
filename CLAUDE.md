@@ -508,6 +508,13 @@ and no dumbbells.
   `volume`). That is how "higher reps allowed" is honoured without touching the 12-rep ceiling:
   `tagForReps`/`snapReps` leave `max` alone. Rehab-tagged work keeps its 15s.
 - A home program carries `kg:0` everywhere — "no weight set yet", filled from history.
+- **Home bodyweight exercises count body weight** (Henrik, 2026-10-12: *"Use common sense, a
+  inverted body weight row is maybe 35-55% of bw"*). `HOME_BW_NAMES` makes them bodyweight
+  cards; their `factor` is an ESTIMATE, not a measurement: inverted rows 0.45, bodyweight squat
+  0.85, sissy squat 0.8, Nordic curl and single-leg glute bridge 0.6, single-leg RDL and
+  bodyweight good morning 0.5, single-leg calf raise 1.0. Shared names (Bulgarian Split Squat,
+  Lunges) stay non-bodyweight — they are logged with dumbbells at the gym. Only the factor was
+  added: the muscle split of each stays what it was, so program generation is unchanged.
 - Every home name is a first-class catalogue exercise (both pickers + `EXERCISE_SPLITS` +
   `MUSCLE_MAP`). Band names avoid "pulldown"/"pushdown" so `isCableEx` does not give them pulley
   buttons; "Nordic Curl" has its own key so it is legs, not biceps.
