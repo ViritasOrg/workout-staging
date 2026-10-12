@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm');const ctx={};vm.createContext(ctx);
-for(const f of ['engine.js','lib.js','lib2.js','lib3.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+for(const f of ['engine.js','lib.js','lib2.js','lib3.js','lib4.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
 const names=JSON.parse(fs.readFileSync('names.json','utf8'));
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const VIEW={side:'Side',front:'Front',top:'From above'};
@@ -7,7 +7,9 @@ const arrow='<svg class="arr" viewBox="0 0 18 150" width="18" height="150" aria-
 const groups={};let n=0;
 names.forEach(([g,name])=>{n++;const s=ctx.SK[name]();const P=ctx.skPanels(s,132,150);
   const views=s.views.map(v=>`<div class="view"><div class="vl">${VIEW[v]}</div><div class="pair"><figure>${P[v][0]}<figcaption>Start</figcaption></figure>${arrow}<figure>${P[v][1]}<figcaption>Finish</figcaption></figure></div></div>`).join('');
-  (groups[g]=groups[g]||[]).push(`<article class="ex" id="ex${n}"><header><span class="num">${n}</span><h3>${esc(name)}</h3></header><p class="cue">${esc(s.cue)}</p><div class="views">${views}</div></article>`);});
+  let grip='';if(s.grips){const G=ctx.skPanels({views:[s.grips.view],start:s.grips.items[0],end:s.grips.items[1],floor:s.grips.floor},132,150)[s.grips.view];
+    grip=`<div class="view grip"><div class="vl">Grip · ${VIEW[s.grips.view]}</div><div class="pair"><figure>${G[0]}<figcaption>${s.grips.labels[0]}</figcaption></figure><span class="vs">or</span><figure>${G[1]}<figcaption>${s.grips.labels[1]}</figcaption></figure></div><p class="gnote">${esc(s.grips.note)}</p></div>`;}
+  (groups[g]=groups[g]||[]).push(`<article class="ex" id="ex${n}"><header><span class="num">${n}</span><h3>${esc(name)}</h3></header><p class="cue">${esc(s.cue)}</p><div class="views">${views}${grip}</div></article>`);});
 const nav=Object.keys(groups).map(g=>`<a href="#${g.toLowerCase()}">${g} <span>${groups[g].length}</span></a>`).join('');
 const body=Object.keys(groups).map(g=>`<section id="${g.toLowerCase()}"><h2>${g}</h2><div class="grid">${groups[g].join('')}</div></section>`).join('');
 const html=`<title>Exercise Sketches Review</title>
@@ -32,6 +34,8 @@ h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:12px}
 .ex{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0;display:flex;flex-direction:column;gap:6px}
 .ex:has(.view+.view){grid-column:span 2}
+.vs{font-family:var(--mono);font-size:11px;color:#8d8d93;padding:0 4px}
+.gnote{margin:2px 4px 2px;font-size:11px;color:#b9b9be;max-width:36ch}
 @media (max-width:720px){.ex:has(.view+.view){grid-column:auto}}
 .ex header{display:flex;align-items:baseline;gap:8px}
 .num{font-family:var(--mono);font-size:13px;color:var(--accent);font-variant-numeric:tabular-nums;min-width:2.2em}
@@ -48,7 +52,7 @@ figcaption{font-family:var(--mono);font-size:10px;color:#6b6b70;letter-spacing:.
 </style>
 <div class="wrap">
 <h1>Exercise sketches: review</h1>
-<p class="lede">All ${n} exercises in the workout app, drawn as stick figures from one 3D pose per position. Each card shows start → finish, with a front or overhead view where it shows something the side view can't. Yellow is equipment, grey limbs are the far side.</p>
+<p class="lede">All ${n} exercises in the workout app, drawn as stick figures from one 3D pose per position. Each card shows start → finish, with a front or overhead view where it shows something the side view can't. Yellow is equipment, grey limbs are the far side. Exercises where grip width is a real choice also show narrow and wide side by side.</p>
 <p class="how"><b>How to review:</b> reply in the chat with the numbers that look wrong and a few words on what's off, for example "12 knee too far forward". Nothing is in the app yet.</p>
 <nav aria-label="Muscle groups">${nav}</nav>
 ${body}
