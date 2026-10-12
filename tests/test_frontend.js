@@ -7708,6 +7708,15 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('the sketch modal exists', html.includes('id="exSketchModal"') && html.includes('id="exSketchContent"'));
 }
 
+// ── Log card buttons are big enough to hit, ? is blue (Henrik, 2026-10-12) ───
+{
+  const pf = G.prefillLog.toString();
+  const btn = f => (pf.match(new RegExp('<button onclick="' + f + '\\(this\\)"[^>]*>')) || [''])[0];
+  check('?, swap and remove on a Log card are 38px tap targets',
+    ['showExSketch', 'swapExercise', 'removeExCard'].every(f => /width:38px;height:38px/.test(btn(f))), btn('removeExCard'));
+  check('…and ? is blue, not muted grey', /color:#4da3ff/.test(btn('showExSketch')) && !/color:var\(--muted\)/.test(btn('showExSketch')));
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
