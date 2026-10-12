@@ -448,7 +448,7 @@
     </div>
   </div>
 </div>
-<div class="modal-overlay" id="exSketchModal">
+<div class="modal-overlay" id="exSketchModal" style="z-index:500">
   <div class="modal">
     <div class="modal-header"><div class="modal-title" id="exSketchTitle">EXERCISE</div><button class="modal-close" onclick="closeModal('exSketchModal')">×</button></div>
     <div class="modal-body" id="exSketchContent" style="max-height:75vh;overflow-y:auto;padding:16px 16px 20px"></div>
@@ -1106,7 +1106,7 @@ function _dayTplBannerHtml(day,prog){
     '<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;">This day starts with '+first.length+' exercise'+(first.length!==1?'s':'')+' from the <b>'+_escP(t?t.name:'template')+'</b> template, not from '+_escP((prog&&prog.name)||'this program')+': '+_escP(names)+'</div>'+
     '</div>';
 }
-function renderWorkout(num){var day=getActiveProgramDay(num);if(!day)return;var prog=getActiveProgram();var tc={strength:'tag-strength',volume:'tag-volume',rehab:'tag-rehab'};var tl={strength:'Strength',volume:'Volume',rehab:'🔧 Rehab'};var savedW=getData('template_weights_day'+num,{});var restLabel=getProgramRest(prog);var html='<div class="workout-detail">'+_deloadBannerHtml()+_dayTplBannerHtml(day,prog)+'<div class="workout-header"><div><div class="workout-title">'+day.name+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px">⏱ '+restLabel+'</div></div>'+'</div>';var effExs=_applyRehabSubs(day.exercises,prog);effExs.forEach(function(ex){var lastKg=savedW[ex.name];if((lastKg==null||lastKg===0)&&ex._rehabOrig)lastKg=savedW[ex._rehabOrig];if((lastKg==null||lastKg===0)&&logs.length){var _fl=getBestKgFromLogs(ex.name)||(ex._rehabOrig?getBestKgFromLogs(ex._rehabOrig):null);if(_fl)lastKg=_fl;}if(_deloadActive&&lastKg>0){lastKg=_deloadKg(lastKg);if(isBarbellEx(ex.name))lastKg=roundBarbellKg(lastKg);}var kgStr=lastKg!=null&&lastKg>0?'<span style="color:var(--accent);font-weight:600;margin-left:6px">'+kgToUnit(lastKg)+unitLabel()+'</span>':'';var nameHtml=_escP(ex.name)+(ex._rehabOrig?'<span style="color:#ff9b3c;font-size:10px;margin-left:6px" title="Rehab sub for '+_escP(ex._rehabOrig)+'">↺ rehab</span>':'')+_tplChipHtml(ex);html+='<div class="exercise-row"><div class="ex-info"><div class="ex-name">'+nameHtml+'</div><div class="ex-scheme">'+_escP(_deloadActive?_deloadScheme(ex.scheme)+' · deload':ex.scheme)+kgStr+'</div></div><span class="ex-tag '+(tc[ex.tag]||'tag-volume')+'">'+(tl[ex.tag]||ex.tag)+'</span></div>';});html+='</div>';document.getElementById('workout-display').innerHTML=html;}
+function renderWorkout(num){var day=getActiveProgramDay(num);if(!day)return;var prog=getActiveProgram();var tc={strength:'tag-strength',volume:'tag-volume',rehab:'tag-rehab'};var tl={strength:'Strength',volume:'Volume',rehab:'🔧 Rehab'};var savedW=getData('template_weights_day'+num,{});var restLabel=getProgramRest(prog);var html='<div class="workout-detail">'+_deloadBannerHtml()+_dayTplBannerHtml(day,prog)+'<div class="workout-header"><div><div class="workout-title">'+day.name+'</div><div style="font-size:11px;color:var(--muted);margin-top:2px">⏱ '+restLabel+'</div></div>'+'</div>';var effExs=_applyRehabSubs(day.exercises,prog);effExs.forEach(function(ex){var lastKg=savedW[ex.name];if((lastKg==null||lastKg===0)&&ex._rehabOrig)lastKg=savedW[ex._rehabOrig];if((lastKg==null||lastKg===0)&&logs.length){var _fl=getBestKgFromLogs(ex.name)||(ex._rehabOrig?getBestKgFromLogs(ex._rehabOrig):null);if(_fl)lastKg=_fl;}if(_deloadActive&&lastKg>0){lastKg=_deloadKg(lastKg);if(isBarbellEx(ex.name))lastKg=roundBarbellKg(lastKg);}var kgStr=lastKg!=null&&lastKg>0?'<span style="color:var(--accent);font-weight:600;margin-left:6px">'+kgToUnit(lastKg)+unitLabel()+'</span>':'';var nameHtml=_escP(ex.name)+(ex._rehabOrig?'<span style="color:#ff9b3c;font-size:10px;margin-left:6px" title="Rehab sub for '+_escP(ex._rehabOrig)+'">↺ rehab</span>':'')+_tplChipHtml(ex);html+='<div class="exercise-row"><div class="ex-info"><div class="ex-name">'+nameHtml+'</div><div class="ex-scheme">'+_escP(_deloadActive?_deloadScheme(ex.scheme)+' · deload':ex.scheme)+kgStr+'</div></div><div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+_exSketchBtnHtml('_openExSketch('+JSON.stringify(ex.name)+')')+'<span class="ex-tag '+(tc[ex.tag]||'tag-volume')+'">'+(tl[ex.tag]||ex.tag)+'</span></div></div>';});html+='</div>';document.getElementById('workout-display').innerHTML=html;}
 var _lsDbgKeys=[];
 // Built with DOM nodes and textContent, never innerHTML: every value here is an
 // exception message or a URL — exactly the untrusted-text-into-HTML shape CodeQL
@@ -1612,7 +1612,7 @@ function _renderProgOverlay(){
     day.exercises.forEach(function(ex,ei){
       html+='<div style="border-bottom:1px solid var(--border);padding:10px 0;'+(_isTplEx(ex)?'border-left:2px solid #7cc4ff;padding-left:8px;':'')+'">';
       if(_isTplEx(ex))html+='<div style="font-size:10px;font-weight:700;color:#7cc4ff;letter-spacing:0.5px;margin-bottom:4px;">\u26a1 '+_escP(ex._tplDay||'From template')+'</div>';
-      html+=_exOpts(di,ei,ex.name);
+      html+='<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;min-width:0;">'+_exOpts(di,ei,ex.name)+'</div>'+_exSketchBtnHtml('_openExSketch(_progEditBuf.days['+di+'].exercises['+ei+'].name)')+'</div>';
       html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;">';
       html+='<input type="text" id="prog-scheme-'+di+'-'+ei+'" value="'+_escP(ex.scheme)+'" oninput="_progEditBuf.days['+di+'].exercises['+ei+'].scheme=this.value" placeholder="Scheme e.g. 5×5" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11px;font-family:var(--font-ui);outline:none;">';
       html+=_progSetsSelects(di,ei,ex.sets);
@@ -3398,6 +3398,27 @@ _skWithGrip('Overhead Press',function(){var mk=function(a){var J=_skStandQ({uppe
   return{view:'front',items:[mk(8),mk(24)],labels:['Narrow','Wide'],note:"Narrow: hands just outside the shoulders. Wide \u2248 1.5\u00d7 shoulder width. What changes: a narrower grip lets you lift more over a longer range, with more load on the elbows and less on the shoulders; wider is the reverse (Gundersen 2026, seated press)."};});
 _skWithGrip('Barbell Row',function(){var mk=function(a){var J=_skStandQ({torso:68,neck:55,thigh:[160,6],shank:192,upper:[180,a],fore:[180,a]});return{J:J,eq:[{t:'bar',at:_skBarAt(J,0,0)}]};}
   return{view:'front',items:[mk(3),mk(20)],labels:['Narrow','Wide'],note:"Narrow \u2248 shoulder width, wide \u2248 1.5\u00d7 shoulder width. What changes: no good study has compared grip width in the barbell row. Use the width that lets you pull the bar to the lower ribs comfortably, and keep it the same so your numbers compare."};});
+// ── Core (generated programs use these; 2026-10-12) ──────────────────────────
+function _skMat(J){var xs=[J.tR[0],J.tL[0],J.headc[0],J.wR[0],J.wL[0],J.kR[0],J.kL[0]];return{t:'box',x:[Math.min.apply(null,xs)-5,Math.max.apply(null,xs)+5],y:[0,1],z:[-26,26],c:'#26262b'};}
+SK['Plank']=function(){
+  var mk=function(knees){var J=skSolve(function(t){var q=_skQ({torso:t,neck:t,upper:180,fore:90,thigh:t-180,shank:knees?-90:t-180,foot:knees?-90:180});var K=skPose(q);
+      return knees?skMove(K,[-30-K.kR[0],1.5-K.kR[1],0]):skMove(K,[-45-K.tR[0],-K.tR[1],0]);},40,130,function(J){return 2.5-J.eR[1];});
+    return{J:J,eq:[_skMat(J)]};}
+  return _skX(mk(true),mk(false),['side'],'Forearms under the shoulders. Lift the knees so the body is one straight line from head to heels; brace the abs and squeeze the glutes, hips level. Hold.');};
+SK['Dead Bug']=function(){
+  var mk=function(i){var q=_skQ({torso:-90,neck:-90,upper:0,fore:0,thigh:0,shank:90,foot:0});
+    if(i){q.upperR=-75;q.foreR=-75;q.thighL=72;q.shankL=72;q.footL=-10;}
+    var J=skPose(q);J=skMove(J,[0,4-J.hip[1],0]);return{J:J,eq:[_skMat(J)]};}
+  return _skX(mk(0),mk(1),['side'],'On your back, arms to the ceiling, knees bent 90° above the hips. Press the lower back into the floor, then lower one arm and the opposite leg slowly without the back arching; return and switch.');};
+SK['Bird Dog']=function(){
+  var mk=function(i){var q=_skQ({torso:76,neck:84,upper:180,fore:180,thigh:180,shank:-90,foot:-90});
+    if(i){q.upperR=84;q.foreR=84;q.thighL=-86;q.shankL=-86;q.footL=180;}
+    var J=skPose(q);J=skMove(J,[0,26.5-J.hip[1],0]);return{J:J,eq:[_skMat(J)]};}
+  return _skX(mk(0),mk(1),['side','top'],'Hands under the shoulders, knees under the hips, back flat. Reach one arm forward and the opposite leg back until both are level with the body, hips square; return and switch.');};
+SK['Pallof Press']=function(){
+  var mk=function(i){var J=_skStandQ(i?{upper:[90,-14],fore:[90,-14],thighR:[180,6],thighL:[180,6]}:{upper:[172,8],fore:[35,-55],thighR:[180,6],thighL:[180,6]});
+    var m=skMid(J.wR,J.wL),to=[J.sh[0],J.sh[1]-6,48];return{J:J,eq:[{t:'line',a:m,b:to,w:1.4},{t:'line',a:[to[0],0,to[2]],b:[to[0],J.sh[1]+8,to[2]],w:2.4},{t:'db',r:2}]};}
+  return _skX(mk(0),mk(1),['top','front'],'Stand side-on to the cable or band at chest height, handle at the chest. Press straight out and hold for a breath without letting the body twist toward the anchor; bring it back.');};
 // Exercise sketch viewer (Henrik, 2026-10-12): the "?" on a Log Workout card opens how to do that exercise.
 function _exSketchSpec(name){var f=SK[name]||SK[_exCanonName(name)];return f?f():null;}
 function _exSketchHtml(name){var s=_exSketchSpec(name);if(!s)return '<div data-sk-none="1" style="color:var(--muted);font-size:13px">No sketch for '+_escP(name||'this exercise')+' yet.</div>';
@@ -3410,7 +3431,10 @@ function _exSketchHtml(name){var s=_exSketchSpec(name);if(!s)return '<div data-s
   if(s.grips){var g=s.grips,G=skPanels({views:[g.view],start:g.items[0],end:g.items[1],floor:g.floor},W,H)[g.view];
     out+=tile('Grip · '+V[g.view],G[0],G[1],g.labels[0],g.labels[1],'<span style="font-size:11px;color:#8d8d93;padding:0 4px">or</span>','<div data-sk-grip="1" style="font-size:11.5px;line-height:1.45;color:#c4c4c9;margin:4px">'+_escP(g.note)+'</div>');}
   return out;}
-function showExSketch(btn){var n=_exCardName(btn.closest('.ex-card'));document.getElementById('exSketchTitle').textContent=(n||'Exercise').toUpperCase();document.getElementById('exSketchContent').innerHTML=_exSketchHtml(n);openModal('exSketchModal');}
+function _openExSketch(n){document.getElementById('exSketchTitle').textContent=(n||'Exercise').toUpperCase();document.getElementById('exSketchContent').innerHTML=_exSketchHtml(n);openModal('exSketchModal');}
+function showExSketch(btn){_openExSketch(_exCardName(btn.closest('.ex-card')));}
+// The same blue ? on the Program day view and in the program editor (Henrik, 2026-10-12). onclick is JS, so it is attribute-escaped.
+function _exSketchBtnHtml(onclick){return '<button onclick="'+_escP(onclick)+'" title="How to do it" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;cursor:pointer;font-family:var(--font-ui);line-height:1;padding:0;background:rgba(77,163,255,0.12);border:1px solid #4da3ff;color:#4da3ff;font-size:19px;font-weight:700;flex-shrink:0">?</button>';}
 // ── end exercise sketches ──
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
