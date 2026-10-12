@@ -7634,6 +7634,27 @@ console.log('\n── Training at home ─────────────�
   check('wizard: step 2 shows the choice', /_progWizEquipHtml\(wiz\.equip\)/.test(String(G._renderProgWiz)));
 }
 
+// ── Section: home bodyweight exercises count body weight (2026-10-12) ───────
+// Henrik: "Use common sense, a inverted body weight row is maybe 35-55% of bw".
+{
+  const F = { 'Inverted Row': 0.45, 'Underhand Inverted Row': 0.45, 'Bodyweight Squat': 0.85, 'Sissy Squat': 0.8,
+    'Nordic Curl': 0.6, 'Single-leg Glute Bridge': 0.6, 'Single-leg RDL': 0.5, 'Bodyweight Good Morning': 0.5 };
+  Object.keys(F).forEach(n => check(`home bodyweight: ${n} is a bodyweight card moving ${F[n] * 100}% of body weight`,
+    G.isBWExName(n) && G.getExSplits(n).factor === F[n], JSON.stringify(G.getExSplits(n))));
+  check('home bodyweight: inverted rows sit inside Henrik\'s 35-55% range',
+    G.getExSplits('Inverted Row').factor >= 0.35 && G.getExSplits('Inverted Row').factor <= 0.55);
+  check('home bodyweight: a single-leg calf raise moves all of it (bodyweight card, no factor)',
+    G.isBWExName('Single-leg Calf Raise') && G.getExSplits('Single-leg Calf Raise').factor === undefined);
+  check('home bodyweight: the inverted rows still count toward back', G.getExGroup('Inverted Row') === 'back' && G.getExSplits('Underhand Inverted Row').back > 0.5);
+  check('shared names are untouched — logged with dumbbells at the gym',
+    !G.isBWExName('Bulgarian Split Squat') && !G.isBWExName('Lunges') && G.getExSplits('Lunges').factor === undefined);
+  check('loaded home lifts are not bodyweight and carry no factor',
+    !G.isBWExName('Kettlebell Glute Bridge') && G.getExSplits('Kettlebell Glute Bridge').factor === undefined &&
+    !G.isBWExName('Kettlebell Romanian Deadlift') && G.getExSplits('Kettlebell Romanian Deadlift').factor === undefined &&
+    !G.isBWExName('Kettlebell Front Squat') && G.getExSplits('Kettlebell Front Squat').factor === undefined);
+  check('gym names are untouched', !G.isBWExName('Squat') && !G.isBWExName('Barbell Row') && G.getExSplits('Romanian Deadlift').factor === undefined && G.getExSplits('Cable Row').factor === undefined);
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
