@@ -4,6 +4,7 @@
 
 - **Answer first, then say what you will do before doing it** ("You're right. I'll answer first and say what I'm doing before I start."). A question gets its answer in the first lines, before any tool call. Before starting any work (a workflow, a PR, a deploy, waiting on CI), say in one line what you are about to do and why; never disappear into tool calls on a simple question.
 - **Every request carries context** (Henrik, 2026-10-10: "add context to requests so I have a clue what you are talking about"). When you ask Henrik to do or check something, say what it is for, where it fits in the overall task (step N of what), and what he should see when it worked. Never a bare instruction that assumes he remembers the thread.
+- **Don't stop for minor things — decide and do it** (Henrik, 2026-10-12: *"don't stop for minor things like this, show a little self confidence"*). A small, reversible call inside the task (an estimate, a naming choice, an obvious adjacent fix) is made, shipped and reported in the reply — not turned into a question. Ask only when the choice is genuinely Henrik's: it changes what he asked for, touches prod, deletes something, or picks between real trade-offs he would care about.
 - **Every step Henrik must do comes with its commands, in the same message** (Henrik, 2026-10-10: "you must always provide detailed instructions and commands for stuff like this"). When a reply mentions anything he will have to do (merge, deploy, change a config, restart, check), give the full instructions and the exact, complete, copy-paste commands right there, saying which machine each runs on. Never "I'll give you the command when…" or "deploy as usual": he should never have to ask for the how.
 
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
@@ -515,6 +516,7 @@ and no dumbbells.
   bodyweight good morning 0.5, single-leg calf raise 1.0. Shared names (Bulgarian Split Squat,
   Lunges) stay non-bodyweight — they are logged with dumbbells at the gym. Only the factor was
   added: the muscle split of each stays what it was, so program generation is unchanged.
+  Pike and decline push-ups count 0.7 (raised from the push-up's 0.64, Henrik 2026-10-12).
 - Every home name is a first-class catalogue exercise (both pickers + `EXERCISE_SPLITS` +
   `MUSCLE_MAP`). Band names avoid "pulldown"/"pushdown" so `isCableEx` does not give them pulley
   buttons; "Nordic Curl" has its own key so it is legs, not biceps.
