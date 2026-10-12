@@ -640,6 +640,28 @@ them under one entry.
 - Also merges Weighted Chin-ups and Weighted Dips with their base movement. **Chin-ups stay
   distinct from Pull-ups** — a different grip, not a loading variant.
 
+### Exercise sketches — every catalogue exercise has one (rule 2026-10-12)
+Henrik: *"Every exercise in the catalog needs a simple sketch showing how to perform it"*, then *"Go stick
+figures"*, approved after review. The **?** on a Log Workout card opens `exSketchModal` for that card's current
+name (`_exCardName`, so a swap shows the swapped exercise).
+
+- **`index.html` is the only copy of the sketch code**, between `// ── Exercise sketches:` and
+  `// ── end exercise sketches ──`. A 3D stick-figure rig (`skPose`) posed once per position; `skPanels` projects
+  it to side / front / from-above SVGs, start → finish. `tools/sketches/page.js` renders the review page from that
+  block, so the page and the app cannot disagree.
+- **Every name in `EX_OPTS_HTML` must have an `SK[...]` entry, and no `SK` entry may name anything else** — a
+  test asserts both. Adding a catalogue exercise means adding its sketch in the same PR. `Weighted X` falls back
+  to `X` (`_exCanonName`): one movement, one sketch.
+- Side view always; a front or overhead view only where it shows something the side view cannot.
+- **Grip variations are panels on the existing exercise, never new catalogue names** (Henrik: *"Grip panels on
+  existing exercises"*) — one movement, one history.
+- **Grip notes are science based.** Every claim cites a study retrieved into `claude-agent-backend`
+  `docs/enhanced-bodybuilding/sources/grip-width-*` (summary: doc `20-grip-width.md`). Where the studies show a
+  smaller effect than the common belief, say so first — Henrik: *"rather point out differences are smaller than
+  gym lore in those occasions"*. Where there is no study (barbell row), say that.
+- Nested helpers inside the sketch code are written `var mk=function(` — the duplicate-function-name test reads
+  every `function name(` in the script, inner ones included.
+
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
 day containing a pressing movement (bench/incline/OHP/dips/chest-or-landmine press) — **even in
