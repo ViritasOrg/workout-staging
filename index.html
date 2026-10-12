@@ -487,7 +487,9 @@ const REHAB_CONDITIONS=[
    detect:function(n){return/romanian|\brdl\b|deadlift|good morning/i.test(n);},
    suggest:function(n){return/romanian|\brdl\b/i.test(n)?'Leg Curl':'Leg Press';}},
   {id:'knees',label:'Knees',desc:'Squats/lunges → leg press/machine',
-   detect:function(n){return(/\bsquat\b|\blunge\b/i.test(n))&&!/\b(leg press|leg curl|leg extension|machine)\b/i.test(n);},
+   // \blunges?\b, not \blunge\b: the plural is what every generated program and the catalogue
+   // call it, and \blunge\b never matched "Lunges", so a knees injury kept them (fixed 2026-10-12).
+   detect:function(n){return(/\bsquat\b|\blunges?\b/i.test(n))&&!/\b(leg press|leg curl|leg extension|machine)\b/i.test(n);},
    suggest:function(n){return/lunge/i.test(n)?'Leg Extension':'Leg Press';}}
 ];
 // ── Training at home (Henrik, 2026-10-12) ──────────────────────────────────────

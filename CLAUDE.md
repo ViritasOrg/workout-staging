@@ -518,9 +518,9 @@ and no dumbbells.
 - Every home name is a first-class catalogue exercise (both pickers + `EXERCISE_SPLITS` +
   `MUSCLE_MAP`). Band names avoid "pulldown"/"pushdown" so `isCableEx` does not give them pulley
   buttons; "Nordic Curl" has its own key so it is legs, not biceps.
-- **Open, not fixed (raise before touching):** the gym `knees` condition matches `/\blunge\b/`,
-  which does not match "Lunges", so a gym program with a knees injury still keeps Lunges. Home
-  programs override it explicitly.
+- **Fixed 2026-10-12 (Henrik: "Pls fix"):** the `knees` condition matched `/\blunge\b/`, which
+  never matched "Lunges", so a gym program with a knees injury kept Lunges. It is `/\blunges?\b/`
+  now. The home `'Lunges'` knee overrides were written for that gap and are left in place.
 
 ### Full-body at low frequency — ≤4 days/week (rule 2026-07-24)
 When a generated program is **4 days/week or fewer**, it must be **full-body** (each session

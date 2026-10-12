@@ -7655,6 +7655,22 @@ console.log('\n── Training at home ─────────────�
   check('gym names are untouched', !G.isBWExName('Squat') && !G.isBWExName('Barbell Row') && G.getExSplits('Romanian Deadlift').factor === undefined && G.getExSplits('Cable Row').factor === undefined);
 }
 
+// ── Section: a knees injury catches "Lunges" (2026-10-12) ─────────────────────
+// The knees condition matched /\blunge\b/, which never matched the plural every program uses.
+{
+  const knees = G.REHAB_CONDITIONS.find(c => c.id === 'knees');
+  check('knees: "Lunges" is detected as aggravating', knees.detect('Lunges') === true);
+  check('knees: …and singular / other lunge names still are', knees.detect('Lunge') && knees.detect('Walking Lunges') && knees.detect('Kettlebell Reverse Lunge'));
+  check('knees: …and it is replaced the way a lunge always was', knees.suggest('Lunges') === 'Leg Extension');
+  check('knees: the safe machines are still left alone', !knees.detect('Leg Press') && !knees.detect('Leg Extension'));
+  const GOALS = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower']];
+  const left = [];
+  for (const [g, s] of GOALS) for (let d = 1; d <= 7; d++) {
+    G._generateWorkoutProgram(g, s, d, 'T', 12, ['knees']).days.forEach(day => day.exercises.forEach(ex => { if (/\blunges?\b/i.test(ex.name)) left.push(`${g}-${s} ${d}d ${day.name}: ${ex.name}`); }));
+  }
+  check('knees: no generated gym program keeps a lunge', left.length === 0, left.slice(0, 4).join(' | '));
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
