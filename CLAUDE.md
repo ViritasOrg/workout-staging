@@ -666,6 +666,33 @@ editor overlay (300); at the default modal z-index the sketch opened behind the 
 - Nested helpers inside the sketch code are written `var mk=function(` — the duplicate-function-name test reads
   every `function name(` in the script, inner ones included.
 
+### The Log Workout screen (redesign, rule 2026-10-12)
+Henrik asked for "a new holistic design sprint" of the Log screen, approved the review's plan, and answered
+its questions: *"Remove rest timers. 1 yes 2 no remove the timers totally 3 yes 4 yes 5 do all at once"*.
+
+- **No rest timers, anywhere.** The per-card ⏱, the REST TIMER button and the timer bar are gone, with their
+  code. Do not bring one back as a "small helper". `restSecsForTag` stays: the session-length estimate uses it.
+- **Card = name, blue ?, ⋯.** Swap, the equipment toggles (½ gear, 2× cable, two dumbbells) and Remove live in
+  the ⋯ menu (`exMenuModal`, z-index 500). The toggles are still the card's own gear buttons, kept in a hidden
+  `.gear-slot` and clicked by the menu, so `toggleGear`/`toggleGear2`/`toggleDb` and their storage are unchanged.
+  An active toggle shows as a chip on the card (`_gearChipText`).
+- **One prescription line in plain words** (the program's `scheme`, `· deload` when deloading) plus the tag chip,
+  in muted ink. Yellow is for Save and numbers you type; blue is help; green is a finished exercise.
+- **One row per set, built only by `_setRowInner`** (prefill, "+ set" and custom exercises all call it). Three
+  load modes from `_loadMode`: `kg`; `bw` shows "BW" (body weight is still in a hidden kg input, so the saved log
+  is exactly what it was); `none` is reps only, for `UNLOADED_EX` (Dead Bug, Plank, Bird Dog, Pallof Press,
+  Prone Y-Raise, Prone T-Raise). **The kg input is always present, hidden when not shown**: `saveLog`, drafts,
+  `editLog` and propagation all read `input[data-type="kg"]` per set, and that contract must not change.
+  A swap re-applies the mode (`_applyLoadMode`). No gear toggles on bodyweight or unloaded work.
+- **"Last (8 Oct): 25 kg × 10, 10, 9"** under the prescription, from the newest stored log holding that exercise
+  (`_lastTimeText`), skipping the log being edited. Read-only; it never writes anything.
+- **An exercise is done when every set has reps** (no tick buttons: Henrik said no to set ✓). Done cards get a
+  green edge and the Save bar, which stays on screen above the tabs, counts them.
+- **The header and every full-screen layer clear the iOS status bar**: `viewport-fit=cover`, the header and
+  overlays pad by `env(safe-area-inset-top)`, and a fixed `body::before` strip keeps scrolled content from
+  showing under the clock (the app asks for a see-through `black-translucent` status bar).
+- Set inputs are 16px so iOS does not zoom when one is tapped.
+
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
 day containing a pressing movement (bench/incline/OHP/dips/chest-or-landmine press) — **even in
