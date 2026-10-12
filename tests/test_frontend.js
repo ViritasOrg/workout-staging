@@ -7716,6 +7716,9 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('the shared ? button is the blue 38px one', /width:38px;height:38px/.test(b) && /color:#4da3ff/.test(b) && />\?<\/button>$/.test(b));
   check('…and its onclick is attribute-escaped', b.includes('onclick="_openExSketch(&quot;Squat&quot;)"'));
   check('the Program day view shows ? on every exercise row', G.renderWorkout.toString().includes("_exSketchBtnHtml('_openExSketch('+JSON.stringify(ex.name)+')')"));
+  const rw = G.renderWorkout.toString();
+  check('…and sits at the right edge, after the tag, so it lines up whatever the tag width (Henrik: "Blue ? Are not aligned")',
+    rw.indexOf("_exSketchBtnHtml('_openExSketch(") > rw.indexOf('<span class=\"ex-tag ') && rw.indexOf('<span class=\"ex-tag ') > -1);
   check('…the editor shows ? next to each exercise and opens what is CURRENTLY picked',
     G._renderProgOverlay.toString().includes("_exSketchBtnHtml('_openExSketch(_progEditBuf.days['+di+'].exercises['+ei+'].name)')"));
   const zOf = sel => { const m = html.match(new RegExp(sel + '\\{[^}]*z-index:(\\d+)')); return m ? +m[1] : 0; };
