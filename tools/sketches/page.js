@@ -1,6 +1,11 @@
-const fs=require('fs'),vm=require('vm');const ctx={};vm.createContext(ctx);
-for(const f of ['engine.js','lib.js','lib2.js','lib3.js','lib4.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
-const names=JSON.parse(fs.readFileSync('names.json','utf8'));
+// Renders the sketch review page from the app itself: index.html is the only copy of the sketch code.
+// Run from the repo root: node tools/sketches/page.js out.html
+const fs=require('fs'),vm=require('vm'),path=require('path');const ctx={};vm.createContext(ctx);
+const app=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+const B='// ── Exercise sketches:',E='// ── end exercise sketches ──';
+vm.runInContext(app.slice(app.indexOf(B),app.indexOf(E)),ctx);
+const opts=app.match(/const EX_OPTS_HTML='([^']*)'/)[1];const names=[];
+for(const m of opts.matchAll(/<optgroup label="([^"]*)">(.*?)<\/optgroup>/g))for(const o of m[2].matchAll(/<option>([^<]*)<\/option>/g))names.push([m[1],o[1].replace(/&amp;/g,'&')]);
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const VIEW={side:'Side',front:'Front',top:'From above'};
 const arrow='<svg class="arr" viewBox="0 0 18 150" width="18" height="150" aria-hidden="true"><path d="M2 75 L14 75 M9 70 L15 75 L9 80" stroke="#e8ff3c" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -53,7 +58,7 @@ figcaption{font-family:var(--mono);font-size:10px;color:#6b6b70;letter-spacing:.
 <div class="wrap">
 <h1>Exercise sketches: review</h1>
 <p class="lede">All ${n} exercises in the workout app, drawn as stick figures from one 3D pose per position. Each card shows start → finish, with a front or overhead view where it shows something the side view can't. Yellow is equipment, grey limbs are the far side. Exercises where grip width is a real choice also show narrow and wide side by side, with what the studies found changes (author and year in brackets).</p>
-<p class="how"><b>How to review:</b> reply in the chat with the numbers that look wrong and a few words on what's off, for example "12 knee too far forward". Nothing is in the app yet.</p>
+<p class="how"><b>In the app:</b> tap <b>?</b> on a Log Workout card. <b>To review:</b> reply in the chat with the numbers that look wrong and a few words on what's off.</p>
 <nav aria-label="Muscle groups">${nav}</nav>
 ${body}
 </div>`;

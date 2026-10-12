@@ -7677,6 +7677,37 @@ check('decline push-ups count 70% of body weight', G.isBWExName('Decline Push-up
 check('…regular, wide, diamond and archer push-ups keep 64%',
   ['Push-ups', 'Wide Push-ups', 'Diamond Push-ups', 'Archer Push-ups'].every(n => G.getExSplits(n).factor === 0.64));
 
+// ── Exercise sketches (2026-10-12) ───────────────────────────────────────────
+// Henrik: "Every exercise in the catalog needs a simple sketch showing how to perform it", approved as stick figures.
+{
+  const cat = [...G.EX_OPTS_HTML.matchAll(/<option>([^<]*)<\/option>/g)].map(m => m[1].replace(/&amp;/g, '&'));
+  const bad = [];
+  cat.forEach(n => {
+    try {
+      const s = G._exSketchSpec(n);
+      if (!s || !s.cue || !s.views || !s.views.length) { bad.push(n + ': no sketch'); return; }
+      const P = G.skPanels(s, 150, 170);
+      s.views.forEach(v => { if (!P[v] || P[v].length !== 2 || !P[v].every(x => /^<svg viewBox=/.test(x) && x.includes('<line'))) bad.push(n + ': ' + v); });
+    } catch (e) { bad.push(n + ': ' + e.message); }
+  });
+  check('every catalogue exercise has a start and finish sketch for each of its views', cat.length > 100 && bad.length === 0, bad.slice(0, 5).join(' | '));
+  check('every sketch name is a catalogue exercise (no orphan sketches)', Object.keys(G.SK).every(n => cat.includes(n)),
+    Object.keys(G.SK).filter(n => !cat.includes(n)).join(', '));
+  const h = G._exSketchHtml('Squat'), s = G._exSketchSpec('Squat');
+  check('the viewer shows the cue and one start/finish tile per view',
+    h.includes(G._escP(s.cue)) && (h.match(/data-sk-view="1"/g) || []).length === s.views.length && (h.match(/<svg /g) || []).length === 2 * s.views.length);
+  const pu = G._exSketchHtml('Pull-ups');
+  check('…a grip-variation exercise adds the grip tile and its sourced note', /data-sk-grip="1"/.test(pu) && /smaller than gym lore/i.test(pu));
+  check('…Weighted Dips falls back to the Dips sketch (one movement)',
+    G._exSketchHtml('Weighted Dips') === G._exSketchHtml('Dips') && !/data-sk-none/.test(G._exSketchHtml('Weighted Dips')));
+  const none = G._exSketchHtml('My <b>custom</b> move');
+  check('…an unknown (custom) exercise says there is no sketch, escaped', /data-sk-none="1"/.test(none) && !none.includes('<b>'));
+  const pf = G.prefillLog.toString();
+  check('Log Workout cards carry the "?" that opens the sketch', pf.includes('onclick="showExSketch(this)"'));
+  check('the sketch opens for the card\'s CURRENT name (swaps included)', G.showExSketch.toString().includes('_exCardName('));
+  check('the sketch modal exists', html.includes('id="exSketchModal"') && html.includes('id="exSketchContent"'));
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
