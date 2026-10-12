@@ -642,15 +642,19 @@ them under one entry.
 
 ### Exercise sketches — every catalogue exercise has one (rule 2026-10-12)
 Henrik: *"Every exercise in the catalog needs a simple sketch showing how to perform it"*, then *"Go stick
-figures"*, approved after review. The **?** on a Log Workout card opens `exSketchModal` for that card's current
-name (`_exCardName`, so a swap shows the swapped exercise).
+figures"*, approved after review. A blue **?** opens `exSketchModal` (`_openExSketch`) from three places: a Log Workout
+card (its current name via `_exCardName`, so a swap shows the swapped exercise), each row of the Program day view, and
+each exercise in the program editor (whatever is picked right now). `exSketchModal` sits at z-index 500, above the
+editor overlay (300); at the default modal z-index the sketch opened behind the editor and showed nothing.
 
 - **`index.html` is the only copy of the sketch code**, between `// ── Exercise sketches:` and
   `// ── end exercise sketches ──`. A 3D stick-figure rig (`skPose`) posed once per position; `skPanels` projects
   it to side / front / from-above SVGs, start → finish. `tools/sketches/page.js` renders the review page from that
   block, so the page and the app cannot disagree.
-- **Every name in `EX_OPTS_HTML` must have an `SK[...]` entry, and no `SK` entry may name anything else** — a
-  test asserts both. Adding a catalogue exercise means adding its sketch in the same PR. `Weighted X` falls back
+- **Every name in `EX_OPTS_HTML`, and every name a generated program or template can contain, must have an
+  `SK[...]` entry; no `SK` entry may name anything else** — tests assert both. Adding an exercise to the catalogue
+  or to the generator means adding its sketch in the same PR. The generator's core moves (Dead Bug, Plank, Pallof
+  Press, Bird Dog) are not in the picker and have sketches all the same. `Weighted X` falls back
   to `X` (`_exCanonName`): one movement, one sketch.
 - Side view always; a front or overhead view only where it shows something the side view cannot.
 - **Grip variations are panels on the existing exercise, never new catalogue names** (Henrik: *"Grip panels on

@@ -7691,8 +7691,23 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
     } catch (e) { bad.push(n + ': ' + e.message); }
   });
   check('every catalogue exercise has a start and finish sketch for each of its views', cat.length > 100 && bad.length === 0, bad.slice(0, 5).join(' | '));
-  check('every sketch name is a catalogue exercise (no orphan sketches)', Object.keys(G.SK).every(n => cat.includes(n)),
-    Object.keys(G.SK).filter(n => !cat.includes(n)).join(', '));
+  // Generated programs also use four core moves that are not in the picker (Dead Bug, Plank, Pallof Press, Bird Dog);
+  // the ? must not come up empty on a program the app wrote itself.
+  const gen = new Set();
+  const GOALS = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],['hypertrophy','upper'],['hypertrophy','lower'],
+    ['aesthetic','fullbody'],['aesthetic','upperlower'],['aesthetic','ppl'],['rehab','knee'],['rehab','back'],['rehab','shoulder']];
+  for (const [g, sub] of GOALS) for (let d = 1; d <= 7; d++) for (const inj of [[], ['knees'], ['shoulders'], ['lowerback']])
+    for (const eq of [undefined, 'home-kb', 'home-bw']) {
+      let p; try { p = G._generateWorkoutProgram(g, sub, d, 'T', 12, inj, eq); } catch (e) { continue; }
+      p.days.forEach(day => day.exercises.forEach(ex => gen.add(ex.name)));
+    }
+  (G.PROGRAM_TEMPLATES || []).forEach(t => t.days.forEach(day => day.exercises.forEach(ex => gen.add(ex.name))));
+  const genMiss = [...gen].filter(n => !G._exSketchSpec(n));
+  check('every exercise a generated program or template can contain has a sketch', gen.size > 50 && genMiss.length === 0, genMiss.join(', '));
+  ['Dead Bug', 'Plank', 'Pallof Press', 'Bird Dog'].forEach(n => check(`…${n} is one of them and renders`, gen.has(n) &&
+    G._exSketchSpec(n).views.every(v => G.skPanels(G._exSketchSpec(n), 150, 170)[v].every(x => x.includes('<line')))));
+  check('every sketch is for a catalogue or generated exercise (no orphan sketches)', Object.keys(G.SK).every(n => cat.includes(n) || gen.has(n)),
+    Object.keys(G.SK).filter(n => !cat.includes(n) && !gen.has(n)).join(', '));
   const h = G._exSketchHtml('Squat'), s = G._exSketchSpec('Squat');
   check('the viewer shows the cue and one start/finish tile per view',
     h.includes(G._escP(s.cue)) && (h.match(/data-sk-view="1"/g) || []).length === s.views.length && (h.match(/<svg /g) || []).length === 2 * s.views.length);
@@ -7715,6 +7730,20 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('?, swap and remove on a Log card are 38px tap targets',
     ['showExSketch', 'swapExercise', 'removeExCard'].every(f => /width:38px;height:38px/.test(btn(f))), btn('removeExCard'));
   check('…and ? is blue, not muted grey', /color:#4da3ff/.test(btn('showExSketch')) && !/color:var\(--muted\)/.test(btn('showExSketch')));
+}
+
+// ── The ? on the Program day view and in the editor (Henrik, 2026-10-12) ──────
+{
+  const b = G._exSketchBtnHtml('_openExSketch("Squat")');
+  check('the shared ? button is the blue 38px one', /width:38px;height:38px/.test(b) && /color:#4da3ff/.test(b) && />\?<\/button>$/.test(b));
+  check('…and its onclick is attribute-escaped', b.includes('onclick="_openExSketch(&quot;Squat&quot;)"'));
+  check('the Program day view shows ? on every exercise row', G.renderWorkout.toString().includes("_exSketchBtnHtml('_openExSketch('+JSON.stringify(ex.name)+')')"));
+  check('…the editor shows ? next to each exercise and opens what is CURRENTLY picked',
+    G._renderProgOverlay.toString().includes("_exSketchBtnHtml('_openExSketch(_progEditBuf.days['+di+'].exercises['+ei+'].name)')"));
+  const zOf = sel => { const m = html.match(new RegExp(sel + '\\{[^}]*z-index:(\\d+)')); return m ? +m[1] : 0; };
+  check('…the sketch opens ON TOP of the program editor, not behind it',
+    +(html.match(/id="exSketchModal" style="z-index:(\d+)"/) || [])[1] > Math.max(zOf('#prog-overlay'), zOf('\\.prog-overlay'), 300));
+  check('the Log card ? and the new ones open the same viewer', G.showExSketch.toString().includes('_openExSketch('));
 }
 
 setImmediate(() => {
