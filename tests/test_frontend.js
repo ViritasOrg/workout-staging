@@ -7797,8 +7797,9 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   const low = [];
   fam.forEach(n => { const s = G.SK[n](); [['start', s.start], ['end', s.end]].forEach(([k, st]) => { if (st.J.headc[1] - 6 < 0) low.push(`${n} ${k}: ${(st.J.headc[1] - 6).toFixed(1)}`); }); });
   check('no push-up pose puts the head through the floor (the diamond bottom did)', low.length === 0, low.join(', '));
-  check('Diamond Push-ups shows the hands from above, not head-on (a flat body seen from the front is a blob)',
-    G.SK['Diamond Push-ups']().views.join() === 'side,top');
+  check('Diamond, Wide and Archer push-ups show the hands from above, never head-on (a flat body seen from the front is a blob; Henrik flagged #78/#79 too)',
+    ['Diamond Push-ups', 'Wide Push-ups', 'Archer Push-ups'].every(n => G.SK[n]().views.join() === 'side,top'));
+  check('…and no push-up variant uses a front view at all', fam.every(n => G.SK[n]().views.indexOf('front') < 0));
   check('panels are capped at SK_MAX_SCALE so a narrow view is never blown up into fat strokes',
     G.SK_MAX_SCALE === 2.4 && String(G.skPanels).includes('SK_MAX_SCALE)'));
 }
