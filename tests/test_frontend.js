@@ -7791,6 +7791,18 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('the version label is muted, not yellow', html.includes('<span style="color:var(--muted);font-weight:600" id="header-version">'));
 }
 
+// ── Push-up sketches (Henrik, 2026-10-12: "The front view gone mad?" on Diamond Push-ups) ──
+{
+  const fam = ['Push-ups', 'Wide Push-ups', 'Diamond Push-ups', 'Archer Push-ups', 'Decline Push-ups'];
+  const low = [];
+  fam.forEach(n => { const s = G.SK[n](); [['start', s.start], ['end', s.end]].forEach(([k, st]) => { if (st.J.headc[1] - 6 < 0) low.push(`${n} ${k}: ${(st.J.headc[1] - 6).toFixed(1)}`); }); });
+  check('no push-up pose puts the head through the floor (the diamond bottom did)', low.length === 0, low.join(', '));
+  check('Diamond Push-ups shows the hands from above, not head-on (a flat body seen from the front is a blob)',
+    G.SK['Diamond Push-ups']().views.join() === 'side,top');
+  check('panels are capped at SK_MAX_SCALE so a narrow view is never blown up into fat strokes',
+    G.SK_MAX_SCALE === 2.4 && String(G.skPanels).includes('SK_MAX_SCALE)'));
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
