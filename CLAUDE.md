@@ -485,6 +485,36 @@ programs; only `rehab-*` still uses the old linear `scaleSets` path.
   and the number of exercises the template supplies. Tests assert the 1.6× bound with the
   at-floor exemption, across every goal × 4–7 days × sets-per-muscle 9–25.
 
+### Training at home — the wizard's "Where do you train?" (rule 2026-10-12)
+Henrik: *"need generator to be able to create programs for training at home without access to
+a gym"*, then: **all three options**, **"B for reps"** (higher reps allowed for bodyweight), and
+**"kettlebell and resistance bands only"** — so a home program assumes no bench, no pull-up bar
+and no dumbbells.
+
+- Three choices on wizard step 2: **Gym** (default), **Home: kettlebell + bands**, **Home:
+  bodyweight**. Stored on the program as `equipment` (absent for gym).
+- The generator builds the gym program, then `HOME_EQUIPMENT` swaps each exercise for its home
+  equivalent — run right after the injury layer and again after prehab injection. `null` drops
+  an exercise (curls with no equipment). Per-injury overrides exist because the injury layer's
+  own answers are gym machines; without them a knee-safe Leg Press turns back into a squat.
+- **Gym output is byte-identical to before** — verified across 1400 programs. Keep it that way:
+  every home rule lives behind `equip`.
+- The leg-day rule asks `_legdaySafeName`, which reads the `equip:<id>` marker. A slot is
+  "blocked" when its safe substitute is not the real lift (`_isMainSquat`/`_isMainDeadlift`), so
+  kettlebell leg days open with **Kettlebell Front Squat** (≥3 strength sets) and close with
+  **Kettlebell Deadlift**; bodyweight has no deadlift and that half stands down, as for a
+  lower-back injury.
+- **Bodyweight at home is AMRAP** (`max`, scheme `N×max — stop 1–2 reps short of failure`, tag
+  `volume`). That is how "higher reps allowed" is honoured without touching the 12-rep ceiling:
+  `tagForReps`/`snapReps` leave `max` alone. Rehab-tagged work keeps its 15s.
+- A home program carries `kg:0` everywhere — "no weight set yet", filled from history.
+- Every home name is a first-class catalogue exercise (both pickers + `EXERCISE_SPLITS` +
+  `MUSCLE_MAP`). Band names avoid "pulldown"/"pushdown" so `isCableEx` does not give them pulley
+  buttons; "Nordic Curl" has its own key so it is legs, not biceps.
+- **Open, not fixed (raise before touching):** the gym `knees` condition matches `/\blunge\b/`,
+  which does not match "Lunges", so a gym program with a knees injury still keeps Lunges. Home
+  programs override it explicitly.
+
 ### Full-body at low frequency — ≤4 days/week (rule 2026-07-24)
 When a generated program is **4 days/week or fewer**, it must be **full-body** (each session
 trains legs + a push + a pull + accessories), **not** a push/pull/legs or upper/lower split.

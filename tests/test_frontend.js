@@ -2232,7 +2232,7 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   check('_progWizGenerate passes setsPerMuscle to _generateWorkoutProgram',
     src.includes('wiz.setsPerMuscle||12'));
   check('_generateWorkoutProgram accepts setsPerMuscle + injuries params',
-    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries)'));
+    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equip)'));
   check('scaleSets helper scales exercise set counts',
     src.includes('function scaleSets(setsStr)'));
   check('pool padding loop fills short pools up to nDays',
@@ -5997,8 +5997,9 @@ console.log('\n── Standard machine exercises ──────────�
     check('every exercise in the picker resolves to a muscle group',
       unclassified.length === 0, unclassified.join(', '));
     // Exact count on purpose: adding or removing an exercise should be a conscious edit here.
-    check('the catalogue holds every exercise it is meant to (69)',
-      opts.length === 69, String(opts.length));
+    // 69 → 117 on 2026-10-12: the 48 home exercises (kettlebell, band and bodyweight).
+    check('the catalogue holds every exercise it is meant to (117)',
+      opts.length === 117, String(opts.length));
     check('no exercise is listed twice in the picker',
       new Set(opts).size === opts.length,
       opts.filter((n, i) => opts.indexOf(n) !== i).join(', '));
@@ -7529,6 +7530,108 @@ console.log('\n── Save never discards a workout in silence ─────�
     /_promoteRunId&&\(data\.run_attempt\|\|1\)<_promoteMinAttempt/.test(poll));
   check('retry: a fresh Push to Prod stops following the old run',
     /_promoteRunId=null;_promoteMinAttempt=0;/.test(String(G.pushToProd)));
+}
+
+// ── Section: training at home (2026-10-12) ───────────────────────────────────
+// "need generator to be able to create programs for training at home without access to a gym"
+// → three choices (Gym / Home: kettlebell + bands / Home: bodyweight), higher reps allowed for
+// bodyweight (AMRAP), "kettlebell and resistance bands only" (no bench, no bar, no dumbbells).
+console.log('\n── Training at home ───────────────────────────────────────');
+{
+  const GOALS = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],['hypertrophy','upper'],
+    ['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],['rehab','shoulder'],['rehab','back'],['rehab','knee']];
+  const INJ = [[], ['knees'], ['shoulders'], ['lower_back'], ['knees','shoulders']];
+  // Anything that needs a gym, a bar, a bench or dumbbells.
+  const GYM_ONLY = /barbell|cable|machine|smith|leg press|hack squat|bench press|lat pulldown|pull-?ups?\b|chin-?ups?\b|landmine|pec deck|t-bar|ez bar|\bdb\b|dumbbell|^dips$|^squat$|^deadlift$|^romanian deadlift$|^overhead press$|^hip thrust$|^arnold press$|^(leg curl|leg extension|lateral raise|face pulls|rear delt fly|y-raise|calf raises|tricep pushdown|hammer curl)$/i;
+  const CORE = new Set(['Plank', 'Dead Bug', 'Bird Dog', 'Pallof Press']);
+  const picker = [...G.EX_OPTS_HTML.matchAll(/<option>([^<]+)<\/option>/g)].map(m => m[1]);
+  const editorAll = String(G._exOpts || '');
+  const bad = { gym: [], cat: [], kg: [], bwReps: [], kbReps: [], dup: [], thin: [], knee: [], shoulder: [], err: [] };
+  let n = 0;
+  for (const [goal, sub] of GOALS) for (let d = 2; d <= 7; d++) for (const inj of INJ) for (const eq of ['home-kb', 'home-bw']) {
+    let prog;
+    try { prog = G._generateWorkoutProgram(goal, sub, d, 'T', 12, inj.slice(), eq); }
+    catch (e) { bad.err.push(`${goal}-${sub} ${d}d ${eq}: ${e.message}`); continue; }
+    n++;
+    const tagS = `${goal}-${sub} ${d}d ${eq} ${inj.join('+') || 'none'}`;
+    if (prog.equipment !== eq) bad.err.push(tagS + ' equipment=' + prog.equipment);
+    prog.days.forEach(day => {
+      const names = day.exercises.map(e => e.name);
+      if (new Set(names).size !== names.length) bad.dup.push(tagS + ' ' + day.name);
+      if (names.length < 2) bad.thin.push(tagS + ' ' + day.name + ': ' + names.join(','));
+      day.exercises.forEach(ex => {
+        if (GYM_ONLY.test(ex.name)) bad.gym.push(tagS + ': ' + ex.name);
+        if (!CORE.has(ex.name) && (!picker.includes(ex.name) || !editorAll.includes("'" + ex.name + "'") || !Object.keys(G.getExSplits(ex.name)).length))
+          bad.cat.push(ex.name);
+        if (ex.kg !== 0) bad.kg.push(tagS + ': ' + ex.name + ' kg=' + ex.kg);
+        const parts = String(ex.sets).split('-');
+        if (eq === 'home-bw') {
+          if (ex.tag === 'rehab' ? !parts.every(r => r === '15') : !parts.every(r => r === 'max')) bad.bwReps.push(tagS + ': ' + ex.name + ' ' + ex.sets);
+        } else if (!parts.every(r => G.REPS_LEGAL.includes(parseInt(r, 10)))) bad.kbReps.push(tagS + ': ' + ex.name + ' ' + ex.sets);
+        if (inj.includes('knees') && /\bsquat\b|\blunges?\b/i.test(ex.name)) bad.knee.push(tagS + ': ' + ex.name);
+        if (inj.includes('shoulders') && eq === 'home-bw' && /pike/i.test(ex.name)) bad.shoulder.push(tagS + ': ' + ex.name);
+      });
+    });
+  }
+  const show = a => [...new Set(a)].slice(0, 6).join(' | ');
+  check(`home: every goal × 2-7 days × injury × equipment generates (${n} programs)`, bad.err.length === 0 && n === GOALS.length * 6 * INJ.length * 2, show(bad.err));
+  check('home: no exercise needs a gym, a bar, a bench or dumbbells', bad.gym.length === 0, show(bad.gym));
+  check('home: every exercise is a first-class catalogue exercise (pickers + muscle split)', bad.cat.length === 0, show(bad.cat));
+  check('home: no gym load is carried over — kg 0 means "no weight set yet"', bad.kg.length === 0, show(bad.kg));
+  check('home bodyweight: every set is AMRAP (higher reps allowed), rehab keeps its 15s', bad.bwReps.length === 0, show(bad.bwReps));
+  check('home kettlebell: reps still sit inside the tagged rep bands', bad.kbReps.length === 0, show(bad.kbReps));
+  check('home: no day lists the same exercise twice', bad.dup.length === 0, show(bad.dup));
+  check('home: no day is left with fewer than 2 exercises', bad.thin.length === 0, show(bad.thin));
+  check('home + knees: no squat or lunge comes back through the home swap', bad.knee.length === 0, show(bad.knee));
+  check('home bodyweight + shoulders: no overhead pike push-ups', bad.shoulder.length === 0, show(bad.shoulder));
+
+  // The gym program is untouched: no argument, 'gym' and today's output are the same thing.
+  let same = true, diff = '';
+  for (const [goal, sub] of GOALS) for (const d of [3, 5, 6]) {
+    const a = JSON.stringify(G._generateWorkoutProgram(goal, sub, d, 'T', 12, ['knees']));
+    const b = JSON.stringify(G._generateWorkoutProgram(goal, sub, d, 'T', 12, ['knees'], 'gym'));
+    if (a !== b || /"equipment"/.test(a)) { same = false; diff = goal + '-' + sub + ' ' + d; }
+  }
+  check('gym: identical with and without the new argument, and carries no equipment field', same, diff);
+
+  // The swap itself.
+  check('swap: kettlebell squat for a squat', G._equipSwap('Squat', 'home-kb', []) === 'Kettlebell Front Squat');
+
+  // Henrik's leg-day rule holds at home wherever the lifts exist: kettlebell leg days open with
+  // the front squat and close with the deadlift. Bodyweight has no deadlift, so that half stands
+  // down exactly as it does for a lower-back injury.
+  const legBad = [];
+  for (const [goal, sub] of GOALS) { if (goal === 'rehab') continue; for (let d = 2; d <= 7; d++) {
+    const p = G._generateWorkoutProgram(goal, sub, d, 'T', 12, [], 'home-kb');
+    p.days.filter(day => G._isLegDay(day)).forEach(day => {
+      const e = day.exercises, f = e[0], l = e[e.length - 1];
+      if (f.name !== 'Kettlebell Front Squat' || String(f.sets).split('-').length < 3 || l.name !== 'Kettlebell Deadlift' || f.tag !== 'strength' || l.tag !== 'strength')
+        legBad.push(`${goal}-${sub} ${d}d ${day.name}: ${e.map(x => x.name + ' ' + x.sets).join(', ')}`);
+    });
+  } }
+  check('home kettlebell: leg days open with ≥3 strength sets of front squat and end with the deadlift', legBad.length === 0, legBad.slice(0, 3).join(' | '));
+  const bwP = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 12, [], 'home-bw');
+  check('home bodyweight: AMRAP work is tagged volume, never strength (no 4-minute rests)',
+    bwP.days.every(day => day.exercises.every(ex => ex.tag !== 'strength')), JSON.stringify(bwP.days.map(d => d.exercises.map(e => e.tag))));
+  check('swap: no equipment drops curls (rows cover the biceps)', G._equipSwap('Barbell Curl', 'home-bw', []) === null);
+  check('swap: a knees injury overrides the plain map', G._equipSwap('Leg Press', 'home-kb', ['knees']) === 'Kettlebell Glute Bridge');
+  check('swap: unknown names and the gym pass through', G._equipSwap('Plank', 'home-bw', []) === 'Plank' && G._equipSwap('Squat', 'gym', []) === 'Squat');
+  check('swap: the leg-day rule asks for the home lift, after the injury layer',
+    G._legdaySafeName('Squat', ['equip:home-bw']) === 'Bodyweight Squat' && G._legdaySafeName('Squat', ['knees', 'equip:home-bw']) === 'Single-leg Glute Bridge');
+  check('swap: band exercises are not mistaken for cable ones (no pulley buttons)',
+    !G.isCableEx('Band Lat Pull') && !G.isCableEx('Band Face Pull') && !G.isCableEx('Band Tricep Extension') && !G.isCableEx('Band Overhead Tricep Extension') && !G.isCableEx('Band Lateral Raise'));
+  check('swap: Nordic Curl is a leg exercise, not a biceps curl',
+    G.getExGroup('Nordic Curl') === 'legs' && G.getExSplits('Nordic Curl').legs === 1);
+  check('swap: pike push-ups count as shoulders', G.getExGroup('Pike Push-ups') === 'shoulders' && G.getExSplits('Pike Push-ups').shoulders > 0.5);
+
+  // The wizard.
+  const w = G._progWizEquipHtml('home-bw');
+  check('wizard: "Where do you train?" offers Gym and both home options',
+    /Where do you train\?/.test(w) && /_progWiz\.equip='gym'/.test(w) && /_progWiz\.equip='home-kb'/.test(w) && /_progWiz\.equip='home-bw'/.test(w), w);
+  check('wizard: Gym is the default', /var on=o\.id===cur/.test(String(G._progWizEquipHtml)) && /cur=cur\|\|'gym'/.test(String(G._progWizEquipHtml)));
+  check('wizard: both the preview and Generate pass the choice to the generator',
+    (String(G._renderProgWiz).match(/wiz\.injuries,wiz\.equip\)/g) || []).length === 1 && /wiz\.injuries,wiz\.equip\)/.test(String(G._progWizGenerate)));
+  check('wizard: step 2 shows the choice', /_progWizEquipHtml\(wiz\.equip\)/.test(String(G._renderProgWiz)));
 }
 
 setImmediate(() => {
