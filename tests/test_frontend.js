@@ -7671,6 +7671,12 @@ console.log('\n── Training at home ─────────────�
   check('knees: no generated gym program keeps a lunge', left.length === 0, left.slice(0, 4).join(' | '));
 }
 
+// ── Pike and decline push-ups count 70% of body weight (2026-10-12) ─────────
+check('pike push-ups count 70% of body weight', G.isBWExName('Pike Push-ups') && G.getExSplits('Pike Push-ups').factor === 0.7);
+check('decline push-ups count 70% of body weight', G.isBWExName('Decline Push-ups') && G.getExSplits('Decline Push-ups').factor === 0.7);
+check('…regular, wide, diamond and archer push-ups keep 64%',
+  ['Push-ups', 'Wide Push-ups', 'Diamond Push-ups', 'Archer Push-ups'].every(n => G.getExSplits(n).factor === 0.64));
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
