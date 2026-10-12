@@ -35,7 +35,7 @@ h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute
 .ex{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0;display:flex;flex-direction:column;gap:6px}
 .ex:has(.view+.view){grid-column:span 2}
 .vs{font-family:var(--mono);font-size:11px;color:#8d8d93;padding:0 4px}
-.gnote{margin:2px 4px 2px;font-size:11px;color:#b9b9be;max-width:36ch}
+.gnote{margin:4px 4px 2px;font-size:11.5px;line-height:1.45;color:#c4c4c9;max-width:40ch}
 @media (max-width:720px){.ex:has(.view+.view){grid-column:auto}}
 .ex header{display:flex;align-items:baseline;gap:8px}
 .num{font-family:var(--mono);font-size:13px;color:var(--accent);font-variant-numeric:tabular-nums;min-width:2.2em}
@@ -52,7 +52,7 @@ figcaption{font-family:var(--mono);font-size:10px;color:#6b6b70;letter-spacing:.
 </style>
 <div class="wrap">
 <h1>Exercise sketches: review</h1>
-<p class="lede">All ${n} exercises in the workout app, drawn as stick figures from one 3D pose per position. Each card shows start → finish, with a front or overhead view where it shows something the side view can't. Yellow is equipment, grey limbs are the far side. Exercises where grip width is a real choice also show narrow and wide side by side.</p>
+<p class="lede">All ${n} exercises in the workout app, drawn as stick figures from one 3D pose per position. Each card shows start → finish, with a front or overhead view where it shows something the side view can't. Yellow is equipment, grey limbs are the far side. Exercises where grip width is a real choice also show narrow and wide side by side, with what the studies found changes (author and year in brackets).</p>
 <p class="how"><b>How to review:</b> reply in the chat with the numbers that look wrong and a few words on what's off, for example "12 knee too far forward". Nothing is in the app yet.</p>
 <nav aria-label="Muscle groups">${nav}</nav>
 ${body}
