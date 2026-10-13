@@ -2991,14 +2991,15 @@ function _skSvg(pr,T,W,H){var sx=T[0],ox=T[1],oy=T[2],o=[];function S(p){return[
     else{var a2=S([p[1][0],p[2][1]]),b2=S([p[2][0],p[1][1]]);o.push('<rect x="'+a2[0]+'" y="'+a2[1]+'" width="'+(b2[0]-a2[0]).toFixed(1)+'" height="'+(b2[1]-a2[1]).toFixed(1)+'" rx="'+(1.5*sx).toFixed(1)+'" fill="'+p[3]+'"/>');}});
   return '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img">'+o.join('')+'</svg>';}
 // spec: {views:[...], start:{J,eq}, end:{J,eq}, floor:bool}
-var SK_MAX_SCALE=2.4;
+var SK_MAX_SCALE=1.6;
 function skPanels(spec,W,H){W=W||132;H=H||150;var pad=8,out={};
   spec.views.forEach(function(v){var pr=[spec.start,spec.end].map(function(st){var e=_skEquip(st.eq,st.J,v);
       var back=e.filter(function(p){return p[0]==='r'||(p[0]==='l'&&p[3]===SK_C.mu);});var front=e.filter(function(p){return back.indexOf(p)<0;});
       var fl=(spec.floor!==false&&v!=='top')?[['l',[-1e3,0],[1e3,0],SK_C.mu,1.8]]:[];
       return {fl:fl,body:back.concat(_skFigure(st.J,v)).concat(front)};});
     var bb=_skBBox(pr.map(function(x){return x.body;}));if(spec.floor!==false&&v!=='top')bb[2]=Math.min(bb[2],0);
-    // Capped so a narrow view (a push-up seen head-on) is not blown up into fat strokes; 2.4 sits above every normal panel.
+    // Capped at a standing figure's own fit (1.6), so every stick figure is drawn at the same size: a compact pose
+    // (bent-over or seated row) used to be zoomed to ~2.2x and looked bigger than the rest. Larger poses still shrink to fit.
     var sx=Math.min((W-2*pad)/(bb[1]-bb[0]||1),(H-2*pad)/(bb[3]-bb[2]||1),SK_MAX_SCALE);
     var ox=pad+((W-2*pad)-(bb[1]-bb[0])*sx)/2-bb[0]*sx,oy=H-pad-((H-2*pad)-(bb[3]-bb[2])*sx)/2+bb[2]*sx;
     out[v]=pr.map(function(x){var fl=x.fl.map(function(p){return['l',[bb[0]-6,0],[bb[1]+6,0],p[3],p[4]];});return _skSvg(fl.concat(x.body),[sx,ox,oy],W,H);});});
