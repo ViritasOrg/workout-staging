@@ -7801,7 +7801,14 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
     ['Diamond Push-ups', 'Wide Push-ups', 'Archer Push-ups'].every(n => G.SK[n]().views.join() === 'side,top'));
   check('…and no push-up variant uses a front view at all', fam.every(n => G.SK[n]().views.indexOf('front') < 0));
   check('panels are capped at SK_MAX_SCALE so a narrow view is never blown up into fat strokes',
-    G.SK_MAX_SCALE === 2.4 && String(G.skPanels).includes('SK_MAX_SCALE)'));
+    String(G.skPanels).includes('SK_MAX_SCALE)'));
+  // Henrik, 2026-10-13: "54 55 stick dudes are suddenly bigger than the others" (Kettlebell Row, Band Seated Row).
+  const fitOf = (n, v) => { const s = G.SK[n](); const bb = G._skBBox([s.start, s.end].map(st => G._skFigure(st.J, v))); return Math.min(134 / (bb[1] - bb[0] || 1), 154 / (bb[3] - bb[2] || 1)); };
+  const standing = fitOf('Shrug', 'front');
+  check('the cap is a standing figure\'s own size, so no stick figure is ever drawn bigger than a standing one',
+    Math.abs(G.SK_MAX_SCALE - standing) < 0.05, `cap ${G.SK_MAX_SCALE}, standing ${standing.toFixed(2)}`);
+  check('…the rows that looked bigger would otherwise zoom past it (so the cap is what sizes them)',
+    ['Kettlebell Row', 'Band Seated Row', 'Cable Row'].every(n => fitOf(n, 'side') > G.SK_MAX_SCALE));
 }
 
 setImmediate(() => {
