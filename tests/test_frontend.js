@@ -963,17 +963,16 @@ console.log('\n── Key functions ──────────────�
 })();
 
 // Henrik 2026-09-29: "make sure choices for cable gears and sets are on one line not
-// breaking". Every Log Workout card's control row (timer, ½ gear, 2× cable, DB, − set, + set)
-// is a .card-btn-row, and the stylesheet keeps that row from wrapping; its buttons shrink
-// instead (measured in Chromium at iPhone width: 6 buttons fit 285px with no text clipped).
+// breaking". Since the 2026-10-12 redesign the gear toggles live in the ⋯ menu and the
+// timer is gone, so the control row holds only − set / + set, on one line.
 (function(){
-  const rows = (html.match(/class="card-btn-row" style="[^"]*"/g) || []);
-  check('both Log card builders use the .card-btn-row control row', rows.length === 2, String(rows.length));
+  const fns = [String(G.prefillLog), String(G.addCustomExercise)];
+  check('both Log card builders use the .card-btn-row control row',
+    fns.every(f => f.includes('class=\"card-btn-row\"') || f.includes('class="card-btn-row"')));
   const rule = (html.match(/\.card-btn-row\{[^}]*\}/) || [''])[0];
-  check('the control row never wraps (stylesheet beats the inline flex-wrap)', /flex-wrap:nowrap!important/.test(rule), rule);
-  const btn = (html.match(/\.card-btn-row>button\{[^}]*\}/) || [''])[0];
-  check('its buttons keep their label on one line and may shrink',
-    /white-space:nowrap/.test(btn) && /flex:0 1 auto/.test(btn) && /min-width:0/.test(btn), btn);
+  check('the control row is one flex line (no wrap)', /display:flex/.test(rule) && !/flex-wrap:wrap/.test(rule), rule);
+  check('…holding − set and + set; the gear toggles sit in its hidden .gear-slot for the ⋯ menu',
+    fns.every(f => /gear-slot\\?" hidden/.test(f) && f.includes('removeSet(this)') && f.includes('addSet(this)')));
 })();
 
 // Henrik 2026-09-28, on a fresh install: "Backup logs in backend? ... the app has zero logs"
@@ -1686,26 +1685,12 @@ console.log('\n── Lean body mass chart ────────────�
   check('lean-mass values are shown in the user unit', /kgToUnit\(last\.lbm\)/.test(rawScript));
 }
 
-// ── 37. Rest timer — showRestTimer / startRest / cancelRest ──────────────────
-console.log('\n── Rest timer ───────────────────────────────────────────────');
-check('showRestTimer defined', typeof G.showRestTimer === 'function');
-check('startRest defined',     typeof G.startRest     === 'function');
-check('cancelRest defined',    typeof G.cancelRest    === 'function');
-// Timer bar element exists in HTML
-check('rest-timer-bar element in HTML', rawScript.includes('rest-timer-bar'));
-// Preset buttons exist (in HTML body, not script block)
-check('60s preset in HTML',  html.includes('startRest(60)'));
-check('90s preset in HTML',  html.includes('startRest(90)'));
-check('120s preset in HTML', html.includes('startRest(120)'));
-check('180s preset in HTML', html.includes('startRest(180)'));
-check('300s preset in HTML', html.includes('startRest(300)'));
-// cancelRest clears the interval and hides bar
-check('cancelRest clears _restTid', rawScript.includes('_restTid'));
-check('cancelRest sets _restEnd to 0', rawScript.includes('_restEnd=0'));
-// Web Notification API requested on start
-check('Notification.requestPermission called', rawScript.includes('Notification.requestPermission'));
-// REST TIMER button present in log form
-check('REST TIMER button in log form', rawScript.includes('showRestTimer'));
+// ── 37. Rest timers removed (Henrik, 2026-10-12: "remove the timers totally") ──
+console.log('\n── Rest timers are gone ─────────────────────────────────────');
+check('no rest timer functions remain', ['showRestTimer', 'startRest', 'cancelRest', '_renderRestBar', '_playBeep'].every(f => typeof G[f] === 'undefined'));
+check('no rest timer bar, presets or REST TIMER button in the page',
+  !html.includes('rest-timer-bar') && !html.includes('startRest(') && !html.includes('REST TIMER') && !html.includes('showRestTimer'));
+check('restSecsForTag stays: the session-length estimate still uses it', typeof G.restSecsForTag === 'function' && G.restSecsForTag('strength') === 240);
 
 // ── 38. PWA sync after sign-in (regression: PWA had stale data) ──────────────
 console.log('\n── PWA sync after fresh sign-in ─────────────────────────────');
@@ -2232,7 +2217,7 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   check('_progWizGenerate passes setsPerMuscle to _generateWorkoutProgram',
     src.includes('wiz.setsPerMuscle||12'));
   check('_generateWorkoutProgram accepts setsPerMuscle + injuries params',
-    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries)'));
+    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equip)'));
   check('scaleSets helper scales exercise set counts',
     src.includes('function scaleSets(setsStr)'));
   check('pool padding loop fills short pools up to nDays',
@@ -2347,8 +2332,8 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     try {
       check('prefillLog uses ex.sets.split without artificial slice cap',
         src.includes("(_deloadActive?_deloadSets(ex.sets):ex.sets).split('-')") && !src.includes("ex.sets.split('-').slice(0,5)"));
-      check('prefillLog label shows program sets (deloaded when active, else raw ex.sets)',
-        src.includes("margin-top:2px\">'+(_deloadActive?_deloadSets(ex.sets):ex.sets)+'</div>"));
+      check('prefillLog prescription line shows the scheme in words (deloaded when active)',
+        src.includes("const _rx=_deloadActive?_deloadScheme(ex.scheme||ex.sets)+' · deload':(ex.scheme||ex.sets);") && src.includes('exc-rx'));
     } catch(e) {
       check('prefillLog no-cap invariant (caught)', false, String(e));
     }
@@ -2356,8 +2341,8 @@ console.log('\n── 48. Program wizard days/sets ─────────�
     // sets-row in prefillLog uses flex-wrap:nowrap + overflow-x:auto for single-line 7-set layout
     try {
       const fn62 = G.prefillLog.toString();
-      check('prefillLog sets-row uses flex-wrap:nowrap with overflow-x:auto for single-line 7-set layout',
-        fn62.includes('flex-wrap:nowrap') && fn62.includes('overflow-x:auto'));
+      check('prefillLog renders one .set-row per set through the shared _setRowInner',
+        fn62.includes('class="set-row"') && fn62.includes('_setRowInner(i,'));
     } catch(e) {
       check('prefillLog sets-row flex-wrap (caught)', false, String(e));
     }
@@ -2816,18 +2801,16 @@ console.log('\n── prefillLog — WPU / reps / scheme label ─────�
     fn.includes('isBWExName(ex._rehabOrig||ex.name)&&!_isWPU'));
 
   // 62b. Reps inputs are always empty (never pre-filled from template)
-  check('prefillLog: repsVal is always empty string',
-    fn.includes("repsVal=''") && !fn.includes("repsVal=r==='max'"));
+  check('prefillLog: reps inputs are always empty (no value attribute on the shared row)',
+    !/data-type="reps"[^>]*value=/.test(String(G._setRowInner)) && !/value=[^>]*data-type="reps"/.test(String(G._setRowInner)) && !fn.includes("repsVal=r==='max'"));
 
-  // 62c. Scheme label uses accent colour, larger font, no weight
-  check('prefillLog: scheme label uses font-size:13px',
-    fn.includes('font-size:13px'));
-  check('prefillLog: scheme label uses var(--accent)',
-    fn.includes('color:var(--accent)') && fn.includes("margin-top:2px"));
-  check('prefillLog: scheme label shows sets only (no weight)',
-    fn.includes(">'+(_deloadActive?_deloadSets(ex.sets):ex.sets)+'</div>") && !fn.includes("ex.sets+' '+(lastKg?lastKg+'kg'"));
-  check('prefillLog: exercise name is heading above scheme label (not same line)',
-    fn.includes('margin-bottom:10px') && fn.includes("margin-top:2px"));
+  // 62c. Prescription line (redesign 2026-10-12): muted plain words + tag chip, not yellow code
+  check('prefillLog: prescription line is the muted .exc-rx with the tag chip',
+    fn.includes('exc-rx') && fn.includes('_tagChipHtml(ex.tag)') && /\.exc-rx\{[^}]*color:var\(--muted\)/.test(html));
+  check('prefillLog: the prescription is no longer the raw sets string in yellow',
+    !fn.includes(">'+(_deloadActive?_deloadSets(ex.sets):ex.sets)+'</div>") && !fn.includes('color:var(--accent);margin-top:2px'));
+  check('prefillLog: exercise name heads the card, above the prescription',
+    fn.indexOf('exc-name') > -1 && fn.indexOf('exc-name') < fn.indexOf('exc-rx'));
   // Regression: must NOT still use the old muted/11px combo for the scheme label
   check('prefillLog: scheme label no longer uses font-size:11px+var(--muted) combo',
     !fn.includes('font-size:11px;color:var(--muted)'));
@@ -4617,7 +4600,8 @@ if (typeof G._generateWorkoutProgram === 'function') {
 {
   console.log('\n── Reps entry: numeric keypad + dropdowns ─────────────────');
   const repsInputs = rawScript.match(/<input[^>]*data-type="reps"[^>]*>/g) || [];
-  check('every reps input exists (log, add-set, custom exercise)', repsInputs.length === 3,
+  check('every reps input comes from ONE builder (_setRowInner), used by log, add-set and custom exercise',
+    repsInputs.length === 1 && ['prefillLog', 'addSetToCard', 'addCustomExercise'].every(f => String(G[f]).includes('_setRowInner(')),
     `found ${repsInputs.length}`);
   check('every reps input requests the numeric keypad',
     repsInputs.length > 0 && repsInputs.every(t => /inputmode="numeric"/.test(t)),
@@ -5997,8 +5981,9 @@ console.log('\n── Standard machine exercises ──────────�
     check('every exercise in the picker resolves to a muscle group',
       unclassified.length === 0, unclassified.join(', '));
     // Exact count on purpose: adding or removing an exercise should be a conscious edit here.
-    check('the catalogue holds every exercise it is meant to (69)',
-      opts.length === 69, String(opts.length));
+    // 69 → 117 on 2026-10-12: the 48 home exercises (kettlebell, band and bodyweight).
+    check('the catalogue holds every exercise it is meant to (117)',
+      opts.length === 117, String(opts.length));
     check('no exercise is listed twice in the picker',
       new Set(opts).size === opts.length,
       opts.filter((n, i) => opts.indexOf(n) !== i).join(', '));
@@ -6118,14 +6103,11 @@ console.log('\n── Weight propagation on added cards / Cable Bicep Curl ─�
   // The wiring: the boxes have to CALL it — an added card's three seeded boxes and every
   // box created by "+ set".
   {
-    const add = String(G.addCustomExercise || '');
-    check('an added exercise renders its kg boxes with the propagation handler',
-      /data-type="kg" oninput="propagateWeight\(this\)"/.test(add));
-    const addSet = String(G.addSetToCard || '');
-    check('a box created by "+ set" propagates too',
-      /data-type="kg" oninput="propagateWeight\(this\)"/.test(addSet));
+    const row = G._setRowInner(0, '', '62.5', 'kg');
+    check('every kg box (log, added exercise, "+ set") carries the propagation handler',
+      /data-type="kg" oninput="propagateWeight\(this\)"/.test(row) && String(G.addCustomExercise).includes('_setRowInner(') && String(G.addSetToCard).includes('_setRowInner('));
     check('"+ set" still seeds the new box from the last one',
-      addSet.includes("value=\"'+lastKg+'\""));
+      String(G.addSetToCard).includes("_setRowInner(n,exAttr,lastKg,") && row.includes('value="62.5"'));
   }
 
   // Cable Bicep Curl
@@ -7448,6 +7430,452 @@ console.log('\n── Save never discards a workout in silence ─────�
     check('…and the kg it reports is not mistaken for bodyweight',
       G._cardsAsTemplate(box([card(0, 'Rear Delt Fly')]))[0].kg !== 0);
   }
+}
+
+// ── Section: session-time summary on History (2026-10-12) ────────────────────
+// Median over believable stamps only (KCAL_DUR_MIN..KCAL_DUR_MAX); averages over the
+// latest 7 and 30 believable sessions, so they never read "—" while the median shows.
+{
+  const L = (date, m, at) => Object.assign({ date, duration_min: m }, at ? { started_at: at } : {});
+  // 9 believable sessions, newest first after sorting, plus junk and an unstamped log.
+  const logsT = [
+    L('2026-09-01', 100), L('2026-10-12', 60), L('2026-10-10', 70), L('2026-10-08', 80),
+    L('2026-10-06', 90), L('2026-10-04', 0.08), L('2026-10-03', 300), // 5 s and 5 h: junk
+    L('2026-10-02', 50), L('2026-09-30', 40), L('2026-09-28', 30), L('2026-09-20', 200),
+    { date: '2026-10-11' },
+  ];
+  const s = G._sessionTimeStats(logsT);
+  check('session median ignores 5-second and 5-hour stamps', s.median === 70 && s.n === 9, JSON.stringify(s));
+  check('…and counts what it left out (unstamped logs are not counted as excluded)', s.excluded === 2, s.excluded);
+  check('last-7 average uses the 7 most recent believable sessions, whatever the list order',
+    s.last7N === 7 && s.last7Avg === (60+70+80+90+50+40+30)/7, JSON.stringify(s));
+  check('last-30 average uses all of them when there are fewer than 30', s.last30N === 9, JSON.stringify(s));
+  check('the band is the calorie estimator\'s, not a second copy',
+    String(G._validSessionMin).indexOf('KCAL_DUR_MIN') >= 0 && String(G._validSessionMin).indexOf('KCAL_DUR_MAX') >= 0);
+  const many = []; for (let k = 0; k < 40; k++) many.push(L('2026-0' + (k < 20 ? 8 : 9) + '-' + String(k % 20 + 1).padStart(2, '0'), k < 10 ? 100 : 50));
+  const m = G._sessionTimeStats(many);
+  check('last-30 stops at 30 sessions', m.last30N === 30, JSON.stringify(m));
+  check('two sessions on one day are ordered by start time',
+    G._sessionTimeStats([L('2026-10-12', 40, '2026-10-12T07:00:00Z'), L('2026-10-12', 60, '2026-10-12T18:00:00Z'),
+      L('2026-10-11', 90), L('2026-10-10', 90), L('2026-10-09', 90), L('2026-10-08', 90), L('2026-10-07', 90), L('2026-10-06', 90)]).last7Avg
+      === (60 + 40 + 90 * 5) / 7);
+  const h = G._sessionTimeStatsHtml(logsT);
+  check('summary renders median, last 7 and last 30', /MEDIAN/.test(h) && /AVG LAST 7</.test(h) && /AVG LAST 30</.test(h) && h.indexOf('1:10') >= 0, h);
+  check('the calendar / day labels are gone', !/THIS WEEK|THIS MONTH|DAYS/.test(h));
+  check('a single old session fills every tile — no dash', G._sessionTimeStatsHtml([L('2025-01-01', 50)]).indexOf('—') < 0);
+  check('no believable stamps → no summary card at all', G._sessionTimeStatsHtml([L('2026-10-12', 2)]) === '');
+  check('History puts the summary on top of the list',
+    /innerHTML=_sessionTimeStatsHtml\(logs\)\+logs\.map/.test(String(G.renderHistory)));
+}
+
+// ── Section: Retry a failed Push to Prod (2026-10-12) ────────────────────────
+// "Under the Deploy button for a red failed line show a small retry button" — GitHub's
+// own re-run of THAT run, via POST /promote-to-prod/retry.
+{
+  const RUN = 'https://github.com/ViritasOrg/workout-staging/actions/runs/38243649584';
+  check('retry: the run id is read off the stored run URL',
+    G._promoteRunIdOf(RUN) === '38243649584' && G._promoteRunIdOf('https://github.com/ViritasOrg/workout-staging/actions') === null);
+  const b = G._promoteRetryBtn(RUN, '1.259');
+  check('retry: the button names the version it will push again',
+    /↻ Retry v1\.259/.test(b) && /retryPromote\('38243649584','1\.259'\)/.test(b), b);
+  check('retry: no run id, no button', G._promoteRetryBtn('', '1.259') === '');
+  check('retry: a hostile version string cannot break out of the onclick',
+    G._promoteRetryBtn(RUN, "1');alert(1);//").indexOf('alert') < 0);
+
+  const el = { innerHTML: '' };
+  const steps = [{ name: 'Wait for CI and merge prod PR', status: 'completed', conclusion: 'failure' }];
+  G.renderPromoteStatus({ status: 'completed', conclusion: 'failure', run_url: RUN, steps }, el);
+  check('retry: a failed run shows the button under the red line', el.innerHTML.indexOf('retryPromote(') >= 0, el.innerHTML);
+  G.renderPromoteStatus({ status: 'in_progress', run_url: RUN, steps }, el);
+  check('retry: …a running push does not', el.innerHTML.indexOf('retryPromote(') < 0);
+  G.renderPromoteStatus({ status: 'completed', conclusion: 'success', run_url: RUN, steps: [] }, el);
+  check('retry: …nor does a successful one', el.innerHTML.indexOf('retryPromote(') < 0);
+
+  const src = String(G.buildLastPushDropdown);
+  check('retry: the Last push row offers it for a failed record, outside the collapsed details',
+    /<\/details>[^]*_promoteRetryBtn\(rec\.runUrl,rec\.stagingVer\)/.test(src) && /rec\.conclusion==='failure'&&rec\.runUrl/.test(src));
+
+  const calls = []; const _f = G.fetch;
+  G.fetch = (u, o) => { calls.push([String(u), o && o.method]); return new Promise(() => {}); };
+  G.retryPromote('38243649584', '1.259');
+  G.fetch = _f;
+  const post = calls.find(c => c[1] === 'POST');
+  check('retry: it POSTs the retry endpoint for that run, in this app\'s repo',
+    post && /\/promote-to-prod\/retry\?repo=ViritasOrg%2Fworkout-staging&run_id=38243649584$/.test(post[0]), JSON.stringify(calls));
+  check('retry: …and never dispatches a fresh promotion', !calls.some(c => /\/promote-to-prod(\?|$)/.test(c[0]) && c[1] === 'POST'));
+
+  const poll = String(G.pollPromoteStatus);
+  check('retry: the poller follows the retried run by id',
+    /&run_id='\+_promoteRunId/.test(poll));
+  check('retry: …and waits for the NEW attempt, not the old one\'s failure',
+    /_promoteRunId&&\(data\.run_attempt\|\|1\)<_promoteMinAttempt/.test(poll));
+  check('retry: a fresh Push to Prod stops following the old run',
+    /_promoteRunId=null;_promoteMinAttempt=0;/.test(String(G.pushToProd)));
+}
+
+// ── Section: training at home (2026-10-12) ───────────────────────────────────
+// "need generator to be able to create programs for training at home without access to a gym"
+// → three choices (Gym / Home: kettlebell + bands / Home: bodyweight), higher reps allowed for
+// bodyweight (AMRAP), "kettlebell and resistance bands only" (no bench, no bar, no dumbbells).
+console.log('\n── Training at home ───────────────────────────────────────');
+{
+  const GOALS = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],['hypertrophy','upper'],
+    ['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],['rehab','shoulder'],['rehab','back'],['rehab','knee']];
+  const INJ = [[], ['knees'], ['shoulders'], ['lower_back'], ['knees','shoulders']];
+  // Anything that needs a gym, a bar, a bench or dumbbells.
+  const GYM_ONLY = /barbell|cable|machine|smith|leg press|hack squat|bench press|lat pulldown|pull-?ups?\b|chin-?ups?\b|landmine|pec deck|t-bar|ez bar|\bdb\b|dumbbell|^dips$|^squat$|^deadlift$|^romanian deadlift$|^overhead press$|^hip thrust$|^arnold press$|^(leg curl|leg extension|lateral raise|face pulls|rear delt fly|y-raise|calf raises|tricep pushdown|hammer curl)$/i;
+  const CORE = new Set(['Plank', 'Dead Bug', 'Bird Dog', 'Pallof Press']);
+  const picker = [...G.EX_OPTS_HTML.matchAll(/<option>([^<]+)<\/option>/g)].map(m => m[1]);
+  const editorAll = String(G._exOpts || '');
+  const bad = { gym: [], cat: [], kg: [], bwReps: [], kbReps: [], dup: [], thin: [], knee: [], shoulder: [], err: [] };
+  let n = 0;
+  for (const [goal, sub] of GOALS) for (let d = 2; d <= 7; d++) for (const inj of INJ) for (const eq of ['home-kb', 'home-bw']) {
+    let prog;
+    try { prog = G._generateWorkoutProgram(goal, sub, d, 'T', 12, inj.slice(), eq); }
+    catch (e) { bad.err.push(`${goal}-${sub} ${d}d ${eq}: ${e.message}`); continue; }
+    n++;
+    const tagS = `${goal}-${sub} ${d}d ${eq} ${inj.join('+') || 'none'}`;
+    if (prog.equipment !== eq) bad.err.push(tagS + ' equipment=' + prog.equipment);
+    prog.days.forEach(day => {
+      const names = day.exercises.map(e => e.name);
+      if (new Set(names).size !== names.length) bad.dup.push(tagS + ' ' + day.name);
+      if (names.length < 2) bad.thin.push(tagS + ' ' + day.name + ': ' + names.join(','));
+      day.exercises.forEach(ex => {
+        if (GYM_ONLY.test(ex.name)) bad.gym.push(tagS + ': ' + ex.name);
+        if (!CORE.has(ex.name) && (!picker.includes(ex.name) || !editorAll.includes("'" + ex.name + "'") || !Object.keys(G.getExSplits(ex.name)).length))
+          bad.cat.push(ex.name);
+        if (ex.kg !== 0) bad.kg.push(tagS + ': ' + ex.name + ' kg=' + ex.kg);
+        const parts = String(ex.sets).split('-');
+        if (eq === 'home-bw') {
+          if (ex.tag === 'rehab' ? !parts.every(r => r === '15') : !parts.every(r => r === 'max')) bad.bwReps.push(tagS + ': ' + ex.name + ' ' + ex.sets);
+        } else if (!parts.every(r => G.REPS_LEGAL.includes(parseInt(r, 10)))) bad.kbReps.push(tagS + ': ' + ex.name + ' ' + ex.sets);
+        if (inj.includes('knees') && /\bsquat\b|\blunges?\b/i.test(ex.name)) bad.knee.push(tagS + ': ' + ex.name);
+        if (inj.includes('shoulders') && eq === 'home-bw' && /pike/i.test(ex.name)) bad.shoulder.push(tagS + ': ' + ex.name);
+      });
+    });
+  }
+  const show = a => [...new Set(a)].slice(0, 6).join(' | ');
+  check(`home: every goal × 2-7 days × injury × equipment generates (${n} programs)`, bad.err.length === 0 && n === GOALS.length * 6 * INJ.length * 2, show(bad.err));
+  check('home: no exercise needs a gym, a bar, a bench or dumbbells', bad.gym.length === 0, show(bad.gym));
+  check('home: every exercise is a first-class catalogue exercise (pickers + muscle split)', bad.cat.length === 0, show(bad.cat));
+  check('home: no gym load is carried over — kg 0 means "no weight set yet"', bad.kg.length === 0, show(bad.kg));
+  check('home bodyweight: every set is AMRAP (higher reps allowed), rehab keeps its 15s', bad.bwReps.length === 0, show(bad.bwReps));
+  check('home kettlebell: reps still sit inside the tagged rep bands', bad.kbReps.length === 0, show(bad.kbReps));
+  check('home: no day lists the same exercise twice', bad.dup.length === 0, show(bad.dup));
+  check('home: no day is left with fewer than 2 exercises', bad.thin.length === 0, show(bad.thin));
+  check('home + knees: no squat or lunge comes back through the home swap', bad.knee.length === 0, show(bad.knee));
+  check('home bodyweight + shoulders: no overhead pike push-ups', bad.shoulder.length === 0, show(bad.shoulder));
+
+  // The gym program is untouched: no argument, 'gym' and today's output are the same thing.
+  let same = true, diff = '';
+  for (const [goal, sub] of GOALS) for (const d of [3, 5, 6]) {
+    const a = JSON.stringify(G._generateWorkoutProgram(goal, sub, d, 'T', 12, ['knees']));
+    const b = JSON.stringify(G._generateWorkoutProgram(goal, sub, d, 'T', 12, ['knees'], 'gym'));
+    if (a !== b || /"equipment"/.test(a)) { same = false; diff = goal + '-' + sub + ' ' + d; }
+  }
+  check('gym: identical with and without the new argument, and carries no equipment field', same, diff);
+
+  // The swap itself.
+  check('swap: kettlebell squat for a squat', G._equipSwap('Squat', 'home-kb', []) === 'Kettlebell Front Squat');
+
+  // Henrik's leg-day rule holds at home wherever the lifts exist: kettlebell leg days open with
+  // the front squat and close with the deadlift. Bodyweight has no deadlift, so that half stands
+  // down exactly as it does for a lower-back injury.
+  const legBad = [];
+  for (const [goal, sub] of GOALS) { if (goal === 'rehab') continue; for (let d = 2; d <= 7; d++) {
+    const p = G._generateWorkoutProgram(goal, sub, d, 'T', 12, [], 'home-kb');
+    p.days.filter(day => G._isLegDay(day)).forEach(day => {
+      const e = day.exercises, f = e[0], l = e[e.length - 1];
+      if (f.name !== 'Kettlebell Front Squat' || String(f.sets).split('-').length < 3 || l.name !== 'Kettlebell Deadlift' || f.tag !== 'strength' || l.tag !== 'strength')
+        legBad.push(`${goal}-${sub} ${d}d ${day.name}: ${e.map(x => x.name + ' ' + x.sets).join(', ')}`);
+    });
+  } }
+  check('home kettlebell: leg days open with ≥3 strength sets of front squat and end with the deadlift', legBad.length === 0, legBad.slice(0, 3).join(' | '));
+  const bwP = G._generateWorkoutProgram('hypertrophy', 'balanced', 6, 'T', 12, [], 'home-bw');
+  check('home bodyweight: AMRAP work is tagged volume, never strength (no 4-minute rests)',
+    bwP.days.every(day => day.exercises.every(ex => ex.tag !== 'strength')), JSON.stringify(bwP.days.map(d => d.exercises.map(e => e.tag))));
+  check('swap: no equipment drops curls (rows cover the biceps)', G._equipSwap('Barbell Curl', 'home-bw', []) === null);
+  check('swap: a knees injury overrides the plain map', G._equipSwap('Leg Press', 'home-kb', ['knees']) === 'Kettlebell Glute Bridge');
+  check('swap: unknown names and the gym pass through', G._equipSwap('Plank', 'home-bw', []) === 'Plank' && G._equipSwap('Squat', 'gym', []) === 'Squat');
+  check('swap: the leg-day rule asks for the home lift, after the injury layer',
+    G._legdaySafeName('Squat', ['equip:home-bw']) === 'Bodyweight Squat' && G._legdaySafeName('Squat', ['knees', 'equip:home-bw']) === 'Single-leg Glute Bridge');
+  check('swap: band exercises are not mistaken for cable ones (no pulley buttons)',
+    !G.isCableEx('Band Lat Pull') && !G.isCableEx('Band Face Pull') && !G.isCableEx('Band Tricep Extension') && !G.isCableEx('Band Overhead Tricep Extension') && !G.isCableEx('Band Lateral Raise'));
+  check('swap: Nordic Curl is a leg exercise, not a biceps curl',
+    G.getExGroup('Nordic Curl') === 'legs' && G.getExSplits('Nordic Curl').legs === 1);
+  check('swap: pike push-ups count as shoulders', G.getExGroup('Pike Push-ups') === 'shoulders' && G.getExSplits('Pike Push-ups').shoulders > 0.5);
+
+  // The wizard.
+  // The wizard (2026-10-14: Gym / Home, and Home lists the user's own equipment).
+  const w = G._progWizEquipHtml('home', ['dumbbells', 'bench']);
+  check('wizard: "Where do you train?" offers Gym and Home, and Home lists the equipment to tick',
+    /Where do you train\?/.test(w) && /_progWiz\.equip='gym'/.test(w) && /_progWiz\.equip='home'/.test(w)
+    && G.HOME_ITEMS.every(h => w.includes('data-home-item="' + h.id + '"')), w.slice(0, 200));
+  check('wizard: ticked items are highlighted, the rest are not',
+    /data-home-item="dumbbells" style="[^"]*background:var\(--accent\)/.test(w) && !/data-home-item="barbell" style="[^"]*background:var\(--accent\)/.test(w));
+  check('wizard: the Gym view shows no checklist', !G._progWizEquipHtml('gym', []).includes('data-home-item'));
+  check('wizard: Gym is the default', /cur=cur\|\|'gym'/.test(String(G._progWizEquipHtml)));
+  check('wizard: both the preview and Generate pass the ticked equipment to the generator',
+    (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\)\)/g) || []).length === 1 && /wiz\.injuries,_eq\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
+  check('wizard: step 2 shows the choice with the saved equipment', /_progWizEquipHtml\(wiz\.equip,wiz\.homeItems\)/.test(String(G._renderProgWiz)) && /homeItems:\(getData\('wkt-home-equip',\[\]\)/.test(html));
+}
+
+// ── Section: home bodyweight exercises count body weight (2026-10-12) ───────
+// Henrik: "Use common sense, a inverted body weight row is maybe 35-55% of bw".
+{
+  const F = { 'Inverted Row': 0.45, 'Underhand Inverted Row': 0.45, 'Bodyweight Squat': 0.85, 'Sissy Squat': 0.8,
+    'Nordic Curl': 0.6, 'Single-leg Glute Bridge': 0.6, 'Single-leg RDL': 0.5, 'Bodyweight Good Morning': 0.5 };
+  Object.keys(F).forEach(n => check(`home bodyweight: ${n} is a bodyweight card moving ${F[n] * 100}% of body weight`,
+    G.isBWExName(n) && G.getExSplits(n).factor === F[n], JSON.stringify(G.getExSplits(n))));
+  check('home bodyweight: inverted rows sit inside Henrik\'s 35-55% range',
+    G.getExSplits('Inverted Row').factor >= 0.35 && G.getExSplits('Inverted Row').factor <= 0.55);
+  check('home bodyweight: a single-leg calf raise moves all of it (bodyweight card, no factor)',
+    G.isBWExName('Single-leg Calf Raise') && G.getExSplits('Single-leg Calf Raise').factor === undefined);
+  check('home bodyweight: the inverted rows still count toward back', G.getExGroup('Inverted Row') === 'back' && G.getExSplits('Underhand Inverted Row').back > 0.5);
+  check('shared names are untouched — logged with dumbbells at the gym',
+    !G.isBWExName('Bulgarian Split Squat') && !G.isBWExName('Lunges') && G.getExSplits('Lunges').factor === undefined);
+  check('loaded home lifts are not bodyweight and carry no factor',
+    !G.isBWExName('Kettlebell Glute Bridge') && G.getExSplits('Kettlebell Glute Bridge').factor === undefined &&
+    !G.isBWExName('Kettlebell Romanian Deadlift') && G.getExSplits('Kettlebell Romanian Deadlift').factor === undefined &&
+    !G.isBWExName('Kettlebell Front Squat') && G.getExSplits('Kettlebell Front Squat').factor === undefined);
+  check('gym names are untouched', !G.isBWExName('Squat') && !G.isBWExName('Barbell Row') && G.getExSplits('Romanian Deadlift').factor === undefined && G.getExSplits('Cable Row').factor === undefined);
+}
+
+// ── Section: a knees injury catches "Lunges" (2026-10-12) ─────────────────────
+// The knees condition matched /\blunge\b/, which never matched the plural every program uses.
+{
+  const knees = G.REHAB_CONDITIONS.find(c => c.id === 'knees');
+  check('knees: "Lunges" is detected as aggravating', knees.detect('Lunges') === true);
+  check('knees: …and singular / other lunge names still are', knees.detect('Lunge') && knees.detect('Walking Lunges') && knees.detect('Kettlebell Reverse Lunge'));
+  check('knees: …and it is replaced the way a lunge always was', knees.suggest('Lunges') === 'Leg Extension');
+  check('knees: the safe machines are still left alone', !knees.detect('Leg Press') && !knees.detect('Leg Extension'));
+  const GOALS = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower']];
+  const left = [];
+  for (const [g, s] of GOALS) for (let d = 1; d <= 7; d++) {
+    G._generateWorkoutProgram(g, s, d, 'T', 12, ['knees']).days.forEach(day => day.exercises.forEach(ex => { if (/\blunges?\b/i.test(ex.name)) left.push(`${g}-${s} ${d}d ${day.name}: ${ex.name}`); }));
+  }
+  check('knees: no generated gym program keeps a lunge', left.length === 0, left.slice(0, 4).join(' | '));
+}
+
+// ── Pike and decline push-ups count 70% of body weight (2026-10-12) ─────────
+check('pike push-ups count 70% of body weight', G.isBWExName('Pike Push-ups') && G.getExSplits('Pike Push-ups').factor === 0.7);
+check('decline push-ups count 70% of body weight', G.isBWExName('Decline Push-ups') && G.getExSplits('Decline Push-ups').factor === 0.7);
+check('…regular, wide, diamond and archer push-ups keep 64%',
+  ['Push-ups', 'Wide Push-ups', 'Diamond Push-ups', 'Archer Push-ups'].every(n => G.getExSplits(n).factor === 0.64));
+
+// ── Exercise sketches (2026-10-12) ───────────────────────────────────────────
+// Henrik: "Every exercise in the catalog needs a simple sketch showing how to perform it", approved as stick figures.
+{
+  const cat = [...G.EX_OPTS_HTML.matchAll(/<option>([^<]*)<\/option>/g)].map(m => m[1].replace(/&amp;/g, '&'));
+  const bad = [];
+  cat.forEach(n => {
+    try {
+      const s = G._exSketchSpec(n);
+      if (!s || !s.cue || !s.views || !s.views.length) { bad.push(n + ': no sketch'); return; }
+      const P = G.skPanels(s, 150, 170);
+      s.views.forEach(v => { if (!P[v] || P[v].length !== 2 || !P[v].every(x => /^<svg viewBox=/.test(x) && x.includes('<line'))) bad.push(n + ': ' + v); });
+    } catch (e) { bad.push(n + ': ' + e.message); }
+  });
+  check('every catalogue exercise has a start and finish sketch for each of its views', cat.length > 100 && bad.length === 0, bad.slice(0, 5).join(' | '));
+  // Generated programs also use four core moves that are not in the picker (Dead Bug, Plank, Pallof Press, Bird Dog);
+  // the ? must not come up empty on a program the app wrote itself.
+  const gen = new Set();
+  const GOALS = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],['hypertrophy','upper'],['hypertrophy','lower'],
+    ['aesthetic','fullbody'],['aesthetic','upperlower'],['aesthetic','ppl'],['rehab','knee'],['rehab','back'],['rehab','shoulder']];
+  for (const [g, sub] of GOALS) for (let d = 1; d <= 7; d++) for (const inj of [[], ['knees'], ['shoulders'], ['lowerback']])
+    for (const eq of [undefined, 'home-kb', 'home-bw']) {
+      let p; try { p = G._generateWorkoutProgram(g, sub, d, 'T', 12, inj, eq); } catch (e) { continue; }
+      p.days.forEach(day => day.exercises.forEach(ex => gen.add(ex.name)));
+    }
+  (G.PROGRAM_TEMPLATES || []).forEach(t => t.days.forEach(day => day.exercises.forEach(ex => gen.add(ex.name))));
+  const genMiss = [...gen].filter(n => !G._exSketchSpec(n));
+  check('every exercise a generated program or template can contain has a sketch', gen.size > 50 && genMiss.length === 0, genMiss.join(', '));
+  ['Dead Bug', 'Plank', 'Pallof Press', 'Bird Dog'].forEach(n => check(`…${n} is one of them and renders`, gen.has(n) &&
+    G._exSketchSpec(n).views.every(v => G.skPanels(G._exSketchSpec(n), 150, 170)[v].every(x => x.includes('<line')))));
+  check('every sketch is for a catalogue or generated exercise (no orphan sketches)', Object.keys(G.SK).every(n => cat.includes(n) || gen.has(n)),
+    Object.keys(G.SK).filter(n => !cat.includes(n) && !gen.has(n)).join(', '));
+  const h = G._exSketchHtml('Squat'), s = G._exSketchSpec('Squat');
+  check('the viewer shows the cue and one start/finish tile per view',
+    h.includes(G._escP(s.cue)) && (h.match(/data-sk-view="1"/g) || []).length === s.views.length && (h.match(/<svg /g) || []).length === 2 * s.views.length);
+  const pu = G._exSketchHtml('Pull-ups');
+  check('…a grip-variation exercise adds the grip tile and its sourced note', /data-sk-grip="1"/.test(pu) && /smaller than gym lore/i.test(pu));
+  check('…Weighted Dips falls back to the Dips sketch (one movement)',
+    G._exSketchHtml('Weighted Dips') === G._exSketchHtml('Dips') && !/data-sk-none/.test(G._exSketchHtml('Weighted Dips')));
+  const none = G._exSketchHtml('My <b>custom</b> move');
+  check('…an unknown (custom) exercise says there is no sketch, escaped', /data-sk-none="1"/.test(none) && !none.includes('<b>'));
+  const pf = G.prefillLog.toString();
+  check('Log Workout cards carry the "?" that opens the sketch', pf.includes('_EX_HELP_BTN') && G._EX_HELP_BTN.includes('onclick="showExSketch(this)"'));
+  check('the sketch opens for the card\'s CURRENT name (swaps included)', G.showExSketch.toString().includes('_exCardName('));
+  check('the sketch modal exists', html.includes('id="exSketchModal"') && html.includes('id="exSketchContent"'));
+}
+
+// ── Log card buttons are big enough to hit, ? is blue (Henrik, 2026-10-12) ───
+{
+  check('? and ⋯ on a Log card are 38px tap targets', /width:38px;height:38px/.test(G._EX_HELP_BTN) && /width:38px;height:38px/.test(G._EX_MORE_BTN));
+  check('…and ? is blue, not muted grey', /color:#4da3ff/.test(G._EX_HELP_BTN) && !/color:var\(--muted\)/.test(G._EX_HELP_BTN));
+}
+
+// ── The ? on the Program day view and in the editor (Henrik, 2026-10-12) ──────
+{
+  const b = G._exSketchBtnHtml('_openExSketch("Squat")');
+  check('the shared ? button is the blue 38px one', /width:38px;height:38px/.test(b) && /color:#4da3ff/.test(b) && />\?<\/button>$/.test(b));
+  check('…and its onclick is attribute-escaped', b.includes('onclick="_openExSketch(&quot;Squat&quot;)"'));
+  check('the Program day view shows ? on every exercise row', G.renderWorkout.toString().includes("_exSketchBtnHtml('_openExSketch('+JSON.stringify(ex.name)+')')"));
+  const rw = G.renderWorkout.toString();
+  check('…and sits at the right edge, after the tag, so it lines up whatever the tag width (Henrik: "Blue ? Are not aligned")',
+    rw.indexOf("_exSketchBtnHtml('_openExSketch(") > rw.indexOf('<span class=\"ex-tag ') && rw.indexOf('<span class=\"ex-tag ') > -1);
+  check('…the editor shows ? next to each exercise and opens what is CURRENTLY picked',
+    G._renderProgOverlay.toString().includes("_exSketchBtnHtml('_openExSketch(_progEditBuf.days['+di+'].exercises['+ei+'].name)')"));
+  const zOf = sel => { const m = html.match(new RegExp(sel + '\\{[^}]*z-index:(\\d+)')); return m ? +m[1] : 0; };
+  check('…the sketch opens ON TOP of the program editor, not behind it',
+    +(html.match(/id="exSketchModal" style="z-index:(\d+)"/) || [])[1] > Math.max(zOf('#prog-overlay'), zOf('\\.prog-overlay'), 300));
+  check('the Log card ? and the new ones open the same viewer', G.showExSketch.toString().includes('_openExSketch('));
+}
+
+// ── Log Workout redesign (Henrik, 2026-10-12: "1 yes 2 no remove the timers totally 3 yes 4 yes 5 do all at once") ──
+{
+  console.log('\n── Log Workout redesign ───────────────────────────────────');
+  // Header and overlays clear the iOS status bar
+  check('viewport covers the safe areas so env(safe-area-inset-*) is real', /name="viewport" content="[^"]*viewport-fit=cover/.test(html));
+  check('the header is padded below the status bar', /\.header\{padding:calc\(22px \+ env\(safe-area-inset-top,0px\)\)/.test(html));
+  check('scrolled content never shows under the clock (solid strip behind the status bar)', /body::before\{[^}]*position:fixed;top:0[^}]*height:env\(safe-area-inset-top,0px\)[^}]*background:var\(--bg\)/.test(html));
+  check('the program editor, onboarding and pop-ups clear it too',
+    /\.prog-overlay\{[^}]*padding-top:env\(safe-area-inset-top,0px\)/.test(html) && /#onboarding-overlay\{[^}]*padding-top:env\(safe-area-inset-top/.test(html) && /\.modal-overlay\{[^}]*padding-top:calc\(20px \+ env\(safe-area-inset-top/.test(html));
+
+  // Load modes: kg / BW / none
+  check('Dead Bug, Plank, Bird Dog, Pallof Press and the prone Y/T raises have no kg column',
+    ['Dead Bug', 'Plank', 'Bird Dog', 'Pallof Press', 'Prone Y-Raise', 'Prone T-Raise'].every(n => G._loadMode(n, false) === 'none'));
+  check('…Prone External Rotation (light dumbbell) and loaded lifts keep kg', G._loadMode('Prone External Rotation', false) === 'kg' && G._loadMode('Bench Press', false) === 'kg');
+  check('bodyweight exercises show BW', G._loadMode('Push-ups', true) === 'bw' && G._loadMode('Bodyweight Squat', true) === 'bw');
+  const rk = G._setRowInner(1, ' data-ex="3" data-set="1"', '80', 'kg');
+  const rb = G._setRowInner(0, ' data-ex="2" data-set="0"', '85.2', 'bw');
+  const rn = G._setRowInner(0, ' data-ex="5" data-set="0"', '', 'none');
+  check('a kg row has a visible kg box, the set number and an empty reps box',
+    /<input type="text" class="set-in set-kg"[^>]*value="80"[^>]* data-ex="3" data-set="1" data-type="kg"/.test(rk) && rk.includes('>S2<') && /class="set-bw" hidden/.test(rk));
+  check('a BW row still carries body weight in a hidden kg box (so saved logs are unchanged) and shows "BW"',
+    /<input type="hidden"[^>]*value="85.2"[^>]* data-type="kg"/.test(rb) && /<span class="set-bw">BW<\/span>/.test(rb));
+  check('a no-load row has a hidden, empty kg box and no BW label', /<input type="hidden"[^>]*value=""[^>]*data-type="kg"/.test(rn) && /class="set-bw" hidden/.test(rn));
+  check('every row keeps the data-ex/data-set attributes saveLog and drafts read', [rk, rb, rn].every(r => (r.match(/data-ex="/g) || []).length === 2));
+  check('reps boxes are 16px so iOS does not zoom when you tap one', /input\.set-in\{[^}]*font-size:16px/.test(html));
+  check('a swap re-applies the load mode', String(G._swapResetWeights).includes('_applyLoadMode(card,name)') && String(G.onCustomExPicked).includes('_applyLoadMode(card,sel.value)'));
+
+  // Gear toggles: in the ⋯ menu, never on bodyweight or unloaded work
+  check('no gear toggles on a bodyweight prone raise, Dead Bug or push-ups (DB used to show on any "raise")',
+    ['Prone Y-Raise', 'Prone T-Raise', 'Dead Bug', 'Push-ups'].every(n => G._gearBtnsHtml(n, 1, 1, 1) === ''));
+  check('…loaded lifts keep theirs', G._gearBtnsHtml('Lateral Raise', 1, 1, 1).includes('data-db') && G._gearBtnsHtml('Cable Row', 1, 1, 1).includes('data-gear'));
+  check('an active gear shows as a chip on the card', G._gearChipText({ dataset: { gearHalf: '1', gear2x: '2', db: '2' } }) === '2× cable · 2 dumbbells' && G._gearChipText({ dataset: { gearHalf: '1', gear2x: '1', db: '1' } }) === '');
+  const btn = (attr, val, title) => ({ hasAttribute: a => a === attr, dataset: { [attr.replace('data-', '')]: val }, title });
+  const mkMenuCard = (custom, btns) => ({ dataset: custom ? { custom: 'true' } : {}, querySelectorAll: sel => sel === '.gear-slot button' ? btns : [] });
+  const m1 = G._exMenuHtml(mkMenuCard(false, [btn('data-db', '2', 'Two dumbbells — entered weight counts double')]));
+  check('⋯ menu: Swap, each gear toggle with its state and explanation, then Remove',
+    m1.indexOf('_exMenuSwap()') > -1 && m1.indexOf('_exMenuSwap()') < m1.indexOf('_exMenuGear(0)') && m1.indexOf('_exMenuGear(0)') < m1.indexOf('_exMenuRemove()')
+    && m1.includes('Two dumbbells') && m1.includes('exm-st on') && m1.includes('entered weight counts double'));
+  const m2 = G._exMenuHtml(mkMenuCard(true, []));
+  check('…a custom card (its name is already a picker) has no Swap', !m2.includes('_exMenuSwap()') && m2.includes('_exMenuRemove()'));
+  check('the menu opens above the program editor', /id="exMenuModal" style="z-index:500"/.test(html));
+
+  // "Last" line from the stored logs
+  const _l = G.logs;
+  G.logs = [
+    { id: 1, date: '2026-10-01', exercises: [{ name: 'Bench Press', sets: [{ kg: 80, reps: 6 }, { kg: 80, reps: 5 }] }] },
+    { id: 2, date: '2026-10-08', exercises: [{ name: 'Bench Press', sets: [{ kg: 82.5, reps: 6 }, { kg: 80, reps: 6 }, { kg: 80, reps: 0 }] }, { name: 'Push-ups', sets: [{ kg: 85, reps: 22 }, { kg: 85, reps: 18 }] }, { name: 'Dead Bug', sets: [{ kg: 0, reps: 12 }] }] },
+  ];
+  const lb = G._lastTimeText('Bench Press', 'kg');
+  check('"Last" reads the NEWEST stored session and skips empty sets', /^Last \(8 Oct\): /.test(lb) && lb.endsWith('82.5×6, 80×6'), lb);
+  G.logs[1].exercises[0].sets = [{ kg: 80, reps: 6 }, { kg: 80, reps: 6 }];
+  check('…same weight on every set reads as "80 kg × 6, 6"', G._lastTimeText('Bench Press', 'kg') === 'Last (8 Oct): 80 kg × 6, 6', G._lastTimeText('Bench Press', 'kg'));
+  check('…bodyweight reads "BW × 22, 18", no-load reads "12 reps"', G._lastTimeText('Push-ups', 'bw') === 'Last (8 Oct): BW × 22, 18' && G._lastTimeText('Dead Bug', 'none') === 'Last (8 Oct): 12 reps');
+  check('…an exercise never logged shows nothing', G._lastTimeText('Hip Thrust', 'kg') === '' && /hidden/.test(G._lastTimeHtml('Hip Thrust', 'kg')));
+  G.logs = _l;
+
+  // Page: one top row, Save stays on screen with progress, accent cleanup
+  check('Date and Day share one compact row', /<div class="log-top">\s*<select id="log-day"[\s\S]*?<input type="date" id="log-date"[^>]*>\s*<\/div>/.test(html));
+  check('Save sits in a bar that stays on screen above the tabs, with the progress line',
+    /<div class="log-savebar"><button class="btn btn-primary" onclick="saveLog\(\)">SAVE WORKOUT<\/button><div id="log-progress"><\/div><\/div>/.test(html) && /\.log-savebar\{position:sticky;bottom:calc\(/.test(html));
+  check('typing a rep updates the draft AND the progress', String(G.prefillLog).includes('container.oninput=_onLogInput') && String(G._onLogInput).includes('scheduleDraft()') && String(G._onLogInput).includes('_updateLogProgress()'));
+  check('the version label is muted, not yellow', html.includes('<span style="color:var(--muted);font-weight:600" id="header-version">'));
+}
+
+// ── Push-up sketches (Henrik, 2026-10-12: "The front view gone mad?" on Diamond Push-ups) ──
+{
+  const fam = ['Push-ups', 'Wide Push-ups', 'Diamond Push-ups', 'Archer Push-ups', 'Decline Push-ups'];
+  const low = [];
+  fam.forEach(n => { const s = G.SK[n](); [['start', s.start], ['end', s.end]].forEach(([k, st]) => { if (st.J.headc[1] - 6 < 0) low.push(`${n} ${k}: ${(st.J.headc[1] - 6).toFixed(1)}`); }); });
+  check('no push-up pose puts the head through the floor (the diamond bottom did)', low.length === 0, low.join(', '));
+  check('Diamond, Wide and Archer push-ups show the hands from above, never head-on (a flat body seen from the front is a blob; Henrik flagged #78/#79 too)',
+    ['Diamond Push-ups', 'Wide Push-ups', 'Archer Push-ups'].every(n => G.SK[n]().views.join() === 'side,top'));
+  check('…and no push-up variant uses a front view at all', fam.every(n => G.SK[n]().views.indexOf('front') < 0));
+  check('panels are capped at SK_MAX_SCALE so a narrow view is never blown up into fat strokes',
+    String(G.skPanels).includes('SK_MAX_SCALE)'));
+  // Henrik, 2026-10-13: "54 55 stick dudes are suddenly bigger than the others" (Kettlebell Row, Band Seated Row).
+  const fitOf = (n, v) => { const s = G.SK[n](); const bb = G._skBBox([s.start, s.end].map(st => G._skFigure(st.J, v))); return Math.min(134 / (bb[1] - bb[0] || 1), 154 / (bb[3] - bb[2] || 1)); };
+  const standing = fitOf('Shrug', 'front');
+  check('the cap is a standing figure\'s own size, so no stick figure is ever drawn bigger than a standing one',
+    Math.abs(G.SK_MAX_SCALE - standing) < 0.05, `cap ${G.SK_MAX_SCALE}, standing ${standing.toFixed(2)}`);
+  check('…the rows that looked bigger would otherwise zoom past it (so the cap is what sizes them)',
+    ['Kettlebell Row', 'Band Seated Row', 'Cable Row'].every(n => fitOf(n, 'side') > G.SK_MAX_SCALE));
+}
+
+// ── Home gym: the user's own equipment (Henrik, 2026-10-14) ───────────────────
+{
+  console.log('\n── Home gym equipment ─────────────────────────────────────');
+  check('nothing ticked IS the bodyweight preset, kettlebell + bands IS the kettlebell preset (identical programs)',
+    G._homeEquipId([]) === 'home-bw' && G._homeEquipId(['kettlebell', 'bands']) === 'home-kb' && G._homeEquipId(['bands', 'kettlebell', 'bands']) === 'home-kb');
+  check('any other set is its own sorted id', G._homeEquipId(['pullup', 'dumbbells']) === 'home:dumbbells,pullup' && G._homeItemsOf('home:dumbbells,pullup').join() === 'dumbbells,pullup');
+  check('unknown item ids are ignored', G._homeEquipId(['dumbbells', 'jetpack']) === 'home:dumbbells');
+  const R = (n, items, inj) => G._homeResolve(n, items, inj || []);
+  const DBB = ['dumbbells', 'bench', 'pullup'];
+  check('dumbbells + bench + bar: Bench → Incline DB Press, OHP → Arnold Press, curl → Hammer Curl',
+    R('Bench Press', DBB) === 'Incline DB Press' && R('Overhead Press', DBB) === 'Arnold Press' && R('Barbell Curl', DBB) === 'Hammer Curl');
+  check('…pull-ups stay with a bar, and the lat pulldown becomes pull-ups', R('Pull-ups', DBB) === 'Pull-ups' && R('Lat Pulldown', DBB) === 'Pull-ups');
+  check('…squat becomes loaded lunges, and both rows the chest-supported dumbbell row', R('Squat', DBB) === 'Lunges' && R('Barbell Row', DBB) === 'Chest-Supported Row' && R('Cable Row', DBB) === 'Chest-Supported Row');
+  check('a barbell + rack keeps the barbell lifts', ['Squat', 'Deadlift', 'Barbell Row', 'Overhead Press'].every(n => R(n, ['barbell']) === n) && R('Bench Press', ['barbell', 'bench']) === 'Bench Press');
+  check('…but a bench press needs the bench too', R('Bench Press', ['barbell']) === 'Push-ups');
+  check('machines never stay at home, whatever is ticked', R('Leg Press', G.HOME_ITEMS.map(h => h.id)) !== 'Leg Press' && R('Chest Machine Press', G.HOME_ITEMS.map(h => h.id)) === 'Incline DB Press');
+  check('a cable station keeps the cable work', ['Cable Row', 'Face Pulls', 'Tricep Pushdown', 'Lat Pulldown'].every(n => R(n, ['cable']) === n));
+  check('knees: a knee-safe Leg Press never turns back into a squat or lunge', R('Leg Press', ['dumbbells'], ['knees']) === 'Single-leg Glute Bridge' && R('Leg Press', ['kettlebell'], ['knees']) === 'Kettlebell Glute Bridge');
+  check('nothing to curl with drops the curl', R('Barbell Curl', ['pullup']) === null);
+
+  // Every generated home program can actually be done with what was ticked.
+  const combos = [['dumbbells'], ['dumbbells', 'bench'], ['dumbbells', 'bench', 'pullup'], ['barbell', 'bench'], ['barbell', 'bench', 'pullup', 'dipbars'],
+    ['pullup'], ['bands', 'pullup'], ['kettlebell'], ['cable'], ['dumbbells', 'kettlebell', 'bands', 'pullup'], G.HOME_ITEMS.map(h => h.id)];
+  const GO = [['strength', 'pure'], ['strength', 'hybrid'], ['hypertrophy', 'balanced'], ['hypertrophy', 'upper'], ['hypertrophy', 'lower'], ['aesthetic', 'fullbody'], ['aesthetic', 'upperlower'], ['rehab', 'knee'], ['rehab', 'back'], ['rehab', 'shoulder']];
+  const knees = G.REHAB_CONDITIONS.find(c => c.id === 'knees');
+  const bad = [], kneeBad = [], unsk = [], empty = [];
+  for (const items of combos) { const eq = G._homeEquipId(items); for (const [g, sub] of GO) for (const d of [2, 3, 4, 5, 6]) for (const inj of [[], ['knees'], ['shoulders']]) {
+    let p; try { p = G._generateWorkoutProgram(g, sub, d, 'T', 12, inj, eq); } catch (e) { bad.push(`${eq} ${g}/${sub} ${d}d threw ${e.message}`); continue; }
+    p.days.forEach(day => { if (!day.exercises.length) empty.push(`${eq} ${g}/${sub} ${d}d ${day.name}`);
+      day.exercises.forEach(ex => {
+        if (!G._canDoAtHome(ex.name, items)) bad.push(`${eq} ${g}/${sub} ${d}d: ${ex.name}`);
+        if (inj.includes('knees') && knees.detect(ex.name)) kneeBad.push(`${eq} ${g}/${sub}: ${ex.name}`);
+        if (!G._exSketchSpec(ex.name)) unsk.push(ex.name); }); }); } }
+  check('every exercise in every home program can be done with the ticked equipment (11 equipment sets × goals × 2–6 days × injuries)', bad.length === 0, bad.slice(0, 4).join(' | '));
+  check('…a knees program never gets a knee-aggravating exercise back', kneeBad.length === 0, kneeBad.slice(0, 4).join(' | '));
+  check('…every exercise it picks has a sketch', unsk.length === 0, [...new Set(unsk)].join(', '));
+  check('…no day ends up empty', empty.length === 0, empty.slice(0, 3).join(' | '));
+  const dbp = G._generateWorkoutProgram('hypertrophy', 'balanced', 4, 'T', 12, [], 'home:bench,dumbbells');
+  const dbNames = new Set(dbp.days.flatMap(d => d.exercises.map(e => e.name)));
+  check('a dumbbell program actually uses the dumbbells (not just bodyweight)', dbNames.has('Incline DB Press') && dbNames.has('Hammer Curl'), [...dbNames].join(', '));
+  check('…loaded work keeps real reps; only swapped-in bodyweight work goes AMRAP',
+    dbp.days.every(d => d.exercises.every(e => (G.isBWExName(e.name) || e.tag === 'rehab') || !/max/.test(String(e.sets)))));
+  check('a home program remembers its equipment and how it was built, so it can be rebuilt',
+    dbp.equipment === 'home:bench,dumbbells' && dbp.gen && dbp.gen.goal === 'hypertrophy' && dbp.gen.sub === 'balanced' && dbp.gen.nDays === 4 && dbp.gen.setsPerMuscle === 12);
+  check('…a gym program is unchanged (no equipment, no gen)', (() => { const gp = G._generateWorkoutProgram('hypertrophy', 'balanced', 4, 'T', 12, []); return gp.equipment === undefined && gp.gen === undefined; })());
+  check('the presets still build exactly what they did', JSON.stringify(G._generateWorkoutProgram('strength', 'pure', 4, 'T', 12, [], 'home-kb').days) === JSON.stringify(G._generateWorkoutProgram('strength', 'pure', 4, 'T', 12, [], G._homeEquipId(['kettlebell', 'bands'])).days));
+
+  // Program view: the equipment, and the way to change it.
+  const pv = G._progViewHtml(dbp, false, 3);
+  check('the program view of a home program lists its equipment with a "Change equipment" button',
+    pv.includes('data-home-equip="1"') && pv.includes('Bench · Dumbbells') && pv.includes('openHomeEquipEditor(3)'));
+  check('…a gym program shows no equipment block', !G._progViewHtml(G._generateWorkoutProgram('hypertrophy', 'balanced', 4, 'T', 12, []), false, 0).includes('data-home-equip'));
+  check('…a bodyweight home program says so', G._progViewHtml(G._generateWorkoutProgram('hypertrophy', 'balanced', 4, 'T', 12, [], 'home-bw'), false, 0).includes('Bodyweight only'));
+  const sv = String(G.saveHomeEquip);
+  check('saving equipment stores it for the user AND on the backend', String(G._saveHomeItems).includes("setData('wkt-home-equip'") && String(G._saveHomeItems).includes("pushSettingsToAgent({'wkt-home-equip'") && sv.includes('_saveHomeItems(_heq.items)'));
+  check('…and rebuilds the program from its own wizard choices, after a confirm that hand edits are replaced',
+    sv.includes('confirm(') && /hand are replaced/.test(sv) && sv.includes('_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items))') && sv.includes('savePrograms()'));
+  check('…keeping the program in the same slot (active program and its index unchanged)', sv.includes('_programs[idx]=np'));
+  check('the equipment list comes back from the backend after a cache wipe', String(G.syncSettingsFromAgent).includes("setData('wkt-home-equip',s['wkt-home-equip'])"));
+  check('the equipment editor opens above the program view', /id="homeEquipModal" style="z-index:500"/.test(html));
 }
 
 setImmediate(() => {

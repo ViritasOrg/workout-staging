@@ -1,5 +1,12 @@
 # Workout Staging — Claude Instructions
 
+## Answer first (Henrik, 2026-10-10)
+
+- **Answer first, then say what you will do before doing it** ("You're right. I'll answer first and say what I'm doing before I start."). A question gets its answer in the first lines, before any tool call. Before starting any work (a workflow, a PR, a deploy, waiting on CI), say in one line what you are about to do and why; never disappear into tool calls on a simple question.
+- **Every request carries context** (Henrik, 2026-10-10: "add context to requests so I have a clue what you are talking about"). When you ask Henrik to do or check something, say what it is for, where it fits in the overall task (step N of what), and what he should see when it worked. Never a bare instruction that assumes he remembers the thread.
+- **Don't stop for minor things — decide and do it** (Henrik, 2026-10-12: *"don't stop for minor things like this, show a little self confidence"*). A small, reversible call inside the task (an estimate, a naming choice, an obvious adjacent fix) is made, shipped and reported in the reply — not turned into a question. Ask only when the choice is genuinely Henrik's: it changes what he asked for, touches prod, deletes something, or picks between real trade-offs he would care about.
+- **Every step Henrik must do comes with its commands, in the same message** (Henrik, 2026-10-10: "you must always provide detailed instructions and commands for stuff like this"). When a reply mentions anything he will have to do (merge, deploy, change a config, restart, check), give the full instructions and the exact, complete, copy-paste commands right there, saying which machine each runs on. Never "I'll give you the command when…" or "deploy as usual": he should never have to ask for the how.
+
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
 **The free-T / plasma curve is always in pmol/L. There is no second unit and there must
 never be one.** Missing or incomplete data changes the **confidence** of a number, never
@@ -487,6 +494,64 @@ programs; only `rehab-*` still uses the old linear `scaleSets` path.
   and the number of exercises the template supplies. Tests assert the 1.6× bound with the
   at-floor exemption, across every goal × 4–7 days × sets-per-muscle 9–25.
 
+### Training at home — the wizard's "Where do you train?" (rule 2026-10-12)
+Henrik: *"need generator to be able to create programs for training at home without access to
+a gym"*, then: **all three options**, **"B for reps"** (higher reps allowed for bodyweight), and
+**"kettlebell and resistance bands only"** — so a home program assumes no bench, no pull-up bar
+and no dumbbells.
+
+- Three choices on wizard step 2: **Gym** (default), **Home: kettlebell + bands**, **Home:
+  bodyweight**. Stored on the program as `equipment` (absent for gym).
+- The generator builds the gym program, then `HOME_EQUIPMENT` swaps each exercise for its home
+  equivalent — run right after the injury layer and again after prehab injection. `null` drops
+  an exercise (curls with no equipment). Per-injury overrides exist because the injury layer's
+  own answers are gym machines; without them a knee-safe Leg Press turns back into a squat.
+- **Gym output is byte-identical to before** — verified across 1400 programs. Keep it that way:
+  every home rule lives behind `equip`.
+- The leg-day rule asks `_legdaySafeName`, which reads the `equip:<id>` marker. A slot is
+  "blocked" when its safe substitute is not the real lift (`_isMainSquat`/`_isMainDeadlift`), so
+  kettlebell leg days open with **Kettlebell Front Squat** (≥3 strength sets) and close with
+  **Kettlebell Deadlift**; bodyweight has no deadlift and that half stands down, as for a
+  lower-back injury.
+- **Bodyweight at home is AMRAP** (`max`, scheme `N×max — stop 1–2 reps short of failure`, tag
+  `volume`). That is how "higher reps allowed" is honoured without touching the 12-rep ceiling:
+  `tagForReps`/`snapReps` leave `max` alone. Rehab-tagged work keeps its 15s.
+- A home program carries `kg:0` everywhere — "no weight set yet", filled from history.
+- **Home bodyweight exercises count body weight** (Henrik, 2026-10-12: *"Use common sense, a
+  inverted body weight row is maybe 35-55% of bw"*). `HOME_BW_NAMES` makes them bodyweight
+  cards; their `factor` is an ESTIMATE, not a measurement: inverted rows 0.45, bodyweight squat
+  0.85, sissy squat 0.8, Nordic curl and single-leg glute bridge 0.6, single-leg RDL and
+  bodyweight good morning 0.5, single-leg calf raise 1.0. Shared names (Bulgarian Split Squat,
+  Lunges) stay non-bodyweight — they are logged with dumbbells at the gym. Only the factor was
+  added: the muscle split of each stays what it was, so program generation is unchanged.
+  Pike and decline push-ups count 0.7 (raised from the push-up's 0.64, Henrik 2026-10-12).
+- Every home name is a first-class catalogue exercise (both pickers + `EXERCISE_SPLITS` +
+  `MUSCLE_MAP`). Band names avoid "pulldown"/"pushdown" so `isCableEx` does not give them pulley
+  buttons; "Nordic Curl" has its own key so it is legs, not biceps.
+- **Fixed 2026-10-12 (Henrik: "Pls fix"):** the `knees` condition matched `/\blunge\b/`, which
+  never matched "Lunges", so a gym program with a knees injury kept Lunges. It is `/\blunges?\b/`
+  now. The home `'Lunges'` knee overrides were written for that gap and are left in place.
+
+### Home gym: the user's own equipment (rule 2026-10-14)
+Henrik: *"let the user add what equipment they have home (and later be able to update it from the Program
+views) then have the generator create programs for them like usual but with this new constraint."*
+
+- The wizard's "Where do you train?" is **Gym / Home**; Home shows a checklist of `HOME_ITEMS` (barbell + rack,
+  bench, dumbbells, kettlebell, resistance bands, pull-up bar, dip bars, cable station). The list is saved per user
+  (`wkt-home-equip`, localStorage + `/user-settings`, restored by `syncSettingsFromAgent`).
+- **`EX_EQUIP` says what every catalogue exercise needs** (any-of sets of items; `machine` never exists at home;
+  `Kettlebell …` / `Band …` names need their item by prefix; everything else needs nothing). The generator builds its
+  usual gym program, then `_homeResolve` swaps each exercise for the first entry of `HOME_PREF[name]` the ticked items
+  allow (`HOME_PREF_INJURY` first when an injury applies). Every list ends in something that needs no equipment, and
+  a test sweeps 11 equipment sets × goals × days × injuries asserting every exercise is doable, knee-safe and sketched.
+- **The two old presets are special cases and stay byte-identical:** nothing ticked → `home-bw`, kettlebell + bands
+  → `home-kb` (`_homeEquipId`). Any other set is `equipment:'home:<sorted ids>'`.
+- Loaded work keeps real reps (`max` → 10); only exercises swapped to true bodyweight cards go AMRAP.
+- **A home program stores how it was built** (`prog.gen` = goal, sub, nDays, setsPerMuscle, injuries). The program
+  view shows its equipment with **Change equipment**; saving updates the user's list and, after a confirm that hand
+  edits are replaced, rebuilds that program in the same slot. A home program from before 2026-10-14 has no `gen` and
+  cannot be rebuilt; the editor says so and only saves the list. Gym programs carry neither field.
+
 ### Full-body at low frequency — ≤4 days/week (rule 2026-07-24)
 When a generated program is **4 days/week or fewer**, it must be **full-body** (each session
 trains legs + a push + a pull + accessories), **not** a push/pull/legs or upper/lower split.
@@ -602,6 +667,59 @@ them under one entry.
   not "simplify" by canonicalising the name before the maths.
 - Also merges Weighted Chin-ups and Weighted Dips with their base movement. **Chin-ups stay
   distinct from Pull-ups** — a different grip, not a loading variant.
+
+### Exercise sketches — every catalogue exercise has one (rule 2026-10-12)
+Henrik: *"Every exercise in the catalog needs a simple sketch showing how to perform it"*, then *"Go stick
+figures"*, approved after review. A blue **?** opens `exSketchModal` (`_openExSketch`) from three places: a Log Workout
+card (its current name via `_exCardName`, so a swap shows the swapped exercise), each row of the Program day view, and
+each exercise in the program editor (whatever is picked right now). `exSketchModal` sits at z-index 500, above the
+editor overlay (300); at the default modal z-index the sketch opened behind the editor and showed nothing.
+
+- **`index.html` is the only copy of the sketch code**, between `// ── Exercise sketches:` and
+  `// ── end exercise sketches ──`. A 3D stick-figure rig (`skPose`) posed once per position; `skPanels` projects
+  it to side / front / from-above SVGs, start → finish. `tools/sketches/page.js` renders the review page from that
+  block, so the page and the app cannot disagree.
+- **Every name in `EX_OPTS_HTML`, and every name a generated program or template can contain, must have an
+  `SK[...]` entry; no `SK` entry may name anything else** — tests assert both. Adding an exercise to the catalogue
+  or to the generator means adding its sketch in the same PR. The generator's core moves (Dead Bug, Plank, Pallof
+  Press, Bird Dog) are not in the picker and have sketches all the same. `Weighted X` falls back
+  to `X` (`_exCanonName`): one movement, one sketch.
+- Side view always; a front or overhead view only where it shows something the side view cannot.
+- **Grip variations are panels on the existing exercise, never new catalogue names** (Henrik: *"Grip panels on
+  existing exercises"*) — one movement, one history.
+- **Grip notes are science based.** Every claim cites a study retrieved into `claude-agent-backend`
+  `docs/enhanced-bodybuilding/sources/grip-width-*` (summary: doc `20-grip-width.md`). Where the studies show a
+  smaller effect than the common belief, say so first — Henrik: *"rather point out differences are smaller than
+  gym lore in those occasions"*. Where there is no study (barbell row), say that.
+- Nested helpers inside the sketch code are written `var mk=function(` — the duplicate-function-name test reads
+  every `function name(` in the script, inner ones included.
+
+### The Log Workout screen (redesign, rule 2026-10-12)
+Henrik asked for "a new holistic design sprint" of the Log screen, approved the review's plan, and answered
+its questions: *"Remove rest timers. 1 yes 2 no remove the timers totally 3 yes 4 yes 5 do all at once"*.
+
+- **No rest timers, anywhere.** The per-card ⏱, the REST TIMER button and the timer bar are gone, with their
+  code. Do not bring one back as a "small helper". `restSecsForTag` stays: the session-length estimate uses it.
+- **Card = name, blue ?, ⋯.** Swap, the equipment toggles (½ gear, 2× cable, two dumbbells) and Remove live in
+  the ⋯ menu (`exMenuModal`, z-index 500). The toggles are still the card's own gear buttons, kept in a hidden
+  `.gear-slot` and clicked by the menu, so `toggleGear`/`toggleGear2`/`toggleDb` and their storage are unchanged.
+  An active toggle shows as a chip on the card (`_gearChipText`).
+- **One prescription line in plain words** (the program's `scheme`, `· deload` when deloading) plus the tag chip,
+  in muted ink. Yellow is for Save and numbers you type; blue is help; green is a finished exercise.
+- **One row per set, built only by `_setRowInner`** (prefill, "+ set" and custom exercises all call it). Three
+  load modes from `_loadMode`: `kg`; `bw` shows "BW" (body weight is still in a hidden kg input, so the saved log
+  is exactly what it was); `none` is reps only, for `UNLOADED_EX` (Dead Bug, Plank, Bird Dog, Pallof Press,
+  Prone Y-Raise, Prone T-Raise). **The kg input is always present, hidden when not shown**: `saveLog`, drafts,
+  `editLog` and propagation all read `input[data-type="kg"]` per set, and that contract must not change.
+  A swap re-applies the mode (`_applyLoadMode`). No gear toggles on bodyweight or unloaded work.
+- **"Last (8 Oct): 25 kg × 10, 10, 9"** under the prescription, from the newest stored log holding that exercise
+  (`_lastTimeText`), skipping the log being edited. Read-only; it never writes anything.
+- **An exercise is done when every set has reps** (no tick buttons: Henrik said no to set ✓). Done cards get a
+  green edge and the Save bar, which stays on screen above the tabs, counts them.
+- **The header and every full-screen layer clear the iOS status bar**: `viewport-fit=cover`, the header and
+  overlays pad by `env(safe-area-inset-top)`, and a fixed `body::before` strip keeps scrolled content from
+  showing under the clock (the app asks for a see-through `black-translucent` status bar).
+- Set inputs are 16px so iOS does not zoom when one is tapped.
 
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
