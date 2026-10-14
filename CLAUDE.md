@@ -67,6 +67,28 @@ This includes, but is not limited to:
 
 **Current state (as of 2026-06-21):** Any such data that exists in the public repos is known technical debt. **Do not add new compound data to these files** — any new compounds or data updates must go into the backend and be served via API.
 
+## ⚠️ ANYTHING HENRIK MUST RUN COMES AS ONE COPY-PASTE BASH BLOCK ⚠️
+Henrik, 2026-10-14: *"there should be a rule to always provide bash code I can copy, I am
+not here to do linux admin when I have you"*
+
+He is not the sysadmin. If a step cannot be done from the session, it is handed over as
+**one fenced bash block he can paste whole** — not prose, not a numbered walkthrough, not
+a command with `<placeholders>` to fill in, not steps scattered through a paragraph.
+
+- **It generates its own values.** No "generate a key, then run X with it".
+- **It checks its own prerequisites** and fails with the fix (`command -v fly >/dev/null ||
+  { echo "brew install flyctl"; exit 1; }`), rather than erroring cryptically.
+- **It verifies itself and prints what it proved** — the expected values next to the actual
+  ones, and a final OK / NOT OK line. He should never have to judge whether it worked.
+- **Secrets stay out of the chat and off the screen**: generated inside the block, piped to
+  `pbcopy`, never echoed and never pasted into this conversation.
+- **If one step really is a UI click** he alone can reach, the block does everything around
+  it and ends by naming that single click, with the value already on his clipboard.
+- **Default to doing it in the session.** A block for Henrik is the fallback for what the
+  sandbox genuinely cannot reach — never a way to hand work back. Check the pre-authorised
+  paths (GitHub runners, the MCP endpoints, the session's own tokens) before deciding
+  something is his to run, and say which one you tried.
+
 ## ⚠️ ROTATING THE READ-ONLY KEY — REPLACE IN ONE STEP, NEVER JUST DELETE ⚠️
 Henrik, 2026-10-08: *"You told me to delete that api key in an other session, update all
 md files to make sure you don't do the same mistake ever again"*
