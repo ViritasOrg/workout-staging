@@ -524,6 +524,26 @@ and no dumbbells.
   never matched "Lunges", so a gym program with a knees injury kept Lunges. It is `/\blunges?\b/`
   now. The home `'Lunges'` knee overrides were written for that gap and are left in place.
 
+### Home gym: the user's own equipment (rule 2026-10-14)
+Henrik: *"let the user add what equipment they have home (and later be able to update it from the Program
+views) then have the generator create programs for them like usual but with this new constraint."*
+
+- The wizard's "Where do you train?" is **Gym / Home**; Home shows a checklist of `HOME_ITEMS` (barbell + rack,
+  bench, dumbbells, kettlebell, resistance bands, pull-up bar, dip bars, cable station). The list is saved per user
+  (`wkt-home-equip`, localStorage + `/user-settings`, restored by `syncSettingsFromAgent`).
+- **`EX_EQUIP` says what every catalogue exercise needs** (any-of sets of items; `machine` never exists at home;
+  `Kettlebell …` / `Band …` names need their item by prefix; everything else needs nothing). The generator builds its
+  usual gym program, then `_homeResolve` swaps each exercise for the first entry of `HOME_PREF[name]` the ticked items
+  allow (`HOME_PREF_INJURY` first when an injury applies). Every list ends in something that needs no equipment, and
+  a test sweeps 11 equipment sets × goals × days × injuries asserting every exercise is doable, knee-safe and sketched.
+- **The two old presets are special cases and stay byte-identical:** nothing ticked → `home-bw`, kettlebell + bands
+  → `home-kb` (`_homeEquipId`). Any other set is `equipment:'home:<sorted ids>'`.
+- Loaded work keeps real reps (`max` → 10); only exercises swapped to true bodyweight cards go AMRAP.
+- **A home program stores how it was built** (`prog.gen` = goal, sub, nDays, setsPerMuscle, injuries). The program
+  view shows its equipment with **Change equipment**; saving updates the user's list and, after a confirm that hand
+  edits are replaced, rebuilds that program in the same slot. A home program from before 2026-10-14 has no `gen` and
+  cannot be rebuilt; the editor says so and only saves the list. Gym programs carry neither field.
+
 ### Full-body at low frequency — ≤4 days/week (rule 2026-07-24)
 When a generated program is **4 days/week or fewer**, it must be **full-body** (each session
 trains legs + a push + a pull + accessories), **not** a push/pull/legs or upper/lower split.
