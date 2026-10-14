@@ -60,47 +60,55 @@ This includes, but is not limited to:
 
 **Current state (as of 2026-06-21):** Any such data that exists in the public repos is known technical debt. **Do not add new compound data to these files** — any new compounds or data updates must go into the backend and be served via API.
 
-## ⚠️ NEVER TELL HENRIK TO DELETE A CREDENTIAL — `API_SECRET_RO` IS SUPPOSED TO BE THERE ⚠️
+## ⚠️ ROTATING THE READ-ONLY KEY — REPLACE IN ONE STEP, NEVER JUST DELETE ⚠️
 Henrik, 2026-10-08: *"You told me to delete that api key in an other session, update all
 md files to make sure you don't do the same mistake ever again"*
+Henrik, 2026-10-14: *"one claude session required it to be deleted, we need to setup a
+new key"* / *"with a less useless name"*
 
-A session advised him to delete the API key. He did. **`API_SECRET_RO` is now unset in
-Claude's session environment** — confirmed 2026-10-08: the variable is empty, and
-`ADMIN_SECRET` / `ADMIN_SECRET_PRODUCTION` both return HTTP 401 against the API. The
-sanctioned read path is dead, so the next session that needs real data is blind. It cost
-immediately: two workout bugs the same day had to be diagnosed from source alone, and one
-of them ("yesterday's log isn't in history") could not be confirmed against his actual
-records at all.
+A session judged that the old key (`API_SECRET_RO`) had to go, and **deleting it was
+right**. The mistake was deleting it **without provisioning a replacement in the same
+step**: the sanctioned read path was dead for six days and nobody noticed until a session
+needed it. On 2026-10-08 two workout bugs had to be diagnosed from source alone, and the
+lost-log one could not be confirmed against Henrik's actual records at all.
 
-**That credential living in Claude's session environment IS THE DESIGN, not a leak.**
-Henrik provisioned it on 2026-08-07, having been offered the full `x-api-secret` and
-deliberately choosing the read-only one. It is GET/HEAD/OPTIONS-only, enforced in
-`main.py` middleware and again in `auth_helper.get_user_id`. Seeing `$API_SECRET_RO` in
-this file, in a hook banner, in a command line or in a session transcript is **expected
-and correct** — that is a *variable reference*, not a secret value. None of it is an
-incident, and none of it is a reason to advise deleting anything.
+**The rule: a credential that must go is REPLACED, not deleted.** One operation, not two,
+with no gap in between:
+1. generate a new value (`openssl rand -hex 32`) — never in a chat reply, a commit, a PR
+   body, a CI log or a workflow input;
+2. set it where the **server** reads it (`CLAUDE_READONLY_API_KEY` on the backend —
+   `fly secrets set` on `claude-agent-api-aged-sun-3616`, or `claude_readonly_api_key` in
+   `config.json`);
+3. set it where the **caller** reads it (the same name in Claude's session environment:
+   the cloud environment menu in the session title bar → Edit → Network secrets, labelled
+   API credentials in an older app). A new session picks it up;
+4. **verify with a real call** before calling it done — `GET /health`, then one
+   `/admin-data/records` read — and confirm a write still returns 403.
 
-**The rules:**
+**The other rules, which the 2026-10-08 incident is the standing example of:**
 - **Never advise deleting, revoking, rotating or unsetting a credential, env var, secret,
   file, branch or data store before establishing what reads it.** Grep for it first. In
-  this ecosystem `API_SECRET_RO` is read by every data-diagnosis path in every repo.
+  this ecosystem the read-only key is used by every data-diagnosis path in every repo.
 - **"A secret appears in a repo" is not a finding.** A reference to an environment
-  variable is correct practice. Only a literal secret *value* committed to a file is a
-  leak — and then name the exact file and line, and say nothing more sweeping than that.
-- **A genuine rotation is "replace", never "delete".** If a value truly must change, the
-  instruction is one step, not two: generate the new value, set it on the backend, AND put
-  it back in the session environment under the same name, so nothing is left blind in
-  between. Never ask him to paste a token, key or password into the chat.
-- **An absent credential is a provisioning gap to REPORT, not a problem to engineer
-  around.** Say plainly that it is unset, say exactly what that blocks, and get on with
-  every part of the task that does not depend on it. Never silently substitute guesswork
-  for the record, and never instrument the UI to find out what is stored.
-- **To restore it:** the cloud environment menu in the session's title bar → Edit → add
-  `API_SECRET_RO` under Network secrets (labelled API credentials in an older app), or as
-  a plain environment variable. A new session picks it up.
+  variable (`$CLAUDE_READONLY_API_KEY`) is correct practice and appears in this file, in
+  hook banners and in command lines by design. Only a literal secret *value* committed to
+  a file is a leak — and then name the exact file and line, nothing more sweeping.
+- **Never ask Henrik to paste a token, key or password into the chat**, and never print one
+  into a reply. The transcript is stored.
+- **The key existing in Claude's session environment is the design, not an exposure.** He
+  was offered the full `x-api-secret` on 2026-08-07 and deliberately chose a read-only one:
+  GET/HEAD/OPTIONS only, enforced in `main.py` middleware and again in
+  `auth_helper.get_user_id`.
+- **An absent key is a provisioning gap to REPORT, not a problem to engineer around.** Say
+  it is unset, say what that blocks, do every part of the task that does not depend on it.
+  Never substitute guesswork for the record, and never instrument the UI instead.
+- **The retired name is not read any more, on purpose.** `auth_helper` reads only
+  `CLAUDE_READONLY_API_KEY` / `claude_readonly_api_key`, so a stale `API_SECRET_RO` left in
+  an environment or a config file grants nothing. `tests/test_readonly_credential.py`
+  (`TestOldNameIsDead`) holds that line — a red test there means the retired key works
+  again, not that the test is stale.
 - **Security advice about Henrik's own tooling is advice, not an action.** State the
-  concern in a sentence, state what acting on it would cost him, and let him decide. A
-  reflexive "delete that key" is how a working diagnostic channel got switched off.
+  concern in a sentence, state what acting on it costs him, and let him decide.
 
 ## ⚠️ RESEARCH & REFERENCE DOCS LIVE IN THE BACKEND — `docs/enhanced-bodybuilding/` ⚠️
 **All peptide/enhancement/compound research, protocol, and reference documents
