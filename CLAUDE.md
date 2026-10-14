@@ -528,7 +528,9 @@ and no dumbbells.
 Henrik: *"let the user add what equipment they have home (and later be able to update it from the Program
 views) then have the generator create programs for them like usual but with this new constraint."*
 
-- The wizard's "Where do you train?" is **Gym / Home**; Home shows a checklist of `HOME_ITEMS` (barbell + rack,
+- The wizard's "Where do you train?" is **Gym / Home**. Choosing Home adds **its own screen** (`step:'equip'`)
+  between step 2 and the summary (Henrik, 2026-10-14: *"the equipment list is not visible and clicking Next then skips
+  the equipment choice"*): a checklist inline on step 2 sat below the fold. It lists `HOME_ITEMS` (barbell + rack,
   bench, dumbbells, kettlebell, resistance bands, pull-up bar, dip bars, cable station). The list is saved per user
   (`wkt-home-equip`, localStorage + `/user-settings`, restored by `syncSettingsFromAgent`).
 - **`EX_EQUIP` says what every catalogue exercise needs** (any-of sets of items; `machine` never exists at home;
