@@ -7607,17 +7607,23 @@ console.log('\n── Training at home ─────────────�
 
   // The wizard.
   // The wizard (2026-10-14: Gym / Home, and Home lists the user's own equipment).
-  const w = G._progWizEquipHtml('home', ['dumbbells', 'bench']);
-  check('wizard: "Where do you train?" offers Gym and Home, and Home lists the equipment to tick',
-    /Where do you train\?/.test(w) && /_progWiz\.equip='gym'/.test(w) && /_progWiz\.equip='home'/.test(w)
-    && G.HOME_ITEMS.every(h => w.includes('data-home-item="' + h.id + '"')), w.slice(0, 200));
+  const w0 = G._progWizEquipHtml('home');
+  check('wizard: "Where do you train?" offers Gym and Home', /Where do you train\?/.test(w0) && /_progWiz\.equip='gym'/.test(w0) && /_progWiz\.equip='home'/.test(w0));
+  check('wizard: the checklist is NOT on that step, where it could be scrolled past (Henrik 2026-10-14)', !w0.includes('data-home-item'));
+  const rw = String(G._renderProgWiz);
+  check('wizard: Next from step 2 goes to the equipment screen when Home is chosen, else straight to step 3',
+    rw.includes("_progWiz.step=_progWiz.equip===\\'home\\'?\\'equip\\':3"));
+  check('wizard: the equipment screen exists, with Next → step 3 and Back → step 2',
+    rw.includes("wiz.step==='equip'") && rw.includes('_progWizItemsScreenHtml(wiz.homeItems)'));
+  check('wizard: Back from step 3 returns to the equipment screen for Home', rw.includes("_progWiz.step=_progWiz.equip===\\'home\\'?\\'equip\\':2"));
+  const w = G._progWizItemsScreenHtml(['dumbbells', 'bench']);
+  check('wizard: the equipment screen lists every item to tick', G.HOME_ITEMS.every(h => w.includes('data-home-item="' + h.id + '"')));
   check('wizard: ticked items are highlighted, the rest are not',
     /data-home-item="dumbbells" style="[^"]*background:var\(--accent\)/.test(w) && !/data-home-item="barbell" style="[^"]*background:var\(--accent\)/.test(w));
-  check('wizard: the Gym view shows no checklist', !G._progWizEquipHtml('gym', []).includes('data-home-item'));
   check('wizard: Gym is the default', /cur=cur\|\|'gym'/.test(String(G._progWizEquipHtml)));
   check('wizard: both the preview and Generate pass the ticked equipment to the generator',
     (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\)\)/g) || []).length === 1 && /wiz\.injuries,_eq\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
-  check('wizard: step 2 shows the choice with the saved equipment', /_progWizEquipHtml\(wiz\.equip,wiz\.homeItems\)/.test(String(G._renderProgWiz)) && /homeItems:\(getData\('wkt-home-equip',\[\]\)/.test(html));
+  check('wizard: step 2 shows the choice, and the saved equipment is preselected', /_progWizEquipHtml\(wiz\.equip\)/.test(String(G._renderProgWiz)) && /homeItems:\(getData\('wkt-home-equip',\[\]\)/.test(html));
 }
 
 // ── Section: home bodyweight exercises count body weight (2026-10-12) ───────

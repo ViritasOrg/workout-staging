@@ -1840,9 +1840,14 @@ function _renderProgWiz(title,body,footer){
     html+='<div style="margin-top:24px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Injuries (optional)</div><div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Aggravating exercises are replaced with joint-friendly alternatives</div><div style="display:flex;gap:8px;">';
     REHAB_CONDITIONS.forEach(function(c){var _on=_wInj.indexOf(c.id)>=0;html+='<div onclick="_progWizToggleInjury(\''+c.id+'\')" title="'+_escP(c.desc)+'" style="flex:1;text-align:center;padding:12px 6px;border-radius:10px;cursor:pointer;font-size:13px;background:'+(_on?'var(--accent)':'var(--surface2)')+';color:'+(_on?'#000':'var(--text)')+';border:1px solid '+(_on?'var(--accent)':'var(--border)')+';font-weight:600;">'+_escP(c.label)+'</div>';});
     html+='</div></div>';
-    html+=_progWizEquipHtml(wiz.equip,wiz.homeItems);
+    html+=_progWizEquipHtml(wiz.equip);
     body.innerHTML=html;
-    footer.innerHTML='<button onclick="_progWiz.name=_progWizDefaultName();_progWiz.step=3;_renderProgOverlay()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-ui);margin-bottom:8px;">Next →</button><button onclick="_progWiz.step=1;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-ui);">← Back</button>';
+    footer.innerHTML='<button onclick="_progWiz.name=_progWizDefaultName();_progWiz.step=_progWiz.equip===\'home\'?\'equip\':3;_renderProgOverlay()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-ui);margin-bottom:8px;">Next →</button><button onclick="_progWiz.step=1;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-ui);">← Back</button>';
+  }else if(wiz.step==='equip'){
+    // Its own screen, so it cannot be scrolled past (Henrik, 2026-10-14: "make the equipment selection a next screen").
+    if(title)title.textContent='NEW PROGRAM';
+    body.innerHTML=_progWizItemsScreenHtml(wiz.homeItems);
+    footer.innerHTML='<button onclick="_progWiz.step=3;_renderProgOverlay()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-ui);margin-bottom:8px;">Next →</button><button onclick="_progWiz.step=2;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-ui);">← Back</button>';
   }else if(wiz.step===3){
     if(title)title.textContent='NEW PROGRAM';
     var gn={strength:'Strength',hypertrophy:'Hypertrophy',rehab:'Rehab'}[wiz.goal]||wiz.goal;
@@ -1855,7 +1860,7 @@ function _renderProgWiz(title,body,footer){
     if(_pv&&_pv.days&&_pv.days.length){var _tots=_pv.days.map(function(d){return(d.exercises||[]).reduce(function(s,e){return s+String(e.sets).split('-').length;},0);});var _avg=Math.round(_tots.reduce(function(a,b){return a+b;},0)/_tots.length);var _mx=Math.max.apply(null,_tots);html+='<div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;">Resulting sessions: ≈'+_avg+' sets avg ('+_mx+' max) — roughly '+Math.round(_avg*3.5)+' min per session</div>';}
     html+='</div>';
     body.innerHTML=html;
-    footer.innerHTML='<button onclick="_progWizGenerate()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-ui);margin-bottom:8px;">Generate Program →</button><button onclick="_progWiz.step=2;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-ui);">← Back</button>';
+    footer.innerHTML='<button onclick="_progWizGenerate()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-ui);margin-bottom:8px;">Generate Program →</button><button onclick="_progWiz.step=_progWiz.equip===\'home\'?\'equip\':2;_renderProgOverlay()" style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);border-radius:50px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-ui);">← Back</button>';
   }
 }
 function _equipLabel(id){var it=_homeItemsOf(id);if(it===null)return'Gym';if(!it.length)return'Home: bodyweight only';return'Home: '+HOME_ITEMS.filter(function(h){return it.indexOf(h.id)>=0;}).map(function(h){return h.label.toLowerCase();}).join(', ');}
@@ -1865,12 +1870,14 @@ function _homeItemsHtml(items,toggleFn){return '<div style="display:flex;flex-wr
     return '<div onclick="'+toggleFn+'(\''+h.id+'\')" data-home-item="'+h.id+'" style="flex:1 1 40%;text-align:center;padding:11px 6px;border-radius:10px;cursor:pointer;font-size:13px;background:'+(on?'var(--accent)':'var(--surface2)')+';color:'+(on?'#000':'var(--text)')+';border:1px solid '+(on?'var(--accent)':'var(--border)')+';font-weight:600;">'+_escP(h.label)+'</div>';}).join('')+'</div>';}
 function _progWizEquipHtml(cur,items){
   cur=cur||'gym';items=items||[];
-  var h='<div style="margin-top:24px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Where do you train?</div><div style="font-size:11px;color:var(--muted);margin-bottom:12px;">At home, tick what you have. Every exercise is swapped for the best one your equipment allows.</div><div style="display:flex;gap:8px;">';
+  var h='<div style="margin-top:24px;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Where do you train?</div><div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Home programs only use the equipment you have.</div><div style="display:flex;gap:8px;">';
   [{id:'gym',label:'Gym'},{id:'home',label:'Home'}].forEach(function(o){var on=o.id===cur;h+='<div onclick="_progWiz.equip=\''+o.id+'\';_renderProgOverlay()" style="flex:1;text-align:center;padding:12px 6px;border-radius:10px;cursor:pointer;font-size:13px;background:'+(on?'var(--accent)':'var(--surface2)')+';color:'+(on?'#000':'var(--text)')+';border:1px solid '+(on?'var(--accent)':'var(--border)')+';font-weight:600;">'+_escP(o.label)+'</div>';});
   h+='</div>';
-  if(cur==='home')h+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:16px 0 8px;">Your equipment</div>'+_homeItemsHtml(items,'_progWizToggleItem')+'<div style="font-size:11px;color:var(--muted);margin-top:8px;">Nothing ticked = bodyweight only.</div>';
+  if(cur==='home')h+='<div style="font-size:11px;color:var(--muted);margin-top:8px;">Next you tick the equipment you have.</div>';
   return h+'</div>';
 }
+function _progWizItemsScreenHtml(items){items=items||[];
+  return '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Your home equipment</div><div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5;">Tick everything you have. Every exercise is swapped for the best one this equipment allows.</div>'+_homeItemsHtml(items,'_progWizToggleItem')+'<div style="font-size:12px;color:var(--muted);margin-top:12px;">Nothing ticked = bodyweight only.</div>';}
 function _progWizToggleItem(id){var a=_progWiz.homeItems||(_progWiz.homeItems=[]);var i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);_renderProgOverlay();}
 // The equipment id the wizard hands the generator ('gym', a preset, or 'home:<items>').
 function _progWizEquipId(){if(!_progWiz||_progWiz.equip!=='home')return'gym';return _homeEquipId(_progWiz.homeItems||[]);}
