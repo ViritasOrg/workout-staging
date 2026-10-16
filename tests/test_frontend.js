@@ -1312,7 +1312,15 @@ check('_savedGearState defined', typeof G._savedGearState === 'function');
   const hBench = G._gearBtnsHtml('Bench Press', 1, 1, 1);
   check('Bench Press: no cable buttons',     !hBench.includes('cable') && !hBench.includes('gear<'));
   check('Bench Press: has DB button',        hBench.includes('>DB<'));
-  check('Squat: no buttons at all',          G._gearBtnsHtml('Squat', 1, 1, 1) === '');
+  // Was "Squat: no buttons at all". 2026-10-16: which implement is in your hands is the
+  // user's call, so every free-weight lift now offers the DB toggle (off by default) —
+  // a dumbbell/goblet squat is a real thing, and the old gate is what left a Shrug with
+  // no way to say "two dumbbells". The subject that still matters is that a free-weight
+  // lift gets no CABLE buttons, which is asserted here.
+  check('Squat: no cable buttons, DB offered but off',
+    (() => { const h = G._gearBtnsHtml('Squat', 1, 1, 1);
+             return !h.includes('gear') && !h.includes('cable') && h.includes('>DB<'); })(),
+    G._gearBtnsHtml('Squat', 1, 1, 1));
   // legacy wk-gear-=2 (from the brief combined scheme) reads as 2× cable on, ½ off
   G.localStorage.setItem('wk-gear-Cable Crossover', '2');
   const legacy = G._savedGearState('Cable Crossover');
@@ -8047,6 +8055,69 @@ console.log('\n── The app is titled with the person using it ─────
     (() => { const f = String(G.applyOwnerName || '');
              return f.includes('document.title') && f.includes('.login-logo') &&
                     f.includes('.header-title'); })());
+}
+
+// ── Section 104: choosing the implement is the user's call ──────────────────
+// Henrik, 2026-10-16: "Shrug can be done differently but I cant choose DB (as an
+// example)." The ⋯ menu lists whatever gear buttons the card has, and the DB button was
+// emitted only when isPressEx(name) matched /press|raise|fly|curl/. A Shrug matches
+// none of those, so the menu had no "Two dumbbells" row at all — the choice did not
+// exist, rather than being there and switched off.
+console.log('\n── Choosing the implement is the user’s call ──────────────');
+{
+  const HAVE = typeof G.canBeDumbbell === 'function';
+  check('canBeDumbbell exists', HAVE);
+  if (HAVE) {
+    check('the reported case: a Shrug can be two dumbbells',
+      G.canBeDumbbell('Shrug') === true && G._gearBtnsHtml('Shrug', 1, 1, 1).includes('>DB<'));
+    check('…and so can the others the old gate missed',
+      ['Dumbbell Row', 'Lunge', 'Pullover', 'Tricep Kickback', 'Upright Row', 'Reverse Fly']
+        .every(n => G.canBeDumbbell(n)),
+      ['Dumbbell Row', 'Lunge', 'Pullover', 'Tricep Kickback', 'Upright Row', 'Reverse Fly']
+        .filter(n => !G.canBeDumbbell(n)).join(', '));
+
+    check('a cable stack keeps its own toggles instead',
+      !G.canBeDumbbell('Cable Row') && !G.canBeDumbbell('Lat Pulldown') &&
+      G._gearBtnsHtml('Cable Row', 1, 1, 1).includes('2× cable'));
+    check('a name that states another implement does not offer it',
+      ['Barbell Row', 'Smith Machine Squat', 'Hack Squat', 'Leg Extension']
+        .every(n => !G.canBeDumbbell(n)),
+      ['Barbell Row', 'Smith Machine Squat', 'Hack Squat', 'Leg Extension']
+        .filter(n => G.canBeDumbbell(n)).join(', '));
+    // Leg Press, Leg Curl and Landmine Press match the OLD gate (/press/, /curl/) and so
+    // already offered DB before today. Keeping the gate a superset means they keep it —
+    // taking it away would be an unasked-for removal, not part of this fix.
+    check('…while the ones the old gate already allowed are untouched',
+      ['Leg Press', 'Leg Curl', 'Landmine Press'].every(n => G.canBeDumbbell(n)));
+    check('nothing to load, or bodyweight, offers nothing',
+      !G.canBeDumbbell('Plank') && !G.canBeDumbbell('Dead Bug') &&
+      !G.canBeDumbbell('Pull-ups') && !G.canBeDumbbell('Dips'));
+    check('an empty or missing name is not an exercise',
+      !G.canBeDumbbell('') && !G.canBeDumbbell(null) && !G.canBeDumbbell('   '));
+
+    // The point of the gate being a superset: nothing that offered DB before loses it.
+    check('every exercise the old gate allowed still gets DB',
+      ['Bench Press', 'Incline DB Press', 'Chest Machine Press', 'Lateral Raise',
+       'Cable Fly', 'Barbell Curl', 'Hammer Curl', 'Calf Raises', 'Y-Raise']
+        .every(n => G.canBeDumbbell(n)),
+      ['Bench Press', 'Incline DB Press', 'Chest Machine Press', 'Lateral Raise',
+       'Cable Fly', 'Barbell Curl', 'Hammer Curl', 'Calf Raises', 'Y-Raise']
+        .filter(n => !G.canBeDumbbell(n)).join(', '));
+
+    // A choice that is not remembered is not a choice.
+    check('a DB choice is read back for the exercises that just gained it',
+      (() => { G.localStorage.setItem('wk-db-Shrug', '2');
+               const st = G._savedGearState('Shrug');
+               G.localStorage.removeItem('wk-db-Shrug');
+               return st.db === 2; })());
+    check('…and an untouched exercise stays single',
+      G._savedGearState('Shrug').db === 1);
+  }
+
+  // The ⋯ menu is where the toggle is actually reachable from.
+  check('the ⋯ menu lists the card’s DB button as "Two dumbbells"',
+    String(G._exMenuHtml || '').includes('gear-slot button') &&
+    /\['data-db','Two dumbbells'/.test(fs.readFileSync(htmlPath, 'utf8')));
 }
 
 setImmediate(() => {
