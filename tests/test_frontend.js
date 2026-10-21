@@ -8158,6 +8158,26 @@ console.log('\n── Food log ────────────────�
   check('food log: deletes go through confirmGlobalDelete',
     /function flEditDelete[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && /function flRemoveKey[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && !/[^.]confirm\('/.test(_flBlock));
 
+  // Today's intake against the Macros tab's targets (2026-10-21).
+  const _flSaveT = G._macrosTargets;
+  G._flKey = {set: true, last4: 'WXYZ'}; G._flErr = ''; G._flPending = null; G._flBusy = false;
+  G._flRows = [{id: 'a', food: 'Steak', kcal: 280, protein: 46, carbs: 0, fat: 10}];
+  G._macrosTargets = {kcal: 2400, protein: 180};
+  let _flTg = G._flMainHtml();
+  check('food log: with targets, shows kcal and protein against them with what is left',
+    /Calories 280 of 2400 kcal/.test(_flTg) && /2120 kcal left/.test(_flTg) && /Protein 46 of 180 g/.test(_flTg) && /134 g left/.test(_flTg));
+  G._flRows = [{id: 'a', food: 'Feast', kcal: 2600, protein: 200, carbs: 0, fat: 10}];
+  _flTg = G._flMainHtml();
+  check('food log: past the target it says how far over, and the bar stops at full',
+    /200 kcal over/.test(_flTg) && /20 g over/.test(_flTg) && !/width:10[1-9]%/.test(_flTg));
+  G._macrosTargets = {kcal: null, protein: 180};
+  _flTg = G._flMainHtml();
+  check('food log: a target the Macros tab cannot compute is left out, not shown as 0',
+    !/Calories \d+ of/.test(_flTg) && /Protein 200 of 180 g/.test(_flTg));
+  G._macrosTargets = null;
+  check('food log: without targets only the totals show', !/ of \d+ /.test(G._flMainHtml()));
+  G._macrosTargets = _flSaveT; G._flRows = [];
+
   // Behaviour: the auto-save flow, in its own sandbox holding only this block, so
   // its recorded fetch cannot collide with the suite's other async tests.
   (async () => {
