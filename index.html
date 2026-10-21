@@ -445,6 +445,7 @@
 <nav class="navbar" id="navbar">
   <button class="navbtn active" id="navbtn-program"  onclick="switchPrimary('program')"><span class="navic">▤</span>Program</button>
   <button class="navbtn"        id="navbtn-log"      onclick="switchPrimary('log')"><span class="navic">◉</span>Log</button>
+  <button class="navbtn"        id="navbtn-macros"   onclick="switchPrimary('macros')"><span class="navic">◔</span>Macros</button>
   <button class="navbtn"        id="navbtn-history"  onclick="switchPrimary('history')"><span class="navic">⬡</span>History</button>
   <button class="navbtn"        id="navbtn-progress" onclick="switchPrimary('progress')"><span class="navic">∿</span>Progress</button>
   <button class="navbtn"        id="navbtn-more"     onclick="switchPrimary('more')"><span class="navic">≡</span>More</button>
@@ -783,8 +784,8 @@ const PAGE_DEFAULTS=Object.assign({program:true,log:true,macros:true,foodedit:tr
 // each grouping one or more page destinations; a secondary sub-tab strip appears only
 // when the active group has more than one visible destination (More → Settings/Storage).
 // Every legacy page id and showPage(id) call is preserved — this is an additive nav layer.
-const PRIMARY_GROUPS={program:['program'],log:['log','macros','foodedit'],history:['history'],progress:['progress'],more:['settings','storage']};
-const PRIMARY_ORDER=['program','log','history','progress','more'];
+const PRIMARY_GROUPS={program:['program'],log:['log'],macros:['macros','foodedit'],history:['history'],progress:['progress'],more:['settings','storage']};
+const PRIMARY_ORDER=['program','log','macros','history','progress','more'];
 function primaryOf(id){for(var _p in PRIMARY_GROUPS){if(PRIMARY_GROUPS[_p].indexOf(id)>=0)return _p;}return '';}
 let _pageVis={};let _currentPage='program';let _currentPrimary='program';let _lastSub={};
 function _subVisible(id){if(id==='settings')return true;if(!(id in PAGE_LABELS))return false;return!!_pageVis[id];}
