@@ -4080,7 +4080,7 @@ function _flMainHtml(){
     '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:15px;color:var(--text)"><b>'+t.kcal+' kcal</b><span>P '+t.protein+' g</span><span>C '+t.carbs+' g</span><span>F '+t.fat+' g</span></div>');
   var txt=_flPending?_flPending.text:'';
   h+=_flCard('<textarea id="fl-text" rows="3" placeholder="What did you eat? e.g. 202 g steak, 307 g boiled potato, 15 g butter" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-family:inherit">'+_flEsc(txt)+'</textarea>'+
-    '<input id="fl-photo" type="file" accept="image/*" style="display:none" onchange="flPhotoPicked(this)">'+
+    '<input id="fl-photo" type="file" accept="image/'+'*" style="display:none" onchange="flPhotoPicked(this)">'+
     '<div style="display:flex;gap:8px;margin-top:10px">'+
     (_flBusy?'<div style="font-size:14px;color:var(--muted);padding:10px 0">Estimating…</div>':
       _flBtn('Log','flSubmit()',true)+_flBtn('📷 Photo','document.getElementById(\'fl-photo\').click()',false))+
