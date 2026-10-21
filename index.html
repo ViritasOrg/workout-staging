@@ -4145,7 +4145,7 @@ function _flMainHtml(){
     '<div style="font-size:11px;color:var(--muted);margin-top:8px">A photo can be the food itself or its nutrition label; say how much you ate before tapping Log. Entries are saved as soon as they are estimated; fix them on the Food Edit tab.</div>'+
     (_flErr?'<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+' Nothing was saved.</div>'+(_flPending?'<div style="margin-top:8px">'+_flBtn('Try again','flRetry()',true)+'</div>':''):''));
   if(_flRows.length){
-    h+=_flCard(_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join(''));
+    h+=_flCard(_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+(r.time?'<span style="color:var(--muted);font-variant-numeric:tabular-nums;margin-right:8px">'+_flEsc(r.time)+'</span>':'')+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join(''));
   }
   h+='<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Anthropic key ending …'+_flEsc(_flKey&&_flKey.last4||'')+' · <span onclick="flRemoveKey()" style="text-decoration:underline;cursor:pointer">Remove</span></div>';
   return h;
@@ -4182,20 +4182,33 @@ async function _flSend(p){if(_flBusy)return;_flBusy=true;_flErr='';_flPending=p;
   catch(e){_flErr='Could not reach the server. Check your connection.';}
   _flBusy=false;_flRender();}
 // ── Food Edit tab ──
+// Every entry carries its amount, and correcting it rescales the entry (Henrik, 2026-10-21:
+// "each entry needs a grams total also, a typo for chicken breast should be possible to Edit
+// instead of forcing me to delete the line"). The amount is read from the stored text
+// ("300g", "115 g", "300ml"); anything else ("2 cups") has no number to scale from.
+function _flGrams(a){var m=String(a==null?'':a).match(/^\s*(\d+(?:[.,]\d+)?)\s*(g|ml)?\s*$/i);return m?{n:parseFloat(m[1].replace(',','.')),u:(m[2]||'g').toLowerCase()}:null;}
 function _flEditHtml(rows,date){
   var inp=function(id,f,v,w,num){return'<input id="fle-'+f+'-'+id+'" value="'+_flEsc(v)+'"'+(num?' inputmode="decimal"':'')+' style="width:'+w+';box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';};
   var h=_flCard('<div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;color:var(--muted)">Day</span><input id="fle-date" type="date" value="'+_flEsc(date)+'" onchange="buildFoodEdit(this.value)" style="padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px"></div>');
   if(!rows.length)return h+_flCard('<div style="font-size:13px;color:var(--muted)">Nothing logged on this day. Food is logged on the Macros tab.</div>');
   var t=_flTotals(rows);
-  h+='<div style="font-size:13px;color:var(--text);margin:0 0 10px 2px"><b>'+t.kcal+' kcal</b> · P '+t.protein+' · C '+t.carbs+' · F '+t.fat+'</div>';
-  rows.forEach(function(r){var id=_flEsc(r.id);
-    h+=_flCard(inp(id,'food',r.food,'100%')+
+  h+='<div style="font-size:13px;color:var(--text);margin:0 0 4px 2px"><b>'+t.kcal+' kcal</b> · P '+t.protein+' · C '+t.carbs+' · F '+t.fat+'</div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin:0 0 10px 2px">Change an amount and its kcal and macros rescale when you tap Save.</div>';
+  rows.forEach(function(r){var id=_flEsc(r.id);var g=_flGrams(r.amount);
+    h+=_flCard((r.time?'<div style="font-size:11px;color:var(--muted);margin-bottom:4px">'+_flEsc(r.time)+'</div>':'')+'<div style="display:flex;gap:6px;align-items:flex-end">'+'<div style="flex:1">'+inp(id,'food',r.food,'100%')+'</div>'+
+      '<label style="font-size:11px;color:var(--muted);width:92px">Amount ('+(g?g.u:'g')+')<input id="fle-grams-'+id+'" value="'+(g?g.n:'')+'" inputmode="decimal" placeholder="'+_flEsc(g?'':(r.amount||''))+'" style="width:100%;box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px"></label></div>'+
       '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;font-size:11px;color:var(--muted)"><label>kcal'+inp(id,'kcal',r.kcal,'100%',1)+'</label><label>Protein'+inp(id,'protein',r.protein,'100%',1)+'</label><label>Carbs'+inp(id,'carbs',r.carbs,'100%',1)+'</label><label>Fat'+inp(id,'fat',r.fat,'100%',1)+'</label></div>'+
       '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Save',"flEditSave('"+id+"')",true)+_flBtn('Delete',"flEditDelete('"+id+"')",false)+'</div>');});
   return h;}
 async function buildFoodEdit(date){_flEditDate=date||_flEditDate||_flDay();var rows=await _flLoadRows(_flEditDate);_flEditRows=rows||[];var el=document.getElementById('food-edit-body');if(el)el.innerHTML=rows?_flEditHtml(_flEditRows,_flEditDate):_flCard('<div style="font-size:13px;color:var(--muted)">Could not load the food log. Check your connection.</div>');}
 async function flEditSave(id){var g=function(f){var e=document.getElementById('fle-'+f+'-'+id);return e?e.value:'';};
   var body={food:String(g('food')).trim().slice(0,120),kcal:_flNum(g('kcal')),protein:_flNum(g('protein')),carbs:_flNum(g('carbs')),fat:_flNum(g('fat'))};
+  var row=_flEditRows.find(function(x){return String(x.id)===String(id);})||{};var g0=_flGrams(row.amount);var gNew=_flNum(String(g('grams')).replace(',','.'));
+  if(gNew>0){body.amount=gNew+' '+(g0?g0.u:'g');
+    // A corrected amount rescales the numbers, unless they were typed over too: then what
+    // was typed wins.
+    var same=['kcal','protein','carbs','fat'].every(function(k){return Math.abs(body[k]-_flNum(row[k]))<0.05;});
+    if(g0&&g0.n>0&&gNew!==g0.n&&same)['kcal','protein','carbs','fat'].forEach(function(k){body[k]=_flNum(_flNum(row[k])*gNew/g0.n);});}
   try{var r=await fetch(AGENT_URL+'/food-log/'+encodeURIComponent(id),{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(body)});if(!r.ok){alert('Not saved: the server answered '+r.status+'.');return;}}catch(e){alert('Not saved: could not reach the server.');return;}
   buildFoodEdit(_flEditDate);}
 async function flEditDelete(id){if(!confirmGlobalDelete('this food entry'))return;
