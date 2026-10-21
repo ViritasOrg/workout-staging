@@ -446,7 +446,7 @@ try {
 } catch(e) {
   check('initTabVis does not throw with empty localStorage', false, e.message);
 }
-check('initTabVis: program tab on by default',  G._pageVis.program  === true);
+check('initTabVis: today and plan tabs on by default',  G._pageVis.today  === true && G._pageVis.plan === true);
 check('initTabVis: log tab on by default',       G._pageVis.log      === true);
 check('initTabVis: history tab on by default',   G._pageVis.history  === true);
 check('initTabVis: progress tab on by default',  G._pageVis.progress === true);
@@ -2728,17 +2728,17 @@ console.log('\n── Storage inspector ─────────────�
 // ── Section 59: Programs card lives in Program tab, not Settings ──────────────
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const progPageStart = src.indexOf('id="page-program"');
-  const progPageEnd = src.indexOf('id="page-log"');
-  const progPageHtml = progPageStart >= 0 && progPageEnd > progPageStart ? src.slice(progPageStart, progPageEnd) : '';
+  const planPageStart = src.indexOf('id="page-plan"');
+  const planPageEnd = src.indexOf('id="page-log"');
+  const planPageHtml = planPageStart >= 0 && planPageEnd > planPageStart ? src.slice(planPageStart, planPageEnd) : '';
   const settingsPageStart = src.indexOf('id="page-settings"');
   const settingsHtml = settingsPageStart >= 0 ? src.slice(settingsPageStart, settingsPageStart + 2000) : '';
-  check('s-programs-card div is inside page-program',
-    progPageHtml.includes('id="s-programs-card"'));
+  check('s-programs-card div is inside page-plan',
+    planPageHtml.includes('id="s-programs-card"'));
   check('s-programs-card div is NOT inside page-settings',
     !settingsHtml.includes('id="s-programs-card"'));
   check('showPage calls buildProgramSettingsCard when navigating to program tab',
-    src.includes("name==='program')buildProgramSettingsCard()"));
+    src.includes("name==='today'||name==='plan')buildProgramSettingsCard()"));
   check('loadSettings does not call buildProgramSettingsCard (card is in Program tab)',
     !src.slice(src.indexOf('async function loadSettings('), src.indexOf('async function loadSettings(') + 4000).includes('buildProgramSettingsCard()'));
 }
@@ -3632,16 +3632,16 @@ console.log('\n── Name-keyed drafts / leg-day prehab strip ─────�
 console.log('\n── Bottom navbar / PLASMA GUI port ─────────────────────────');
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  check('fixed bottom navbar markup exists with 5 primaries',
-    ['navbtn-program', 'navbtn-log', 'navbtn-history', 'navbtn-progress', 'navbtn-more']
+  check('fixed bottom navbar markup exists with 6 primaries',
+    ['navbtn-today', 'navbtn-plan', 'navbtn-log', 'navbtn-history', 'navbtn-progress', 'navbtn-more']
       .every(id => src.includes('id="' + id + '"')));
-  check('navbar buttons call switchPrimary', src.includes("switchPrimary('more')") && src.includes("switchPrimary('program')"));
+  check('navbar buttons call switchPrimary', src.includes("switchPrimary('more')") && src.includes("switchPrimary('today')"));
   check('navbar CSS is fixed to bottom with safe-area inset',
     src.includes('.navbar{position:fixed;bottom:0') && src.includes('env(safe-area-inset-bottom'));
   check('navbtn active indicator bar (::before) present', src.includes('.navbtn.active::before'));
   check('old top-nav markup removed', !src.includes('nav-btn-program') && !src.includes('class="nav-btn'));
   check('sub-tab strip exists with tab-btn-* ids (legacy page ids preserved)',
-    src.includes('id="subtabs"') && src.includes('id="tab-btn-program"') && src.includes('id="tab-btn-settings"'));
+    src.includes('id="subtabs"') && src.includes('id="tab-btn-today"') && src.includes('id="tab-btn-plan"') && src.includes('id="tab-btn-settings"'));
   check('PRIMARY_GROUPS groups settings+storage under more',
     JSON.stringify(G.PRIMARY_GROUPS.more) === JSON.stringify(['settings', 'storage']));
   check('every PAGE_LABELS page belongs to a primary group',
@@ -3687,7 +3687,7 @@ console.log('\n── Swipe navigation between top-level tabs ──────
   check('swipe: view follows finger via translateX', /av\.style\.transform='translateX\(/.test(rawScript));
   check('swipe: rubber-band resistance at the ends', rawScript.includes('dx*0.28'));
   if (typeof G._navSwipeTarget === 'function') {
-    const order = ['program','log','history','progress','more']; // mirrors PRIMARY_ORDER (const, not exported to sandbox)
+    const order = ['today','plan','log','history','progress','more']; // mirrors PRIMARY_ORDER (const, not exported to sandbox)
     check('swipe next from first → second', G._navSwipeTarget(order, order[0], 1) === order[1]);
     check('swipe prev from second → first', G._navSwipeTarget(order, order[1], -1) === order[0]);
     check('no wrap past last tab', G._navSwipeTarget(order, order[order.length-1], 1) === null);
