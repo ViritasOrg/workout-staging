@@ -8158,6 +8158,26 @@ console.log('\n── Food log ────────────────�
   check('food log: deletes go through confirmGlobalDelete',
     /function flEditDelete[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && /function flRemoveKey[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && !/[^.]confirm\('/.test(_flBlock));
 
+  // Today's intake against the Macros tab's targets (2026-10-21).
+  const _flSaveT = G._macrosTargets;
+  G._flKey = {set: true, last4: 'WXYZ'}; G._flErr = ''; G._flPending = null; G._flBusy = false;
+  G._flRows = [{id: 'a', food: 'Steak', kcal: 280, protein: 46, carbs: 0, fat: 10}];
+  G._macrosTargets = {kcal: 2400, protein: 180};
+  let _flTg = G._flMainHtml();
+  check('food log: with targets, shows kcal and protein against them with what is left',
+    /Calories 280 of 2400 kcal/.test(_flTg) && /2120 kcal left/.test(_flTg) && /Protein 46 of 180 g/.test(_flTg) && /134 g left/.test(_flTg));
+  G._flRows = [{id: 'a', food: 'Feast', kcal: 2600, protein: 200, carbs: 0, fat: 10}];
+  _flTg = G._flMainHtml();
+  check('food log: past the target it says how far over, and the bar stops at full',
+    /200 kcal over/.test(_flTg) && /20 g over/.test(_flTg) && !/width:10[1-9]%/.test(_flTg));
+  G._macrosTargets = {kcal: null, protein: 180};
+  _flTg = G._flMainHtml();
+  check('food log: a target the Macros tab cannot compute is left out, not shown as 0',
+    !/Calories \d+ of/.test(_flTg) && /Protein 200 of 180 g/.test(_flTg));
+  G._macrosTargets = null;
+  check('food log: without targets only the totals show', !/ of \d+ /.test(G._flMainHtml()));
+  G._macrosTargets = _flSaveT; G._flRows = [];
+
   // Behaviour: the auto-save flow, in its own sandbox holding only this block, so
   // its recorded fetch cannot collide with the suite's other async tests.
   (async () => {
@@ -8209,6 +8229,60 @@ console.log('\n── Food log ────────────────�
     check('food edit: a confirmed delete calls DELETE /food-log/<id>', calls.some(c => c.m === 'DELETE' && /\/food-log\/n1$/.test(c.url)));
     if (failed > 0) process.exitCode = 1;
   })().catch(e => { check('food log: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
+// ── Macro targets: suggested by /macro-targets, with a manual override (2026-10-21) ──
+console.log('\n── Macro targets (suggested + override) ───────────────────');
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Macro targets (Workout) ──'), _src.indexOf('// ── Food log (Macros) ──'));
+  check('macro targets: no calorie model in this app, only the backend\'s',
+    _blk.length > 500 && /\/macro-targets\?/.test(_blk) && !/370\s*\+\s*21\.6|6\.25\s*\*|\*\s*1\.4\b/.test(_blk));
+  const ls = {}, calls = [], pushed = [], els = {};
+  let fail = false;
+  const served = {kcal: 2450, protein: 225, carbs: 205, fat: 81, tdee: 2750, phaseOffset: -300, missing: []};
+  const T = vm.createContext({console, Promise, JSON, Math, String, Number, parseInt, parseFloat, isFinite,
+    AGENT_URL: 'https://agent', authHeaders: () => ({}),
+    getData: (k, d) => (k in ls ? JSON.parse(ls[k]) : d), setData: (k, v) => { ls[k] = JSON.stringify(v); },
+    pushSettingsToAgent: (kv) => pushed.push(kv), _flRender: () => {},
+    document: {getElementById: id => { if (!els[id]) { let h = ''; els[id] = {value: ''}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async (url) => { calls.push(url);
+      if (/training-energy/.test(url)) return {ok: true, json: async () => ({avg_per_calendar_day: 310})};
+      if (fail) return {ok: false, json: async () => ({})};
+      return {ok: true, json: async () => Object.assign({}, served)}; },
+  });
+  vm.runInContext('var weights=[{date:"2026-10-01",weight:88},{date:"2026-10-20",weight:85.2}];var bfLog=[{date:"2026-10-10",bf:16}];' + _blk, T);
+  ls['wkt-profile'] = JSON.stringify({gender: 'female', height: 168, age: 38});
+  (async () => {
+    await T.buildWkMacroTargets();
+    const q = calls.find(u => /macro-targets/.test(u)) || '';
+    check('macro targets: suggested from the profile, latest weight, body fat and training burn',
+      /bw=85\.2/.test(q) && /sex=female/.test(q) && /height_cm=168/.test(q) && /age=38/.test(q) && /body_fat_pct=16/.test(q) && /train_kcal=310/.test(q) && /phase=recomp/.test(q) && /on_androgens=false/.test(q));
+    const h = els['wk-macro-targets'].innerHTML;
+    check('macro targets: shows the suggestion and offers a phase choice', /2450/.test(h) && /225 g/.test(h) && /setWkMacroPhase\('cut'\)/.test(h) && /Set my own targets instead/.test(h));
+    check('macro targets: the food log reads the suggestion', T._macrosTargets && T._macrosTargets.kcal === 2450 && T._macrosTargets.protein === 225);
+    calls.length = 0;
+    await T.setWkMacroPhase('cut');
+    check('macro targets: changing phase is saved to the account and asks again',
+      pushed.some(p => p['wkt-macro-phase'] === 'cut') && calls.some(u => /phase=cut/.test(u)));
+    T._wkOverrideOpen = true; T._wkRenderTargets();
+    T.document.getElementById('wk-tg-kcal').value = '3100'; T.document.getElementById('wk-tg-protein').value = '';
+    T.saveWkMacroTargets();
+    check('macro targets: the manual override wins and is saved to the account',
+      T._macrosTargets.kcal === 3100 && T._macrosTargets.protein === null && pushed.some(p => p['wkt-macro-targets'] && p['wkt-macro-targets'].kcal === 3100) &&
+      /Using your own targets/.test(els['wk-macro-targets'].innerHTML) && /Use suggested/.test(els['wk-macro-targets'].innerHTML));
+    T.clearWkMacroOverride();
+    check('macro targets: "Use suggested" returns to the suggestion',
+      T._macrosTargets.kcal === 2450 && pushed.some(p => 'wkt-macro-targets' in p && p['wkt-macro-targets'] === null));
+    served.kcal = null; served.missing = ['body fat %', 'or height and age']; T._wkSuggest = null; T._wkSuggestQ = '';
+    await T._wkFetchSuggest();
+    check('macro targets: an incomplete profile says what to add, never a guessed number',
+      /No calorie target yet/.test(els['wk-macro-targets'].innerHTML) && /Settings → Profile/.test(els['wk-macro-targets'].innerHTML));
+    fail = true; T._wkSuggest = null; T._wkSuggestQ = '';
+    await T._wkFetchSuggest();
+    check('macro targets: when the backend cannot be reached it says so', /Could not load suggested targets/.test(els['wk-macro-targets'].innerHTML));
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('macro targets: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
 setImmediate(() => {
