@@ -3627,8 +3627,8 @@ console.log('\n── Name-keyed drafts / leg-day prehab strip ─────�
 console.log('\n── Bottom navbar / PLASMA GUI port ─────────────────────────');
 {
   const src = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  check('fixed bottom navbar markup exists with 5 primaries',
-    ['navbtn-program', 'navbtn-log', 'navbtn-history', 'navbtn-progress', 'navbtn-more']
+  check('fixed bottom navbar markup exists with 6 primaries',
+    ['navbtn-program', 'navbtn-log', 'navbtn-macros', 'navbtn-history', 'navbtn-progress', 'navbtn-more']
       .every(id => src.includes('id="' + id + '"')));
   check('navbar buttons call switchPrimary', src.includes("switchPrimary('more')") && src.includes("switchPrimary('program')"));
   check('navbar CSS is fixed to bottom with safe-area inset',
@@ -3637,6 +3637,11 @@ console.log('\n── Bottom navbar / PLASMA GUI port ────────�
   check('old top-nav markup removed', !src.includes('nav-btn-program') && !src.includes('class="nav-btn'));
   check('sub-tab strip exists with tab-btn-* ids (legacy page ids preserved)',
     src.includes('id="subtabs"') && src.includes('id="tab-btn-program"') && src.includes('id="tab-btn-settings"'));
+  // Henrik, 2026-10-21: "Own tab!" — Macros is its own bottom-bar button, with Food Edit inside it.
+  check('Macros is its own primary, with Food Edit as its sub-tab, after Log',
+    JSON.stringify(G.PRIMARY_GROUPS.macros) === JSON.stringify(['macros', 'foodedit']) &&
+    JSON.stringify(G.PRIMARY_GROUPS.log) === JSON.stringify(['log']) &&
+    /const PRIMARY_ORDER=\['program','log','macros','history','progress','more'\]/.test(src));
   check('PRIMARY_GROUPS groups settings+storage under more',
     JSON.stringify(G.PRIMARY_GROUPS.more) === JSON.stringify(['settings', 'storage']));
   check('every PAGE_LABELS page belongs to a primary group',
@@ -3682,7 +3687,7 @@ console.log('\n── Swipe navigation between top-level tabs ──────
   check('swipe: view follows finger via translateX', /av\.style\.transform='translateX\(/.test(rawScript));
   check('swipe: rubber-band resistance at the ends', rawScript.includes('dx*0.28'));
   if (typeof G._navSwipeTarget === 'function') {
-    const order = ['program','log','history','progress','more']; // mirrors PRIMARY_ORDER (const, not exported to sandbox)
+    const order = ['program','log','macros','history','progress','more']; // mirrors PRIMARY_ORDER (const, not exported to sandbox)
     check('swipe next from first → second', G._navSwipeTarget(order, order[0], 1) === order[1]);
     check('swipe prev from second → first', G._navSwipeTarget(order, order[1], -1) === order[0]);
     check('no wrap past last tab', G._navSwipeTarget(order, order[order.length-1], 1) === null);
