@@ -8302,6 +8302,51 @@ console.log('\n── Macro targets (suggested + override) ───────
   })().catch(e => { check('macro targets: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
+// ── Food log: a photo is attached, then Log sends it with the typed amount (2026-10-21) ──
+// Henrik: a photo of a 500 g tub of cottage cheese was logged as the whole tub, with no way
+// to say he ate 115 g. Picking a photo must not send anything on its own.
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
+  const calls = [], els = {};
+  const P = vm.createContext({console, Promise, JSON, Math, String, Number, encodeURIComponent,
+    AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
+    document: {getElementById: (id) => { if (!els[id]) { let h = ''; els[id] = {value: ''}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async (url, opt) => { calls.push({url, body: opt && opt.body ? JSON.parse(opt.body) : null});
+      if (/estimate$/.test(url)) return {ok: true, status: 200, json: async () => ({ok: true, rows: [{id: 'c1', food: 'Cottage cheese', amount: '115 g', kcal: 83}]})};
+      if (/\?date=/.test(url)) return {ok: true, status: 200, json: async () => [{id: 'c1', food: 'Cottage cheese', amount: '115 g', kcal: 83}]};
+      return {ok: true, status: 200, json: async () => ({})}; },
+  });
+  vm.runInContext(_blk, P);
+  P._flShrink = async () => 'UEhPVE8=';
+  P._flKey = {set: true, last4: 'WXYZ'};
+  (async () => {
+    P.document.getElementById('fl-text').value = '';
+    await P.flPhotoPicked({files: [{}], value: 'x'});
+    let h = els['food-log-body'].innerHTML;
+    check('food log: picking a photo sends nothing on its own', calls.length === 0);
+    check('  …it shows the photo as attached, with Remove, and asks how much was eaten',
+      /Photo attached/.test(h) && /flClearPhoto\(\)/.test(h) && /How much of it did you eat/.test(h) && /data:image\/jpeg;base64,UEhPVE8=/.test(h));
+    P.document.getElementById('fl-text').value = '115 g';
+    await P.flSubmit();
+    const est = calls.find(c => /estimate$/.test(c.url));
+    check('  …and Log sends the photo together with the typed amount, once',
+      calls.filter(c => /estimate$/.test(c.url)).length === 1 && est.body.text === '115 g' && est.body.image_b64 === 'UEhPVE8=' && est.body.media_type === 'image/jpeg');
+    h = els['food-log-body'].innerHTML;
+    check('  …after it is saved, the photo is cleared for the next entry', P._flPhoto === '' && !/Photo attached/.test(h));
+    await P.flPhotoPicked({files: [{}], value: 'x'});
+    P.document.getElementById('fl-text').value = 'half of it';
+    P.flClearPhoto();
+    check('  …Remove drops the photo but keeps what was typed',
+      P._flPhoto === '' && />half of it<\/textarea>/.test(els['food-log-body'].innerHTML));
+    calls.length = 0;
+    P.document.getElementById('fl-text').value = '   ';
+    await P.flSubmit();
+    check('  …Log with no text and no photo sends nothing', calls.length === 0);
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('food log photo: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
