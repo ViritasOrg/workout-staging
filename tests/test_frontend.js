@@ -8347,6 +8347,64 @@ console.log('\n── Macro targets (suggested + override) ───────
   })().catch(e => { check('food log photo: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
+// ── Food Edit: every entry has an editable amount, and correcting it rescales (2026-10-21) ──
+// Henrik: "each entry needs a grams total also, a typo for chicken breast should be possible
+// to Edit instead of forcing me to delete the line".
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
+  const puts = [], els = {};
+  const E = vm.createContext({console, Promise, JSON, Math, String, Number, parseFloat, encodeURIComponent,
+    AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
+    document: {getElementById: (id) => { if (!els[id]) { let h = ''; els[id] = {value: ''}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async (url, opt) => { if (opt && opt.method === 'PUT') puts.push({url, body: JSON.parse(opt.body)});
+      return {ok: true, status: 200, json: async () => []}; },
+  });
+  vm.runInContext(_blk, E);
+  const chick = {id: 'k1', food: 'Raw chicken breast', amount: '300g', kcal: 330, protein: 69, carbs: 0, fat: 4};
+  const coffee = {id: 'k2', food: 'Coffee', amount: '300ml', kcal: 68, protein: 5, carbs: 7, fat: 2};
+  const cups = {id: 'k3', food: 'Tea', amount: '2 cups', kcal: 4, protein: 0, carbs: 1, fat: 0};
+  const html = E._flEditHtml([chick, coffee, cups], '2026-10-21');
+  check('food edit: every entry shows its amount, in its own unit',
+    /id="fle-grams-k1" value="300"/.test(html) && /Amount \(g\)/.test(html) && /id="fle-grams-k2" value="300"/.test(html) && /Amount \(ml\)/.test(html));
+  check('  …an amount with no number to scale from is left empty, with the stored text as a hint',
+    /id="fle-grams-k3" value="" inputmode="decimal" placeholder="2 cups"/.test(html));
+  const fill = (r, grams, over) => { E._flEditRows = [chick, coffee, cups]; const v = Object.assign({food: r.food, kcal: r.kcal, protein: r.protein, carbs: r.carbs, fat: r.fat, grams}, over || {});
+    Object.keys(v).forEach(k => { E.document.getElementById('fle-' + k + '-' + r.id).value = String(v[k]); }); };
+  (async () => {
+    E._flEditRows = [chick, coffee, cups];
+    fill(chick, '200'); await E.flEditSave('k1');
+    let b = puts[0] && puts[0].body;
+    check('  …correcting 300 g to 200 g rescales kcal and macros by 2/3 and stores the new amount',
+      b && b.amount === '200 g' && b.kcal === 220 && b.protein === 46 && b.carbs === 0 && b.fat === 2.7, JSON.stringify(b));
+    puts.length = 0; fill(chick, '200', {kcal: 250}); await E.flEditSave('k1');
+    b = puts[0] && puts[0].body;
+    check('  …but numbers typed over by hand are kept as typed', b && b.amount === '200 g' && b.kcal === 250 && b.protein === 69, JSON.stringify(b));
+    puts.length = 0; fill(coffee, '150'); await E.flEditSave('k2');
+    b = puts[0] && puts[0].body;
+    check('  …ml stays ml', b && b.amount === '150 ml' && b.kcal === 34, JSON.stringify(b));
+    puts.length = 0; fill(cups, '500'); await E.flEditSave('k3');
+    b = puts[0] && puts[0].body;
+    check('  …an amount added where there was none is stored without guessing a rescale', b && b.amount === '500 g' && b.kcal === 4, JSON.stringify(b));
+    puts.length = 0; fill(chick, '300'); await E.flEditSave('k1');
+    b = puts[0] && puts[0].body;
+    check('  …an unchanged amount changes nothing', b && b.amount === '300 g' && b.kcal === 330 && b.protein === 69, JSON.stringify(b));
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('food edit grams: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
+// ── Food log: each entry shows when it was logged (2026-10-21) ──
+// Henrik: "show time of logged entry in the list, it helps to check when one ate last".
+{
+  G._flKey = {set: true, last4: 'WXYZ'}; G._flErr = ''; G._flPending = null; G._flBusy = false;
+  G._flRows = [{id: 't1', time: '07:40', food: 'Oats', amount: '80 g', kcal: 300}, {id: 't2', time: '', food: 'Daily total', amount: '', kcal: 2000}];
+  const _h = G._flMainHtml();
+  check('food log: the list shows each entry\'s time before the food', /07:40<\/span>Oats/.test(_h));
+  check('  …and an entry with no time (an imported daily total) shows none', /<span>Daily total/.test(_h));
+  check('food edit: each card shows its time', />07:40<\/div>/.test(G._flEditHtml([G._flRows[0]], '2026-10-21')));
+  G._flRows = [];
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
