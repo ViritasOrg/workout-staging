@@ -8120,6 +8120,97 @@ console.log('\n── Choosing the implement is the user’s call ────�
     /\['data-db','Two dumbbells'/.test(fs.readFileSync(htmlPath, 'utf8')));
 }
 
+// ── Food log (Macros): the shared block, 2026-10-21 ─────────────────────────
+// Same block as the other app; both talk to /food-log on the backend.
+console.log('\n── Food log ───────────────────────────────────────────────');
+{
+  const _flSrc = fs.readFileSync(htmlPath, 'utf8');
+  const _flBlock = _flSrc.slice(_flSrc.indexOf('// ── Food log (Macros)'), _flSrc.indexOf('// ── end food log ──'));
+  check('food log: block present', _flBlock.length > 1000);
+  check('food log: nothing kept in localStorage (backend is the record)',
+    !/localStorage\.|setData\(/.test(_flBlock));
+  check('food log: the eating day before 04:00 is the day before',
+    G._flDay(new Date(2026, 9, 22, 2, 30)) === '2026-10-21' && G._flDay(new Date(2026, 9, 22, 4, 0)) === '2026-10-22');
+  check('food log: totals add every row and round',
+    JSON.stringify(G._flTotals([{kcal: 280, protein: 46, carbs: 0, fat: 10}, {kcal: 264.2, protein: 5.8, carbs: 61, fat: 0.3}])) ===
+    JSON.stringify({kcal: 544, protein: 52, carbs: 61, fat: 10}));
+  const _flGuide = G._flGuideHtml();
+  check('food log: without a key the screen explains how to get one, in Chrome',
+    /console\.anthropic\.com/.test(_flGuide) && /Chrome/.test(_flGuide) && /sk-ant-/.test(_flGuide) && /flSaveKey\(\)/.test(_flGuide));
+  check('food log: the guide offers no way to log food', !/flSubmit\(/.test(_flGuide));
+  G._flKey = {set: true, last4: 'WXYZ'};
+  G._flRows = [{id: 'a', food: 'Steak <b>', amount: '202 g', kcal: 280, protein: 46, carbs: 0, fat: 10}];
+  G._flErr = ''; G._flPending = null; G._flBusy = false;
+  let _flMain = G._flMainHtml();
+  check('food log: with a key: text box, Log, Photo and today\'s total',
+    /id="fl-text"/.test(_flMain) && /flSubmit\(\)/.test(_flMain) && /fl-photo/.test(_flMain) && /280 kcal/.test(_flMain) && /P 46 g/.test(_flMain));
+  check('food log: the key is shown only by its last 4 characters, with Remove',
+    /ending …WXYZ/.test(_flMain) && /flRemoveKey\(\)/.test(_flMain));
+  check('food log: food names are escaped', _flMain.indexOf('Steak <b>') < 0 && _flMain.indexOf('Steak &lt;b&gt;') >= 0);
+  G._flErr = 'Anthropic error 500. Try again.'; G._flPending = {text: '2 eggs', image_b64: ''};
+  _flMain = G._flMainHtml();
+  check('food log: a failure says nothing was saved, keeps the input and offers one-tap retry',
+    /Nothing was saved/.test(_flMain) && /flRetry\(\)/.test(_flMain) && />2 eggs<\/textarea>/.test(_flMain));
+  G._flErr = ''; G._flPending = null;
+  const _flEdit = G._flEditHtml([{id: 'r1', food: 'Steak', kcal: 280, protein: 46, carbs: 0, fat: 10}], '2026-10-21');
+  check('food edit: each row can be saved and deleted', /flEditSave\('r1'\)/.test(_flEdit) && /flEditDelete\('r1'\)/.test(_flEdit));
+  check('food edit: an empty day says where food is logged', /Macros tab/.test(G._flEditHtml([], '2026-10-21')));
+  check('food log: deletes go through confirmGlobalDelete',
+    /function flEditDelete[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && /function flRemoveKey[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && !/[^.]confirm\('/.test(_flBlock));
+
+  // Behaviour: the auto-save flow, in its own sandbox holding only this block, so
+  // its recorded fetch cannot collide with the suite's other async tests.
+  (async () => {
+    const calls = [];
+    let estimateOk = true;
+    const els = {};
+    const F = vm.createContext({
+      AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true,
+      alert: () => {}, Promise, JSON, Date, Math, String, Number, encodeURIComponent, console,
+      document: {getElementById: (id) => {
+        if (!els[id]) { let h = ''; els[id] = {value: id === 'fl-text' ? '2 eggs' : '', files: null, click() {}}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); }
+        return els[id];
+      }},
+      fetch: async (url, opt) => {
+        const m = (opt && opt.method) || 'GET';
+        calls.push({url, m, body: opt && opt.body ? JSON.parse(opt.body) : null});
+        if (/\/food-log\/key$/.test(url)) return {ok: true, status: 200, json: async () => ({set: true, last4: 'WXYZ'})};
+        if (/\/food-log\/estimate$/.test(url)) return estimateOk
+          ? {ok: true, status: 200, json: async () => ({ok: true, rows: [{id: 'n1', food: 'Egg', kcal: 140, protein: 12, carbs: 1, fat: 10}]})}
+          : {ok: false, status: 502, json: async () => ({detail: 'Anthropic error 500. Try again.'})};
+        if (/\/food-log\?date=/.test(url)) return {ok: true, status: 200, json: async () => (estimateOk ? [{id: 'n1', food: 'Egg', kcal: 140, protein: 12, carbs: 1, fat: 10}] : [])};
+        return {ok: true, status: 200, json: async () => ({})};
+      },
+    });
+    vm.runInContext(_flBlock, F);
+    await F.buildFoodLog();
+    check('food log: opening the tab reads the key, then today\'s rows',
+      calls[0] && /\/food-log\/key$/.test(calls[0].url) && calls[1] && /\/food-log\?date=\d{4}-\d\d-\d\d$/.test(calls[1].url));
+    check('food log: with a key the screen shows today\'s total', /140 kcal/.test(els['food-log-body'].innerHTML));
+    calls.length = 0;
+    await F._flSend({text: '2 eggs', image_b64: ''});
+    const est = calls.find(c => /estimate$/.test(c.url));
+    check('food log: Log posts the text once, with the eating day and time, and no confirm step',
+      calls.filter(c => /estimate$/.test(c.url)).length === 1 && est.m === 'POST' && est.body.text === '2 eggs' &&
+      /^\d{4}-\d\d-\d\d$/.test(est.body.date) && /^\d\d:\d\d$/.test(est.body.time) && !est.body.image_b64);
+    check('food log: after a save the input is cleared for the next entry', F._flPending === null);
+    estimateOk = false; calls.length = 0;
+    await F._flSend({text: '2 eggs', image_b64: 'aGk='});
+    const est2 = calls.find(c => /estimate$/.test(c.url));
+    check('food log: a photo is sent as a JPEG', est2 && est2.body.image_b64 === 'aGk=' && est2.body.media_type === 'image/jpeg');
+    check('food log: a failed estimate shows the server\'s reason and keeps the input for retry',
+      /Anthropic error 500/.test(els['food-log-body'].innerHTML) && F._flPending && F._flPending.text === '2 eggs' && /flRetry\(\)/.test(els['food-log-body'].innerHTML));
+    calls.length = 0;
+    F.confirmGlobalDelete = () => false;
+    await F.flEditDelete('n1');
+    check('food edit: a cancelled delete sends nothing', calls.length === 0);
+    F.confirmGlobalDelete = () => true;
+    await F.flEditDelete('n1');
+    check('food edit: a confirmed delete calls DELETE /food-log/<id>', calls.some(c => c.m === 'DELETE' && /\/food-log\/n1$/.test(c.url)));
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('food log: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
