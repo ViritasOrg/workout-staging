@@ -4096,7 +4096,8 @@ function clearWkMacroOverride(){setData('wkt-macro-targets',null);pushSettingsTo
 // Henrik, 2026-10-21: type what you ate or take a photo, it is estimated and SAVED
 // straight away (no confirm step); corrections live on the separate Food Edit tab.
 // The same block is in Peptide Tracker and Workout, which share one log on the
-// backend (/food-log). Estimates run on the user's OWN Anthropic key, so a user
+// backend (/food-log). Estimates run on the user's OWN key — a free Google Gemini key by
+// default (Henrik, 2026-10-21), or an Anthropic key — so a user
 // without one only sees how to add it. Nothing here is cached on the device.
 var _flKey=null,_flRows=[],_flBusy=false,_flErr='',_flPending=null,_flEditRows=[],_flEditDate='';
 // A picked photo is ATTACHED, not sent (Henrik, 2026-10-21: a photo of a 500 g tub was logged as
@@ -4117,15 +4118,22 @@ function _flTargetsHtml(t){var g=(typeof _macrosTargets!=='undefined')?_macrosTa
 function _flCard(inner){return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">'+inner+'</div>';}
 function _flBtn(label,onclick,primary){return'<button onclick="'+onclick+'" style="background:'+(primary?'var(--accent)':'var(--surface2)')+';color:'+(primary?'#000':'var(--text)')+';border:1px solid '+(primary?'transparent':'var(--border)')+';border-radius:10px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';}
 function _flGuideHtml(){
+  var a=function(u){return'<a href="'+u+'" target="_blank" rel="noopener" style="color:var(--accent)">'+u+'</a>';};
   return _flCard('<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Turn on food logging</div>'+
-    '<div style="font-size:13px;color:var(--text);line-height:1.55">Food logging estimates calories and macros with Claude, paid by your own Anthropic account (a few hundredths of a cent per entry). To turn it on:'+
+    '<div style="font-size:13px;color:var(--text);line-height:1.55">Food logging estimates calories and macros with AI on your own API key. A Google Gemini key is free:'+
     '<ol style="margin:8px 0 8px 18px;padding:0">'+
-    '<li>Open <a href="https://console.anthropic.com" target="_blank" rel="noopener" style="color:var(--accent)">https://console.anthropic.com</a> in Chrome and sign in or create an account.</li>'+
+    '<li>Open '+a('https://aistudio.google.com/apikey')+' in Chrome and sign in with your Google account.</li>'+
+    '<li>Tap <b>Create API key</b>, accepting the terms if asked.</li>'+
+    '<li>Copy the key. It starts with <code>AIza</code>.</li>'+
+    '<li>Paste it below and tap <b>Save key</b>.</li></ol>'+
+    '<details style="margin-bottom:6px"><summary style="cursor:pointer;color:var(--muted)">Use Anthropic (Claude) instead, paid</summary>'+
+    '<ol style="margin:8px 0 8px 18px;padding:0">'+
+    '<li>Open '+a('https://console.anthropic.com')+' in Chrome and sign in or create an account.</li>'+
     '<li>Under <b>Billing</b>, add a payment method and a small amount of credit.</li>'+
     '<li>Under <b>API keys</b>, tap <b>Create key</b> and copy it. It starts with <code>sk-ant-</code>.</li>'+
-    '<li>Paste it below and tap <b>Save key</b>.</li></ol>'+
+    '<li>Paste it below and tap <b>Save key</b>.</li></ol></details>'+
     'Your key is stored encrypted on the server and is only ever shown again as its last 4 characters.</div>'+
-    '<input id="fl-key-in" type="password" autocomplete="off" placeholder="sk-ant-…" style="width:100%;box-sizing:border-box;margin:10px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">'+
+    '<input id="fl-key-in" type="password" autocomplete="off" placeholder="AIza…" style="width:100%;box-sizing:border-box;margin:10px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">'+
     _flBtn('Save key','flSaveKey()',true)+
     (_flErr?'<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+'</div>':''));
 }
@@ -4147,7 +4155,7 @@ function _flMainHtml(){
   if(_flRows.length){
     h+=_flCard(_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+(r.time?'<span style="color:var(--muted);font-variant-numeric:tabular-nums;margin-right:8px">'+_flEsc(r.time)+'</span>':'')+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join(''));
   }
-  h+='<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Anthropic key ending …'+_flEsc(_flKey&&_flKey.last4||'')+' · <span onclick="flRemoveKey()" style="text-decoration:underline;cursor:pointer">Remove</span></div>';
+  h+='<div style="font-size:12px;color:var(--muted);margin-bottom:14px">'+(_flKey&&_flKey.provider==='gemini'?'Gemini':'Anthropic')+' key ending …'+_flEsc(_flKey&&_flKey.last4||'')+' · <span onclick="flRemoveKey()" style="text-decoration:underline;cursor:pointer">Remove</span></div>';
   return h;
 }
 function _flRender(){var el=document.getElementById('food-log-body');if(!el)return;el.innerHTML=(_flKey&&_flKey.set)?_flMainHtml():(_flKey?_flGuideHtml():_flCard('<div style="font-size:13px;color:var(--muted)">The food log could not be loaded. Check your connection and open this tab again.</div>'));}
@@ -4162,7 +4170,7 @@ async function flSaveKey(){var el=document.getElementById('fl-key-in');var k=el?
   try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({api_key:k})});var j=await r.json().catch(function(){return{};});
     if(!r.ok){_flErr=_flDetail(r,j);_flRender();return;}_flKey=j;}catch(e){_flErr='Could not reach the server. Check your connection and try again.';_flRender();return;}
   buildFoodLog();}
-async function flRemoveKey(){if(!confirmGlobalDelete('your Anthropic API key (food logging stops until you add one again)'))return;
+async function flRemoveKey(){if(!confirmGlobalDelete('your API key (food logging stops until you add one again)'))return;
   try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'DELETE',headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flRender();}
 // Photos are shrunk to at most 1024 px on the long side before upload: the
 // estimate does not need more, and it keeps both the upload and the token cost small.
