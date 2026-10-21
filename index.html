@@ -4099,6 +4099,9 @@ function clearWkMacroOverride(){setData('wkt-macro-targets',null);pushSettingsTo
 // backend (/food-log). Estimates run on the user's OWN Anthropic key, so a user
 // without one only sees how to add it. Nothing here is cached on the device.
 var _flKey=null,_flRows=[],_flBusy=false,_flErr='',_flPending=null,_flEditRows=[],_flEditDate='';
+// A picked photo is ATTACHED, not sent (Henrik, 2026-10-21: a photo of a 500 g tub was logged as
+// the whole tub when he ate 115 g). It waits here with the typed text until Log is pressed.
+var _flPhoto='',_flDraft='';
 function _flEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function _flYmd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 // The eating day: a meal logged before 04:00 still belongs to the day before.
@@ -4130,14 +4133,16 @@ function _flMainHtml(){
   var t=_flTotals(_flRows);
   var h=_flCard('<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Eaten today ('+_flDay()+')</div>'+
     '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:15px;color:var(--text)"><b>'+t.kcal+' kcal</b><span>P '+t.protein+' g</span><span>C '+t.carbs+' g</span><span>F '+t.fat+' g</span></div>'+_flTargetsHtml(t));
-  var txt=_flPending?_flPending.text:'';
-  h+=_flCard('<textarea id="fl-text" rows="3" placeholder="What did you eat? e.g. 202 g steak, 307 g boiled potato, 15 g butter" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-family:inherit">'+_flEsc(txt)+'</textarea>'+
+  var txt=_flPending?_flPending.text:_flDraft;
+  var ph=_flPhoto?'How much of it did you eat? e.g. 115 g':'What did you eat? e.g. 202 g steak, 307 g boiled potato, 15 g butter';
+  h+=_flCard((_flPhoto?'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><img src="data:image/jpeg;base64,'+_flPhoto+'" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"><span style="font-size:13px;color:var(--text)">Photo attached</span><span onclick="flClearPhoto()" style="font-size:12px;color:var(--muted);text-decoration:underline;cursor:pointer;margin-left:auto">Remove</span></div>':'')+
+    '<textarea id="fl-text" rows="3" placeholder="'+ph+'" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-family:inherit">'+_flEsc(txt)+'</textarea>'+
     '<input id="fl-photo" type="file" accept="image/'+'*" style="display:none" onchange="flPhotoPicked(this)">'+
     '<div style="display:flex;gap:8px;margin-top:10px">'+
     (_flBusy?'<div style="font-size:14px;color:var(--muted);padding:10px 0">Estimating…</div>':
-      _flBtn('Log','flSubmit()',true)+_flBtn('📷 Photo','document.getElementById(\'fl-photo\').click()',false))+
+      _flBtn('Log','flSubmit()',true)+_flBtn(_flPhoto?'📷 Change photo':'📷 Photo','document.getElementById(\'fl-photo\').click()',false))+
     '</div>'+
-    '<div style="font-size:11px;color:var(--muted);margin-top:8px">A photo can be the food itself or its nutrition label. Entries are saved as soon as they are estimated; fix them on the Food Edit tab.</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:8px">A photo can be the food itself or its nutrition label; say how much you ate before tapping Log. Entries are saved as soon as they are estimated; fix them on the Food Edit tab.</div>'+
     (_flErr?'<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+' Nothing was saved.</div>'+(_flPending?'<div style="margin-top:8px">'+_flBtn('Try again','flRetry()',true)+'</div>':''):''));
   if(_flRows.length){
     h+=_flCard(_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join(''));
@@ -4162,16 +4167,18 @@ async function flRemoveKey(){if(!confirmGlobalDelete('your Anthropic API key (fo
 // Photos are shrunk to at most 1024 px on the long side before upload: the
 // estimate does not need more, and it keeps both the upload and the token cost small.
 function _flShrink(file){return new Promise(function(res,rej){var fr=new FileReader();fr.onerror=function(){rej(new Error('read'));};fr.onload=function(){var img=new Image();img.onerror=function(){rej(new Error('image'));};img.onload=function(){var s=Math.min(1,1024/Math.max(img.width,img.height));var c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.8).split(',')[1]);};img.src=fr.result;};fr.readAsDataURL(file);});}
-async function flPhotoPicked(input){var f=input&&input.files&&input.files[0];if(!f)return;var t=document.getElementById('fl-text');var text=t?String(t.value||''):'';input.value='';
-  try{var b64=await _flShrink(f);}catch(e){_flErr='That photo could not be read. Try another one.';_flPending={text:text,image_b64:''};_flRender();return;}
-  _flSend({text:text,image_b64:b64});}
-function flSubmit(){var t=document.getElementById('fl-text');var text=t?String(t.value||'').trim():'';if(!text)return;_flSend({text:text,image_b64:''});}
+function _flTyped(){var t=document.getElementById('fl-text');return t?String(t.value||''):'';}
+async function flPhotoPicked(input){var f=input&&input.files&&input.files[0];if(!f)return;_flDraft=_flTyped();input.value='';_flErr='';_flPending=null;
+  try{_flPhoto=await _flShrink(f);}catch(e){_flErr='That photo could not be read. Try another one.';}
+  _flRender();}
+function flClearPhoto(){_flDraft=_flTyped();_flPhoto='';_flRender();}
+function flSubmit(){var text=_flTyped().trim();if(!text&&!_flPhoto)return;return _flSend({text:text,image_b64:_flPhoto});}
 function flRetry(){if(_flPending)_flSend(_flPending);}
 async function _flSend(p){if(_flBusy)return;_flBusy=true;_flErr='';_flPending=p;_flRender();
   var now=new Date();var body={date:_flDay(now),time:String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),text:p.text||''};
   if(p.image_b64){body.image_b64=p.image_b64;body.media_type='image/jpeg';}
   try{var r=await fetch(AGENT_URL+'/food-log/estimate',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(body)});var j=await r.json().catch(function(){return{};});
-    if(!r.ok){_flErr=_flDetail(r,j);}else{_flPending=null;var rows=await _flLoadRows(body.date);_flRows=rows||_flRows.concat(j.rows||[]);}}
+    if(!r.ok){_flErr=_flDetail(r,j);}else{_flPending=null;_flPhoto='';_flDraft='';var rows=await _flLoadRows(body.date);_flRows=rows||_flRows.concat(j.rows||[]);}}
   catch(e){_flErr='Could not reach the server. Check your connection.';}
   _flBusy=false;_flRender();}
 // ── Food Edit tab ──
