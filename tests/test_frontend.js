@@ -8405,6 +8405,26 @@ console.log('\n── Macro targets (suggested + override) ───────
   G._flRows = [];
 }
 
+// ── Food log: a free Gemini key is the default, Anthropic the alternative (2026-10-21) ──
+// Henrik: "add support for Google Gemini API key also and provide instructions for how to
+// obtain a free one, this should be the default option".
+{
+  const _g = G._flGuideHtml();
+  const _fold = _g.indexOf('<details');
+  check('food log: the guide leads with the free Gemini key, in Chrome',
+    _g.indexOf('https://aistudio.google.com/apikey') > 0 && _g.indexOf('https://aistudio.google.com/apikey') < _fold &&
+    /is free/.test(_g) && /Chrome/.test(_g) && /starts with <code>AIza<\/code>/.test(_g) && /placeholder="AIza…"/.test(_g));
+  check('  …and keeps Anthropic as the alternative, folded away',
+    _fold > 0 && _g.indexOf('https://console.anthropic.com') > _fold && /Use Anthropic \(Claude\) instead, paid/.test(_g));
+  G._flErr = ''; G._flPending = null; G._flBusy = false; G._flRows = [];
+  G._flKey = {set: true, last4: 'GEMI', provider: 'gemini'};
+  check('  …the key line names the provider: Gemini', /Gemini key ending …GEMI/.test(G._flMainHtml()));
+  G._flKey = {set: true, last4: 'WXYZ', provider: 'anthropic'};
+  check('  …or Anthropic', /Anthropic key ending …WXYZ/.test(G._flMainHtml()));
+  G._flKey = {set: true, last4: 'WXYZ'};
+  check('  …and a key stored before Gemini existed reads as Anthropic', /Anthropic key ending …WXYZ/.test(G._flMainHtml()));
+}
+
 setImmediate(() => {
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
   process.exit(failed === 0 ? 0 : 1);
