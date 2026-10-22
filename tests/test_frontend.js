@@ -9,6 +9,13 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const htmlPath = process.argv[2] || path.join(__dirname, '../index.html');
+// The Settings section helpers the food-log cards use, taken from the app itself, for the
+// food-log tests that run that block in a sandbox of its own.
+const _FL_SEC = (() => {
+  const t = fs.readFileSync(htmlPath, 'utf8');
+  const pick = n => (t.match(new RegExp('^function ' + n + '\\(.*$', 'm')) || [''])[0];
+  return 'var _sOpen={};function setData(){}\n' + pick('sSecHdr') + '\n' + pick('sSecBody') + '\n' + pick('toggleSSec') + '\n';
+})();
 const html = fs.readFileSync(htmlPath, 'utf8');
 const rawScript = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
 
@@ -8223,7 +8230,7 @@ console.log('\n── Food log ────────────────�
         return {ok: true, status: 200, json: async () => ({})};
       },
     });
-    vm.runInContext(_flBlock, F);
+    vm.runInContext(_FL_SEC + _flBlock, F);
     await F.buildFoodLog();
     check('food log: opening the tab reads the key, then today\'s rows',
       calls[0] && /\/food-log\/key$/.test(calls[0].url) && calls[1] && /\/food-log\?date=\d{4}-\d\d-\d\d$/.test(calls[1].url));
@@ -8321,7 +8328,7 @@ console.log('\n── Macro targets (suggested + override) ───────
       if (/\?date=/.test(url)) return {ok: true, status: 200, json: async () => [{id: 'c1', food: 'Cottage cheese', amount: '115 g', kcal: 83}]};
       return {ok: true, status: 200, json: async () => ({})}; },
   });
-  vm.runInContext(_blk, P);
+  vm.runInContext(_FL_SEC + _blk, P);
   P._flShrink = async () => 'UEhPVE8=';
   P._flKey = {set: true, last4: 'WXYZ'};
   (async () => {
@@ -8371,7 +8378,7 @@ console.log('\n── Macro targets (suggested + override) ───────
       if (/\/food-log\/key$/.test(url)) return {ok: true, status: 200, json: async () => ({set: true, last4: 'WXYZ', provider: 'anthropic'})};
       return {ok: true, status: 200, json: async () => ([])}; },
   });
-  vm.runInContext(_blk, K);
+  vm.runInContext(_FL_SEC + _blk, K);
   (async () => {
     await K.buildFlKeyCard();
     let h = els['fl-key-card'].innerHTML;
@@ -8421,7 +8428,7 @@ console.log('\n── Macro targets (suggested + override) ───────
       if (/\/food-log\/key$/.test(url)) return {ok: true, status: 200, json: async () => ({set: false, last4: '', provider: ''})};
       return {ok: true, status: 200, json: async () => ([])}; },
   });
-  vm.runInContext(_blk, V);
+  vm.runInContext(_FL_SEC + _blk, V);
   const steps = (id) => { V.flPickProvider(id); return V._flKeyHowTo(); };
   let h = steps('openai');
   check('food key: OpenAI steps, in Chrome, with its key prefix', /https:\/\/platform\.openai\.com/.test(h) && /in Chrome/.test(h) && /<code>sk-<\/code>/.test(h) && /<option value="openai" selected>/.test(h));
@@ -8471,7 +8478,7 @@ console.log('\n── Macro targets (suggested + override) ───────
       if (/import-file$/.test(url)) return {ok: reply.ok, status: reply.status, json: async () => reply.body};
       return {ok: true, status: 200, json: async () => ({set: true, last4: 'GEMI', provider: 'gemini'})}; },
   });
-  vm.runInContext(_blk, I);
+  vm.runInContext(_FL_SEC + _blk, I);
   I._flReadB64 = async () => 'Q1NW';
   I._flKey = {set: true, last4: 'GEMI', provider: 'gemini'}; I._flRows = []; I._flErr = ''; I._flPending = null; I._flBusy = false;
   const main = I._flMainHtml();
@@ -8519,7 +8526,7 @@ console.log('\n── Macro targets (suggested + override) ───────
       if (/\/key$/.test(url)) return {ok: true, status: 200, json: async () => ({set: true, last4: 'GEMI', provider: 'gemini'})};
       return {ok: true, status: 200, json: async () => ([])}; },
   });
-  vm.runInContext(_blk, S);
+  vm.runInContext(_FL_SEC + _blk, S);
   S._flStats = {days: 5, days_logged: 7, from: '2026-09-28', to: '2026-10-21', before_first_goal: 3, first_goal_date: '2026-10-19',
     metrics: {kcal: {avg: 101.4, median: 99.5, days: 5}, protein: {avg: 87.6, median: 90.2, days: 5}, carbs: null, fat: {avg: 120, median: 118, days: 5}}};
   let h = S._flStatsHtml();
@@ -8564,6 +8571,33 @@ console.log('\n── Macro targets (suggested + override) ───────
   })().catch(e => { check('food stats: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
+// ── Food log: the Settings cards follow the Settings design (2026-10-22) ──
+// Henrik: "These Settings sections u added isn't following the design if the others, they
+// should be default collapsed like all others".
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
+  const els = {};
+  const C = vm.createContext({console, Promise, JSON, Math, String, Number, encodeURIComponent,
+    AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
+    document: {getElementById: (id) => { if (!els[id]) { let h = ''; els[id] = {value: '', classList: {toggle() {}}, previousElementSibling: {classList: {toggle() {}}}}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async () => ({ok: true, status: 200, json: async () => ({})}),
+  });
+  vm.runInContext(_FL_SEC + _blk, C);
+  C._flKey = {set: true, last4: 'CwAA', provider: 'anthropic'};
+  const key = C._flKeyCardHtml(), imp = C._flImportCardHtml();
+  check('food settings: the API key card is a Settings section, collapsed by default',
+    /class="s-sec-hdr" onclick="toggleSSec\('flkey'\)">Food log · API key/.test(key) && /class="s-sec-body collapsed" id="s-sec-flkey"/.test(key) && /Anthropic key ending …CwAA/.test(key));
+  check('  …and so is the import card', /onclick="toggleSSec\('flimport'\)">Food log · Import old log/.test(imp) && /class="s-sec-body collapsed" id="s-sec-flimport"/.test(imp));
+  check('  …neither carries its own boxed title any more', !/font-weight:700;color:var\(--text\);margin-bottom:8px">Food logging/.test(key + imp));
+  C.flOpenImportSettings();
+  check('  …the Macros buttons open the section they point at', C._sOpen.flimport === true && /class="s-sec-hdr open"/.test(C._flImportCardHtml()));
+  C.flOpenImportSettings();
+  check('  …and never close it again', C._sOpen.flimport === true);
+  C.flOpenKeySettings();
+  check('  …the API key button opens its own', C._sOpen.flkey === true);
+}
+
 // ── Food Edit: every entry has an editable amount, and correcting it rescales (2026-10-21) ──
 // Henrik: "each entry needs a grams total also, a typo for chicken breast should be possible
 // to Edit instead of forcing me to delete the line".
@@ -8577,7 +8611,7 @@ console.log('\n── Macro targets (suggested + override) ───────
     fetch: async (url, opt) => { if (opt && opt.method === 'PUT') puts.push({url, body: JSON.parse(opt.body)});
       return {ok: true, status: 200, json: async () => []}; },
   });
-  vm.runInContext(_blk, E);
+  vm.runInContext(_FL_SEC + _blk, E);
   const chick = {id: 'k1', food: 'Raw chicken breast', amount: '300g', kcal: 330, protein: 69, carbs: 0, fat: 4};
   const coffee = {id: 'k2', food: 'Coffee', amount: '300ml', kcal: 68, protein: 5, carbs: 7, fat: 2};
   const cups = {id: 'k3', food: 'Tea', amount: '2 cups', kcal: 4, protein: 0, carbs: 1, fat: 0};
