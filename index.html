@@ -4066,7 +4066,7 @@ function _wkTargetsFrom(v){var k=parseFloat(v&&v.kcal),p=parseFloat(v&&v.protein
 function _wkLatest(arr,key){var a=(arr||[]).filter(function(e){return e&&e.date&&e[key]>0;}).slice().sort(function(x,y){return x.date<y.date?-1:x.date>y.date?1:0;});return a.length?a[a.length-1][key]:0;}
 function _wkMacroQuery(){var pr=getData('wkt-profile',{})||{};var bw=_wkLatest(weights,'weight')||parseFloat(pr.weight)||0;
   return 'bw='+bw+'&phase='+_wkPhase()+'&on_androgens=false&height_cm='+(parseFloat(pr.height)||0)+'&age='+(parseInt(pr.age)||0)+'&sex='+(pr.gender==='female'?'female':'male')+'&body_fat_pct='+(_wkLatest(bfLog,'bf')||0)+'&train_kcal='+Math.max(0,Math.round(_wkTrainKcal||0))+'&include_training=true&deficit_mode=absolute';}
-function _wkApplyTargets(){var o=_wkTargetsFrom(getData('wkt-macro-targets',null));_macrosTargets=o||(_wkSuggest&&(_wkSuggest.kcal||_wkSuggest.protein)?{kcal:_wkSuggest.kcal,protein:_wkSuggest.protein}:null);}
+function _wkApplyTargets(){var o=_wkTargetsFrom(getData('wkt-macro-targets',null));_macrosTargets=o||(_wkSuggest&&(_wkSuggest.kcal||_wkSuggest.protein)?{kcal:_wkSuggest.kcal,protein:_wkSuggest.protein,carbs:_wkSuggest.carbs,fat:_wkSuggest.fat}:null);}
 function _wkMacroTargetsHtml(){var o=_wkTargetsFrom(getData('wkt-macro-targets',null));var m=_wkSuggest;var ph=_wkPhase();
   var btn=function(l,on,click){return'<button onclick="'+click+'" style="flex:1;background:'+(on?'var(--accent)':'var(--surface2)')+';color:'+(on?'#000':'var(--text)')+';border:1px solid '+(on?'transparent':'var(--border)')+';border-radius:20px;padding:7px 4px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+l+'</button>';};
   var h='<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Daily targets</div>';
@@ -4102,7 +4102,7 @@ function clearWkMacroOverride(){setData('wkt-macro-targets',null);pushSettingsTo
 var _flKey=null,_flRows=[],_flBusy=false,_flErr='',_flPending=null,_flEditRows=[],_flEditDate='';
 // A picked photo is ATTACHED, not sent (Henrik, 2026-10-21: a photo of a 500 g tub was logged as
 // the whole tub when he ate 115 g). It waits here with the typed text until Log is pressed.
-var _flPhoto='',_flDraft='';
+var _flPhoto='',_flDraft='',_flListOpen=false;
 function _flEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function _flYmd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 // The eating day: a meal logged before 04:00 still belongs to the day before.
@@ -4114,7 +4114,7 @@ function _flTotals(rows){var t={kcal:0,protein:0,carbs:0,fat:0};(rows||[]).forEa
 function _flTargetsHtml(t){var g=(typeof _macrosTargets!=='undefined')?_macrosTargets:null;if(!g)return'';var out=[];
   var line=function(lbl,have,want,unit){var left=Math.round(want-have);return'<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--text);margin-top:8px"><span>'+lbl+' '+have+' of '+want+' '+unit+'</span><span style="color:'+(left>=0?'var(--muted)':'var(--accent2,#ff6b2b)')+'">'+(left>=0?left+' '+unit+' left':(-left)+' '+unit+' over')+'</span></div>'+
     '<div style="height:6px;background:var(--surface2);border-radius:3px;margin-top:4px;overflow:hidden"><div style="height:100%;width:'+Math.min(100,Math.round(have/want*100))+'%;background:var(--accent)"></div></div>';};
-  if(g.kcal>0)out.push(line('Calories',t.kcal,Math.round(g.kcal),'kcal'));if(g.protein>0)out.push(line('Protein',t.protein,Math.round(g.protein),'g'));return out.join('');}
+  if(g.kcal>0)out.push(line('Calories',t.kcal,Math.round(g.kcal),'kcal'));if(g.protein>0)out.push(line('Protein',t.protein,Math.round(g.protein),'g'));if(g.carbs>0)out.push(line('Carbs',t.carbs,Math.round(g.carbs),'g'));if(g.fat>0)out.push(line('Fat',t.fat,Math.round(g.fat),'g'));return out.join('');}
 function _flCard(inner){return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">'+inner+'</div>';}
 function _flBtn(label,onclick,primary){return'<button onclick="'+onclick+'" style="background:'+(primary?'var(--accent)':'var(--surface2)')+';color:'+(primary?'#000':'var(--text)')+';border:1px solid '+(primary?'transparent':'var(--border)')+';border-radius:10px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';}
 function _flGuideHtml(){
@@ -4153,11 +4153,16 @@ function _flMainHtml(){
     '<div style="font-size:11px;color:var(--muted);margin-top:8px">A photo can be the food itself or its nutrition label; say how much you ate before tapping Log. Entries are saved as soon as they are estimated; fix them on the Food Edit tab.</div>'+
     (_flErr?'<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+' Nothing was saved.</div>'+(_flPending?'<div style="margin-top:8px">'+_flBtn('Try again','flRetry()',true)+'</div>':''):''));
   if(_flRows.length){
-    h+=_flCard(_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+(r.time?'<span style="color:var(--muted);font-variant-numeric:tabular-nums;margin-right:8px">'+_flEsc(r.time)+'</span>':'')+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join(''));
+    // Collapsed by default (Henrik, 2026-10-22: the list "will become pretty long during the day");
+    // the closed line still says when you last ate, which is what the times were added for.
+    var last=_flRows.reduce(function(a,r){return r.time&&r.time>a?r.time:a;},'');
+    var head='<div onclick="flToggleList()" style="display:flex;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px;color:var(--text)"><span>'+_flRows.length+' entr'+(_flRows.length===1?'y':'ies')+' today'+(last?' · last at '+_flEsc(last):'')+'</span><span style="color:var(--muted)">'+(_flListOpen?'Hide ▲':'Show ▼')+'</span></div>';
+    h+=_flCard(head+(_flListOpen?'<div style="margin-top:8px">'+_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+(r.time?'<span style="color:var(--muted);font-variant-numeric:tabular-nums;margin-right:8px">'+_flEsc(r.time)+'</span>':'')+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join('')+'</div>':''));
   }
   h+='<div style="font-size:12px;color:var(--muted);margin-bottom:14px">'+(_flKey&&_flKey.provider==='gemini'?'Gemini':'Anthropic')+' key ending …'+_flEsc(_flKey&&_flKey.last4||'')+' · <span onclick="flRemoveKey()" style="text-decoration:underline;cursor:pointer">Remove</span></div>';
   return h;
 }
+function flToggleList(){_flListOpen=!_flListOpen;_flRender();}
 function _flRender(){var el=document.getElementById('food-log-body');if(!el)return;el.innerHTML=(_flKey&&_flKey.set)?_flMainHtml():(_flKey?_flGuideHtml():_flCard('<div style="font-size:13px;color:var(--muted)">The food log could not be loaded. Check your connection and open this tab again.</div>'));}
 function _flDetail(r,j){return(j&&j.detail&&typeof j.detail==='string')?j.detail:('The server answered '+r.status+'.');}
 async function _flLoadRows(date){try{var r=await fetch(AGENT_URL+'/food-log?date='+date,{headers:authHeaders()});if(!r.ok)return null;return await r.json();}catch(e){return null;}}
