@@ -8500,6 +8500,70 @@ console.log('\n── Macro targets (suggested + override) ───────
   })().catch(e => { check('food import: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
+// ── Food log: history as % of goals, average and median (2026-10-22) ──
+// Henrik: "average and median values for all macros and kcal section based on history …
+// as % of the goals". Goals change, so each day's goals are recorded and every past day is
+// measured against its own.
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
+  const calls = [], els = {};
+  let goalOk = true;
+  const S = vm.createContext({console, Promise, JSON, Math, String, Number, parseFloat, encodeURIComponent, Date,
+    AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
+    document: {getElementById: (id) => { if (!els[id]) { let h = ''; els[id] = {value: ''}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async (url, opt) => { const m = (opt && opt.method) || 'GET'; calls.push({url, method: m, body: opt && opt.body ? JSON.parse(opt.body) : null});
+      if (/\/goals$/.test(url)) return {ok: goalOk, status: goalOk ? 200 : 500, json: async () => ({})};
+      if (/\/stats\?/.test(url)) return {ok: true, status: 200, json: async () => ({days: 12, days_logged: 12, from: '2026-10-01', to: '2026-10-21', before_first_goal: 0, first_goal_date: '2026-10-01',
+        metrics: {kcal: {avg: 96.4, median: 98.6, days: 12}, protein: {avg: 88, median: 91, days: 12}, carbs: null, fat: {avg: 110, median: 104, days: 12}}})};
+      if (/\/key$/.test(url)) return {ok: true, status: 200, json: async () => ({set: true, last4: 'GEMI', provider: 'gemini'})};
+      return {ok: true, status: 200, json: async () => ([])}; },
+  });
+  vm.runInContext(_blk, S);
+  S._flStats = {days: 5, days_logged: 7, from: '2026-09-28', to: '2026-10-21', before_first_goal: 3, first_goal_date: '2026-10-19',
+    metrics: {kcal: {avg: 101.4, median: 99.5, days: 5}, protein: {avg: 87.6, median: 90.2, days: 5}, carbs: null, fat: {avg: 120, median: 118, days: 5}}};
+  let h = S._flStatsHtml();
+  check('food stats: a card shows average and median as % of goals',
+    /History · % of your goals/.test(h) && />Average</.test(h) && />Median</.test(h) &&
+    />Kcal<\/td><td[^>]*>101 %<\/td><td[^>]*>100 %</.test(h) && />Protein<\/td><td[^>]*>88 %<\/td><td[^>]*>90 %</.test(h) && />Fat<\/td>/.test(h));
+  check('  …a macro with no goal gets no row', !/>Carbs</.test(h));
+  check('  …it says how many days, from when, that today is out, and that each day has its own goals',
+    /5 days logged, 28 Sep 2026 to 21 Oct 2026\. Today is not included\. Each day is measured against that day's goals\./.test(h));
+  check('  …and says which days used the first recorded goals', /The 3 days before 19 Oct 2026 use the goals recorded that day, the first on record\./.test(h));
+  S._flStats = {days: 0, days_logged: 4, metrics: {}};
+  check('food stats: food logged but no goals yet says when it starts', /start once your goals are set/.test(S._flStatsHtml()));
+  S._flStats = {days: 0, days_logged: 0, metrics: {}};
+  check('  …and with nothing logged there is no card', S._flStatsHtml() === '');
+  (async () => {
+    S._flKey = {set: true, last4: 'GEMI', provider: 'gemini'}; S._flRows = []; S._flErr = ''; S._flPending = null; S._flBusy = false;
+    await S.buildFoodLog();
+    const st = calls.find(c => /\/stats\?/.test(c.url));
+    check('food stats: opening Macros loads the stats with today left out', st && st.url.endsWith('/food-log/stats?today=' + S._flDay()) && /History · % of your goals/.test(els['food-log-body'].innerHTML));
+    calls.length = 0;
+    S._macrosTargets = {kcal: 2400, protein: 180, carbs: 250, fat: 70};
+    S._flRender(); S._flRender();
+    await new Promise(r => setTimeout(r, 0));
+    let puts = calls.filter(c => /\/goals$/.test(c.url));
+    check("food stats: the day's goals are recorded once, with today's date",
+      puts.length === 1 && puts[0].method === 'PUT' && puts[0].body.date === S._flDay() && puts[0].body.kcal === 2400 && puts[0].body.fat === 70);
+    S._macrosTargets = {kcal: 2200, protein: 180, carbs: 220, fat: 70};
+    S._flRender();
+    await new Promise(r => setTimeout(r, 0));
+    puts = calls.filter(c => /\/goals$/.test(c.url));
+    check('  …and again when the goals change', puts.length === 2 && puts[1].body.kcal === 2200);
+    goalOk = false; S._macrosTargets = {kcal: 2000, protein: 150};
+    S._flRender();
+    await new Promise(r => setTimeout(r, 0)); await new Promise(r => setTimeout(r, 0));
+    goalOk = true; S._flRender();
+    await new Promise(r => setTimeout(r, 0));
+    puts = calls.filter(c => /\/goals$/.test(c.url));
+    check('  …a failed save is tried again on the next render', puts.length === 4 && puts[3].body.kcal === 2000 && puts[3].body.carbs === null);
+    calls.length = 0; S._macrosTargets = null; S._flGoalSent = ''; S._flRender();
+    check('  …and without goals nothing is recorded', calls.filter(c => /\/goals$/.test(c.url)).length === 0);
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('food stats: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
 // ── Food Edit: every entry has an editable amount, and correcting it rescales (2026-10-21) ──
 // Henrik: "each entry needs a grams total also, a typo for chicken breast should be possible
 // to Edit instead of forcing me to delete the line".

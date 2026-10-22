@@ -4192,6 +4192,7 @@ function _flMainHtml(){
     var head='<div onclick="flToggleList()" style="display:flex;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px;color:var(--text)"><span>'+_flRows.length+' entr'+(_flRows.length===1?'y':'ies')+' today'+(last?' · last at '+_flEsc(last):'')+'</span><span style="color:var(--muted)">'+(_flListOpen?'Hide ▲':'Show ▼')+'</span></div>';
     h+=_flCard(head+(_flListOpen?'<div style="margin-top:8px">'+_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+(r.time?'<span style="color:var(--muted);font-variant-numeric:tabular-nums;margin-right:8px">'+_flEsc(r.time)+'</span>':'')+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join('')+'</div>':''));
   }
+  h+=_flStatsHtml();
   h+='<div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">'+_flBtn('API key settings','flOpenKeySettings()',false)+_flBtn('Import old log','flOpenImportSettings()',false)+'</div>';
   return h;
 }
@@ -4251,12 +4252,34 @@ async function flImportFile(input){var f=input&&input.files&&input.files[0];if(!
   catch(e){_flImp={busy:false,msg:'',err:'Could not read or send the file. Check your connection and try again.'};}
   _flRenderImportCard();}
 function flToggleList(){_flListOpen=!_flListOpen;_flRender();}
-function _flRender(){var el=document.getElementById('food-log-body');if(!el)return;el.innerHTML=(_flKey&&_flKey.set)?_flMainHtml():(_flKey?_flGuideHtml():_flCard('<div style="font-size:13px;color:var(--muted)">The food log could not be loaded. Check your connection and open this tab again.</div>'));}
+// History as % of goals (Henrik, 2026-10-22: "average and median values for all macros
+// and kcal … as % of the goals"). Goals change, so the day's goals are recorded whenever
+// the page shows them, and the backend measures every past day against its own day's goals.
+var _flStats=null,_flGoalSent='';
+function _flRecordGoal(){var g=(typeof _macrosTargets!=='undefined')?_macrosTargets:null;if(!g||!(g.kcal>0))return;
+  var body={date:_flDay(),kcal:g.kcal,protein:g.protein||null,carbs:g.carbs||null,fat:g.fat||null},key=JSON.stringify(body);
+  if(key===_flGoalSent)return;_flGoalSent=key;
+  fetch(AGENT_URL+'/food-log/goals',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:key})
+    .then(function(r){if(!r.ok){_flGoalSent='';return;}if(_flStats&&!_flStats.first_goal_date)return _flLoadStats().then(_flRender);})
+    .catch(function(){_flGoalSent='';});}
+async function _flLoadStats(){try{var r=await fetch(AGENT_URL+'/food-log/stats?today='+_flDay(),{headers:authHeaders()});if(r.ok)_flStats=await r.json();}catch(e){}}
+function _flShortDate(d){var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var p=String(d||'').split('-');return p.length===3?(+p[2])+' '+m[+p[1]-1]+' '+p[0]:'';}
+function _flStatsHtml(){var s=_flStats;if(!s)return'';
+  if(!s.days)return s.days_logged?_flCard('<div style="font-size:13px;color:var(--muted)">Averages against your goals start once your goals are set. They are recorded each day you open this page.</div>'):'';
+  var rows=[['Kcal','kcal'],['Protein','protein'],['Carbs','carbs'],['Fat','fat']].filter(function(x){return s.metrics[x[1]];});
+  var cell='padding:6px 0;text-align:right;font-variant-numeric:tabular-nums';
+  var h='<div style="font-size:12px;color:var(--muted);margin-bottom:6px">History · % of your goals</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;color:var(--text)"><tr style="color:var(--muted);font-size:12px"><td></td><td style="'+cell+'">Average</td><td style="'+cell+'">Median</td></tr>'+
+    rows.map(function(x){var m=s.metrics[x[1]];return'<tr style="border-top:1px solid var(--border)"><td style="padding:6px 0">'+x[0]+'</td><td style="'+cell+'">'+Math.round(m.avg)+' %</td><td style="'+cell+'">'+Math.round(m.median)+' %</td></tr>';}).join('')+'</table>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5">'+s.days+' day'+(s.days===1?'':'s')+' logged, '+_flShortDate(s.from)+' to '+_flShortDate(s.to)+'. Today is not included. Each day is measured against that day\'s goals.'+
+    (s.before_first_goal?' The '+s.before_first_goal+' day'+(s.before_first_goal===1?'':'s')+' before '+_flShortDate(s.first_goal_date)+' use the goals recorded that day, the first on record.':'')+'</div>';
+  return _flCard(h);}
+function _flRender(){var el=document.getElementById('food-log-body');if(!el)return;if(_flKey&&_flKey.set)_flRecordGoal();el.innerHTML=(_flKey&&_flKey.set)?_flMainHtml():(_flKey?_flGuideHtml():_flCard('<div style="font-size:13px;color:var(--muted)">The food log could not be loaded. Check your connection and open this tab again.</div>'));}
 function _flDetail(r,j){return(j&&j.detail&&typeof j.detail==='string')?j.detail:('The server answered '+r.status+'.');}
 async function _flLoadRows(date){try{var r=await fetch(AGENT_URL+'/food-log?date='+date,{headers:authHeaders()});if(!r.ok)return null;return await r.json();}catch(e){return null;}}
 async function buildFoodLog(){
   try{var r=await fetch(AGENT_URL+'/food-log/key',{headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}
-  if(_flKey&&_flKey.set){var rows=await _flLoadRows(_flDay());if(rows)_flRows=rows;}
+  if(_flKey&&_flKey.set){var rows=await _flLoadRows(_flDay());if(rows)_flRows=rows;await _flLoadStats();}
   _flRender();
 }
 function _flKeyBody(k){var b={api_key:k,provider:_flProv};if(_flProv==='azure'){var e=document.getElementById('fl-key-endpoint'),d=document.getElementById('fl-key-deployment');b.endpoint=e?String(e.value||'').trim():'';b.deployment=d?String(d.value||'').trim():'';}return b;}
