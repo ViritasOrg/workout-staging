@@ -8290,6 +8290,8 @@ console.log('\n── Macro targets (suggested + override) ───────
     const q = calls.find(u => /macro-targets/.test(u)) || '';
     check('macro targets: suggested from the profile, latest weight, body fat and training burn',
       /bw=85\.2/.test(q) && /sex=female/.test(q) && /height_cm=168/.test(q) && /age=38/.test(q) && /body_fat_pct=16/.test(q) && /train_kcal=310/.test(q) && /phase=recomp/.test(q) && /on_androgens=false/.test(q));
+    check('macro targets: the deficit is the backend\'s research-sized one, never a fixed mode (2026-10-22)',
+      !/deficit_mode/.test(q));
     check('macro targets: training burn is left out by default (Henrik, 2026-10-22: "default OFF")',
       /include_training=false/.test(q) && !/include_training=true/.test(q) &&
       /id="wk-include-training"(?! checked)/.test(els['wk-macro-targets'].innerHTML) &&
