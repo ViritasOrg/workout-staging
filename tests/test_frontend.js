@@ -8153,7 +8153,7 @@ console.log('\n── Food log ────────────────�
     JSON.stringify({kcal: 544, protein: 52, carbs: 61, fat: 10}));
   const _flGuide = G._flGuideHtml();
   check('food log: without a key the screen explains how to get one, in Chrome',
-    /console\.anthropic\.com/.test(_flGuide) && /Chrome/.test(_flGuide) && /sk-ant-/.test(_flGuide) && /flSaveKey\(\)/.test(_flGuide));
+    /id="fl-key-prov"/.test(_flGuide) && /aistudio\.google\.com/.test(_flGuide) && /Chrome/.test(_flGuide) && /flSaveKey\(\)/.test(_flGuide));
   check('food log: the guide offers no way to log food', !/flSubmit\(/.test(_flGuide));
   G._flKey = {set: true, last4: 'WXYZ'};
   G._flRows = [{id: 'a', food: 'Steak <b>', amount: '202 g', kcal: 280, protein: 46, carbs: 0, fat: 10}];
@@ -8380,9 +8380,11 @@ console.log('\n── Macro targets (suggested + override) ───────
     h = els['fl-key-card'].innerHTML;
     check('  …Change asks for the new key and says which one it replaces',
       /id="fl-key-new"/.test(h) && /replaces the Anthropic key ending …WXYZ/.test(h) && /flSaveKey\('fl-key-new'\)/.test(h) && /flCancelChange\(\)/.test(h));
-    check('  …and explains how to get a new key, Gemini first and the paid alternative folded (2026-10-22)',
-      h.indexOf('https://aistudio.google.com/apikey') > 0 && h.indexOf('https://aistudio.google.com/apikey') < h.indexOf('<details') &&
-      h.indexOf('https://console.anthropic.com') > h.indexOf('<details') && /in Chrome/.test(h));
+    check('  …and explains how to get a new key, the picker set to the current provider (2026-10-22)',
+      /<option value="anthropic" selected>/.test(h) && /https:\/\/console\.anthropic\.com/.test(h) && /in Chrome/.test(h) && /placeholder="sk-ant-…"/.test(h));
+    K.flPickProvider('gemini');
+    h = els['fl-key-card'].innerHTML;
+    check('  …and picking another provider shows its steps instead', /https:\/\/aistudio\.google\.com\/apikey/.test(h) && !/console\.anthropic\.com/.test(h) && /id="fl-key-new"/.test(h));
     K.flCancelChange();
     check('  …Cancel goes back without sending anything', !/id="fl-key-new"/.test(els['fl-key-card'].innerHTML) && calls.filter(c => c.method !== 'GET').length === 0);
     K.flStartChange();
@@ -8403,6 +8405,54 @@ console.log('\n── Macro targets (suggested + override) ───────
       /No API key yet/.test(h) && /flSaveKey\('fl-key-new'\)/.test(h) && /https:\/\/aistudio\.google\.com\/apikey/.test(h));
     if (failed > 0) process.exitCode = 1;
   })().catch(e => { check('food key: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
+// ── Food log: OpenAI, xAI and Azure OpenAI keys (2026-10-22) ──
+// Henrik: "lets add OpenAI, Grok/xAI Key support as well as Copilot/Microsoft".
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
+  const calls = [], els = {};
+  const V = vm.createContext({console, Promise, JSON, Math, String, Number, parseFloat, encodeURIComponent,
+    AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
+    document: {getElementById: (id) => { if (!els[id]) { let h = ''; els[id] = {value: ''}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async (url, opt) => { const m = (opt && opt.method) || 'GET'; calls.push({url, method: m, body: opt && opt.body ? JSON.parse(opt.body) : null});
+      if (/\/food-log\/key$/.test(url) && m === 'PUT') { const b = JSON.parse(opt.body); return {ok: true, status: 200, json: async () => ({set: true, last4: b.api_key.slice(-4), provider: b.provider})}; }
+      if (/\/food-log\/key$/.test(url)) return {ok: true, status: 200, json: async () => ({set: false, last4: '', provider: ''})};
+      return {ok: true, status: 200, json: async () => ([])}; },
+  });
+  vm.runInContext(_blk, V);
+  const steps = (id) => { V.flPickProvider(id); return V._flKeyHowTo(); };
+  let h = steps('openai');
+  check('food key: OpenAI steps, in Chrome, with its key prefix', /https:\/\/platform\.openai\.com/.test(h) && /in Chrome/.test(h) && /<code>sk-<\/code>/.test(h) && /<option value="openai" selected>/.test(h));
+  h = steps('xai');
+  check('  …xAI steps, in Chrome', /https:\/\/console\.x\.ai/.test(h) && /in Chrome/.test(h) && /API Keys/.test(h));
+  h = steps('azure');
+  check('  …Azure steps say Copilot has no key and ask for endpoint and deployment',
+    /Copilot has no API key/.test(h) && /https:\/\/portal\.azure\.com/.test(h) && /Keys and Endpoint/.test(h) &&
+    /id="fl-key-endpoint"/.test(h) && /id="fl-key-deployment"/.test(h));
+  check('  …only Azure asks for an endpoint', !/fl-key-endpoint/.test(steps('openai')) && !/fl-key-endpoint/.test(steps('gemini')));
+  check('  …an unknown provider id falls back to a real one', (V.flPickProvider('copilot'), V._flProv) === 'anthropic');
+  check('  …the Settings card names each provider', ['openai', 'xai', 'azure'].every(p => {
+    V._flKey = {set: true, last4: 'ABCD', provider: p}; V._flKeyChanging = false;
+    return new RegExp(({openai: 'OpenAI', xai: 'xAI', azure: 'Azure OpenAI'})[p] + ' key ending …ABCD').test(V._flKeyCardHtml()); }));
+  (async () => {
+    V._flKey = {set: false, last4: '', provider: ''};
+    V.flPickProvider('xai');
+    V.document.getElementById('fl-key-in').value = 'xai-' + 'k'.repeat(30) + 'GROK';
+    await V.flSaveKey();
+    const put = calls.filter(c => c.method === 'PUT').pop();
+    check('food key: Save sends the picked provider with the key', put.body.provider === 'xai' && put.body.api_key.endsWith('GROK') && !('endpoint' in put.body));
+    V.flPickProvider('azure');
+    V.document.getElementById('fl-key-in').value = 'a'.repeat(32);
+    V.document.getElementById('fl-key-endpoint').value = ' https://my-food.openai.azure.com/ ';
+    V.document.getElementById('fl-key-deployment').value = 'gpt-5-mini';
+    await V.flSaveKey();
+    const az = calls.filter(c => c.method === 'PUT').pop();
+    check('  …and for Azure, the endpoint and deployment name too',
+      az.body.provider === 'azure' && az.body.endpoint === 'https://my-food.openai.azure.com/' && az.body.deployment === 'gpt-5-mini');
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('food key providers: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
 // ── Food Edit: every entry has an editable amount, and correcting it rescales (2026-10-21) ──
@@ -8471,10 +8521,11 @@ console.log('\n── Macro targets (suggested + override) ───────
   const _g = G._flGuideHtml();
   const _fold = _g.indexOf('<details');
   check('food log: the guide leads with the free Gemini key, in Chrome',
-    _g.indexOf('https://aistudio.google.com/apikey') > 0 && _g.indexOf('https://aistudio.google.com/apikey') < _fold &&
-    /is free/.test(_g) && /Chrome/.test(_g) && /starts with <code>AIza<\/code>/.test(_g) && /placeholder="AIza…"/.test(_g));
-  check('  …and keeps Anthropic as the alternative, folded away',
-    _fold > 0 && _g.indexOf('https://console.anthropic.com') > _fold && /Use Anthropic \(Claude\) instead, paid/.test(_g));
+    /<option value="gemini" selected>Google Gemini \(free\)/.test(_g) && /https:\/\/aistudio\.google\.com\/apikey/.test(_g) &&
+    /Chrome/.test(_g) && /starts with <code>AIza<\/code>/.test(_g) && /placeholder="AIza…"/.test(_g));
+  check('  …and offers Anthropic, OpenAI, xAI and Azure OpenAI as paid alternatives (2026-10-22)',
+    /value="anthropic">Anthropic Claude \(paid\)/.test(_g) && /value="openai">OpenAI ChatGPT \(paid\)/.test(_g) &&
+    /value="xai">xAI Grok \(paid\)/.test(_g) && /value="azure">Microsoft Azure OpenAI \(paid\)/.test(_g) && _fold < 0);
   G._flErr = ''; G._flPending = null; G._flBusy = false; G._flRows = [];
   G._flKey = {set: true, last4: 'GEMI', provider: 'gemini'};
   check('  …the Settings card names the provider: Gemini', /Gemini key ending …GEMI/.test(G._flKeyCardHtml()));
