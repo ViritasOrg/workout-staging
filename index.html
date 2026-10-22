@@ -405,7 +405,7 @@
       </div>
     </div>
     <div id="fl-key-card"></div>
-    <div id="fl-import-card" style="margin-top:14px"></div>
+    <div id="fl-import-card"></div>
     <div id="s-deploy-card"></div>
     <div id="s-tabs-card" style="margin-top:0"></div>
     <div id="s-appearance-card"></div>
@@ -4212,17 +4212,21 @@ function _flKeyCardHtml(){
     '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Change','flStartChange()',true)+_flBtn('Remove','flRemoveKey()',false)+'</div>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:8px">One key serves every app and device signed in to your account.</div>';
   if(_flErr&&_flKey&&(!_flKey.set||_flKeyChanging))b+='<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+'</div>';
-  return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Food logging · API key</div>'+b+'</div>';}
+  return _flSecCard('flkey','Food log · API key',b);}
+// Settings cards follow the Settings design: a header bar that opens and closes, collapsed
+// by default (Henrik, 2026-10-22: "they should be default collapsed like all others").
+function _flSecCard(id,label,body){return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'+sSecHdr(id,label)+sSecBody(id)+'<div style="padding:14px 16px">'+body+'</div></div></div>';}
 function _flRenderKeyCard(){var el=document.getElementById('fl-key-card');if(el)el.innerHTML=_flKeyCardHtml();}
 async function buildFlKeyCard(){_flRenderImportCard();try{var r=await fetch(AGENT_URL+'/food-log/key',{headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flRenderKeyCard();}
 function flStartChange(){_flKeyChanging=true;_flErr='';_flProv=_flProvOf(_flKey&&_flKey.provider||'gemini').id;_flRenderKeyCard();}
 function flCancelChange(){_flKeyChanging=false;_flErr='';_flRenderKeyCard();}
-function _flOpenSettingsAt(id){
+function _flOpenSettingsAt(id,sec){
   if(typeof showPage==='function'&&document.getElementById('page-settings'))showPage('settings');
   else if(typeof switchTab==='function')switchTab('settings',document.getElementById('tab-btn-settings'));
+  if(!_sOpen[sec])toggleSSec(sec);                    // the button opens the section it points at
   var c=document.getElementById(id);if(c&&c.scrollIntoView)c.scrollIntoView({block:'start'});}
-function flOpenKeySettings(){_flOpenSettingsAt('fl-key-card');}
-function flOpenImportSettings(){_flOpenSettingsAt('fl-import-card');}
+function flOpenKeySettings(){_flOpenSettingsAt('fl-key-card','flkey');}
+function flOpenImportSettings(){_flOpenSettingsAt('fl-import-card','flimport');}
 // Import an old log from a CSV or Excel file (Henrik, 2026-10-22: "an "import" feature
 // Button in Macros tab but actual feature in Settings"). The backend reads the file;
 // rows already in the log are skipped, so the same file can be imported twice safely.
@@ -4232,9 +4236,9 @@ function _flImportCardHtml(){
   if(_flImp.busy)s='<div style="margin-top:10px;font-size:13px;color:var(--muted)">Importing…</div>';
   else if(_flImp.err)s='<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flImp.err)+'</div>';
   else if(_flImp.msg)s='<div style="margin-top:10px;font-size:13px;color:var(--text)">'+_flEsc(_flImp.msg)+'</div>';
-  return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Food logging · Import old log</div>'+
+  return _flSecCard('flimport','Food log · Import old log',
     '<div style="font-size:13px;color:var(--text);line-height:1.5">Choose a CSV or Excel (.xlsx) file. It needs a header row with at least <b>Date</b> and <b>Kcal</b>; Food, Amount, Time, Protein, Carbs and Fat are read when present. Entries already in your log are skipped, so importing the same file twice is safe.</div>'+
-    '<input id="fl-import-file" type="file" accept=".csv,.xlsx,.txt,.tsv,text/csv,text/plain" onchange="flImportFile(this)"'+(_flImp.busy?' disabled':'')+' style="margin-top:10px;font-size:14px;color:var(--text)">'+s+'</div>';}
+    '<input id="fl-import-file" type="file" accept=".csv,.xlsx,.txt,.tsv,text/csv,text/plain" onchange="flImportFile(this)"'+(_flImp.busy?' disabled':'')+' style="margin-top:10px;font-size:14px;color:var(--text)">'+s);}
 function _flRenderImportCard(){var el=document.getElementById('fl-import-card');if(el)el.innerHTML=_flImportCardHtml();}
 function _flImportSummary(j){
   var t='Added '+j.added+' entr'+(j.added===1?'y':'ies')+'.';
