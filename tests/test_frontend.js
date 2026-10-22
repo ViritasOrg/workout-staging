@@ -8380,6 +8380,9 @@ console.log('\n── Macro targets (suggested + override) ───────
     h = els['fl-key-card'].innerHTML;
     check('  …Change asks for the new key and says which one it replaces',
       /id="fl-key-new"/.test(h) && /replaces the Anthropic key ending …WXYZ/.test(h) && /flSaveKey\('fl-key-new'\)/.test(h) && /flCancelChange\(\)/.test(h));
+    check('  …and explains how to get a new key, Gemini first and the paid alternative folded (2026-10-22)',
+      h.indexOf('https://aistudio.google.com/apikey') > 0 && h.indexOf('https://aistudio.google.com/apikey') < h.indexOf('<details') &&
+      h.indexOf('https://console.anthropic.com') > h.indexOf('<details') && /in Chrome/.test(h));
     K.flCancelChange();
     check('  …Cancel goes back without sending anything', !/id="fl-key-new"/.test(els['fl-key-card'].innerHTML) && calls.filter(c => c.method !== 'GET').length === 0);
     K.flStartChange();
@@ -8396,7 +8399,8 @@ console.log('\n── Macro targets (suggested + override) ───────
     check('  …and the card then shows the new key', /Gemini key ending …GEMI/.test(h) && !/id="fl-key-new"/.test(h));
     await K.flRemoveKey();
     h = els['fl-key-card'].innerHTML;
-    check('  …Remove leaves the card offering to add a key', /No API key yet/.test(h) && /flSaveKey\('fl-key-new'\)/.test(h));
+    check('  …Remove leaves the card offering to add a key, with how to get one',
+      /No API key yet/.test(h) && /flSaveKey\('fl-key-new'\)/.test(h) && /https:\/\/aistudio\.google\.com\/apikey/.test(h));
     if (failed > 0) process.exitCode = 1;
   })().catch(e => { check('food key: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }

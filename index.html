@@ -4118,22 +4118,28 @@ function _flTargetsHtml(t){var g=(typeof _macrosTargets!=='undefined')?_macrosTa
   if(g.kcal>0)out.push(line('Calories',t.kcal,Math.round(g.kcal),'kcal'));if(g.protein>0)out.push(line('Protein',t.protein,Math.round(g.protein),'g'));if(g.carbs>0)out.push(line('Carbs',t.carbs,Math.round(g.carbs),'g'));if(g.fat>0)out.push(line('Fat',t.fat,Math.round(g.fat),'g'));return out.join('');}
 function _flCard(inner){return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">'+inner+'</div>';}
 function _flBtn(label,onclick,primary){return'<button onclick="'+onclick+'" style="background:'+(primary?'var(--accent)':'var(--surface2)')+';color:'+(primary?'#000':'var(--text)')+';border:1px solid '+(primary?'transparent':'var(--border)')+';border-radius:10px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';}
-function _flGuideHtml(){
+// How to get a key, shown wherever a key is entered: first setup, and Change in Settings
+// (Henrik, 2026-10-22: "if i change Key I dont get any instructions").
+function _flKeyHowTo(){
   var a=function(u){return'<a href="'+u+'" target="_blank" rel="noopener" style="color:var(--accent)">'+u+'</a>';};
-  return _flCard('<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Turn on food logging</div>'+
-    '<div style="font-size:13px;color:var(--text);line-height:1.55">Food logging estimates calories and macros with AI on your own API key. A Google Gemini key is free:'+
+  return'<div style="font-size:13px;color:var(--text);line-height:1.55">A Google Gemini key is free:'+
     '<ol style="margin:8px 0 8px 18px;padding:0">'+
     '<li>Open '+a('https://aistudio.google.com/apikey')+' in Chrome and sign in with your Google account.</li>'+
     '<li>Tap <b>Create API key</b>, accepting the terms if asked.</li>'+
     '<li>Copy the key. It starts with <code>AIza</code>.</li>'+
-    '<li>Paste it below and tap <b>Save key</b>.</li></ol>'+
+    '<li>Paste it below and save it.</li></ol>'+
     '<details style="margin-bottom:6px"><summary style="cursor:pointer;color:var(--muted)">Use Anthropic (Claude) instead, paid</summary>'+
     '<ol style="margin:8px 0 8px 18px;padding:0">'+
     '<li>Open '+a('https://console.anthropic.com')+' in Chrome and sign in or create an account.</li>'+
     '<li>Under <b>Billing</b>, add a payment method and a small amount of credit.</li>'+
     '<li>Under <b>API keys</b>, tap <b>Create key</b> and copy it. It starts with <code>sk-ant-</code>.</li>'+
-    '<li>Paste it below and tap <b>Save key</b>.</li></ol></details>'+
-    'Your key is stored encrypted on the server and is only ever shown again as its last 4 characters.</div>'+
+    '<li>Paste it below and save it.</li></ol></details></div>';
+}
+function _flGuideHtml(){
+  return _flCard('<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Turn on food logging</div>'+
+    '<div style="font-size:13px;color:var(--text);line-height:1.55">Food logging estimates calories and macros with AI on your own API key.</div>'+
+    _flKeyHowTo()+
+    '<div style="font-size:13px;color:var(--text);line-height:1.55">Your key is stored encrypted on the server and is only ever shown again as its last 4 characters.</div>'+
     '<input id="fl-key-in" type="password" autocomplete="off" placeholder="AIza…" style="width:100%;box-sizing:border-box;margin:10px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">'+
     _flBtn('Save key','flSaveKey()',true)+
     (_flErr?'<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+'</div>':''));
@@ -4172,8 +4178,8 @@ function _flKeyCardHtml(){
   var inp='<input id="fl-key-new" type="password" autocomplete="off" placeholder="AIza… or sk-ant-…" style="width:100%;box-sizing:border-box;margin:8px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';
   var b='';
   if(!_flKey)b='<div style="font-size:13px;color:var(--muted)">Could not load your API key status. Check your connection.</div>';
-  else if(!_flKey.set)b='<div style="font-size:13px;color:var(--text);line-height:1.5">No API key yet. Food logging on the Macros page shows how to get a free Gemini key.</div>'+inp+_flBtn('Save key',"flSaveKey('fl-key-new')",true);
-  else if(_flKeyChanging)b='<div style="font-size:13px;color:var(--text)">Paste the new key. It replaces the '+_flKeyName()+' key ending …'+_flEsc(_flKey.last4)+'.</div>'+inp+
+  else if(!_flKey.set)b='<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:6px">No API key yet.</div>'+_flKeyHowTo()+inp+_flBtn('Save key',"flSaveKey('fl-key-new')",true);
+  else if(_flKeyChanging)b='<div style="font-size:13px;color:var(--text);margin-bottom:6px">The new key replaces the '+_flKeyName()+' key ending …'+_flEsc(_flKey.last4)+'.</div>'+_flKeyHowTo()+inp+
     '<div style="display:flex;gap:8px">'+_flBtn('Save new key',"flSaveKey('fl-key-new')",true)+_flBtn('Cancel','flCancelChange()',false)+'</div>';
   else b='<div style="font-size:13px;color:var(--text)">'+_flKeyName()+' key ending …'+_flEsc(_flKey.last4)+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Change','flStartChange()',true)+_flBtn('Remove','flRemoveKey()',false)+'</div>'+
