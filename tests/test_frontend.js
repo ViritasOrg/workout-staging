@@ -8264,6 +8264,8 @@ console.log('\n── Macro targets (suggested + override) ───────
 {
   const _src = fs.readFileSync(htmlPath, 'utf8');
   const _blk = _src.slice(_src.indexOf('// ── Macro targets (Workout) ──'), _src.indexOf('// ── Food log (Macros) ──'));
+  check('macro targets: the hormone switch is restored from the account on a new device',
+    /if\(s\['wkt-on-hormones'\]!==undefined\)setData\('wkt-on-hormones',s\['wkt-on-hormones'\]===true\)/.test(_src));
   check('macro targets: no calorie model in this app, only the backend\'s',
     _blk.length > 500 && /\/macro-targets\?/.test(_blk) && !/370\s*\+\s*21\.6|6\.25\s*\*|\*\s*1\.4\b/.test(_blk));
   const ls = {}, calls = [], pushed = [], els = {};
@@ -8289,6 +8291,19 @@ console.log('\n── Macro targets (suggested + override) ───────
     const h = els['wk-macro-targets'].innerHTML;
     check('macro targets: shows the suggestion and offers a phase choice', /2450/.test(h) && /225 g/.test(h) && /setWkMacroPhase\('cut'\)/.test(h) && /Set my own targets instead/.test(h));
     check('macro targets: the food log reads the suggestion', T._macrosTargets && T._macrosTargets.kcal === 2450 && T._macrosTargets.protein === 225);
+    check('macro targets: the hormone switch is off by default and named for her profile: HRT',
+      /id="wk-on-hormones"(?! checked)/.test(h) && /On HRT/.test(h) && !/On TRT/.test(h));
+    calls.length = 0; pushed.length = 0;
+    await T.setWkOnHormones(true);
+    check('  …switched on, the suggestion is asked for as on hormones, and saved to the account',
+      calls.some(u => /on_androgens=true/.test(u)) && pushed.some(p => p['wkt-on-hormones'] === true) &&
+      /id="wk-on-hormones" checked/.test(els['wk-macro-targets'].innerHTML));
+    ls['wkt-profile'] = JSON.stringify({gender: 'male', height: 168, age: 38});
+    check('  …and it reads TRT for a male profile', /On TRT/.test(T._wkMacroTargetsHtml()));
+    ls['wkt-profile'] = JSON.stringify({gender: 'female', height: 168, age: 38});
+    calls.length = 0;
+    await T.setWkOnHormones(false);
+    check('  …switched off again, on_androgens is false', calls.some(u => /on_androgens=false/.test(u)) && pushed.some(p => p['wkt-on-hormones'] === false));
     calls.length = 0;
     await T.setWkMacroPhase('cut');
     check('macro targets: changing phase is saved to the account and asks again',
