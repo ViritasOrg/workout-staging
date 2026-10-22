@@ -4234,7 +4234,7 @@ function _flImportCardHtml(){
   else if(_flImp.msg)s='<div style="margin-top:10px;font-size:13px;color:var(--text)">'+_flEsc(_flImp.msg)+'</div>';
   return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Food logging · Import old log</div>'+
     '<div style="font-size:13px;color:var(--text);line-height:1.5">Choose a CSV or Excel (.xlsx) file. It needs a header row with at least <b>Date</b> and <b>Kcal</b>; Food, Amount, Time, Protein, Carbs and Fat are read when present. Entries already in your log are skipped, so importing the same file twice is safe.</div>'+
-    '<input id="fl-import-file" type="file" accept=".csv,.xlsx,text/csv" onchange="flImportFile(this)"'+(_flImp.busy?' disabled':'')+' style="margin-top:10px;font-size:14px;color:var(--text)">'+s+'</div>';}
+    '<input id="fl-import-file" type="file" accept=".csv,.xlsx,.txt,.tsv,text/csv,text/plain" onchange="flImportFile(this)"'+(_flImp.busy?' disabled':'')+' style="margin-top:10px;font-size:14px;color:var(--text)">'+s+'</div>';}
 function _flRenderImportCard(){var el=document.getElementById('fl-import-card');if(el)el.innerHTML=_flImportCardHtml();}
 function _flImportSummary(j){
   var t='Added '+j.added+' entr'+(j.added===1?'y':'ies')+'.';
