@@ -4119,28 +4119,53 @@ function _flTargetsHtml(t){var g=(typeof _macrosTargets!=='undefined')?_macrosTa
 function _flCard(inner){return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">'+inner+'</div>';}
 function _flBtn(label,onclick,primary){return'<button onclick="'+onclick+'" style="background:'+(primary?'var(--accent)':'var(--surface2)')+';color:'+(primary?'#000':'var(--text)')+';border:1px solid '+(primary?'transparent':'var(--border)')+';border-radius:10px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';}
 // How to get a key, shown wherever a key is entered: first setup, and Change in Settings
-// (Henrik, 2026-10-22: "if i change Key I dont get any instructions").
-function _flKeyHowTo(){
+// (Henrik, 2026-10-22: "if i change Key I dont get any instructions"). One provider at a
+// time, Gemini first because it is free; OpenAI, xAI and Azure OpenAI added the same day
+// ("lets add OpenAI, Grok/xAI Key support as well as Copilot/Microsoft").
+var _flProv='gemini';
+var _FL_PROV=[
+  {id:'gemini',name:'Gemini',label:'Google Gemini (free)',ph:'AIza…'},
+  {id:'anthropic',name:'Anthropic',label:'Anthropic Claude (paid)',ph:'sk-ant-…'},
+  {id:'openai',name:'OpenAI',label:'OpenAI ChatGPT (paid)',ph:'sk-…'},
+  {id:'xai',name:'xAI',label:'xAI Grok (paid)',ph:'xai-…'},
+  {id:'azure',name:'Azure OpenAI',label:'Microsoft Azure OpenAI (paid)',ph:'KEY 1 from Azure'}];
+function _flProvOf(id){for(var i=0;i<_FL_PROV.length;i++)if(_FL_PROV[i].id===id)return _FL_PROV[i];return _FL_PROV[1];}
+function _flKeySteps(id){
   var a=function(u){return'<a href="'+u+'" target="_blank" rel="noopener" style="color:var(--accent)">'+u+'</a>';};
-  return'<div style="font-size:13px;color:var(--text);line-height:1.55">A Google Gemini key is free:'+
-    '<ol style="margin:8px 0 8px 18px;padding:0">'+
-    '<li>Open '+a('https://aistudio.google.com/apikey')+' in Chrome and sign in with your Google account.</li>'+
-    '<li>Tap <b>Create API key</b>, accepting the terms if asked.</li>'+
-    '<li>Copy the key. It starts with <code>AIza</code>.</li>'+
-    '<li>Paste it below and save it.</li></ol>'+
-    '<details style="margin-bottom:6px"><summary style="cursor:pointer;color:var(--muted)">Use Anthropic (Claude) instead, paid</summary>'+
-    '<ol style="margin:8px 0 8px 18px;padding:0">'+
-    '<li>Open '+a('https://console.anthropic.com')+' in Chrome and sign in or create an account.</li>'+
-    '<li>Under <b>Billing</b>, add a payment method and a small amount of credit.</li>'+
-    '<li>Under <b>API keys</b>, tap <b>Create key</b> and copy it. It starts with <code>sk-ant-</code>.</li>'+
-    '<li>Paste it below and save it.</li></ol></details></div>';
+  var li=function(x){return'<ol style="margin:8px 0 8px 18px;padding:0">'+x.map(function(t){return'<li>'+t+'</li>';}).join('')+'</ol>';};
+  if(id==='anthropic')return li(['Open '+a('https://console.anthropic.com')+' in Chrome and sign in or create an account.',
+    'Under <b>Billing</b>, add a payment method and a small amount of credit.',
+    'Under <b>API keys</b>, tap <b>Create key</b> and copy it. It starts with <code>sk-ant-</code>.','Paste it below and save it.']);
+  if(id==='openai')return li(['Open '+a('https://platform.openai.com')+' in Chrome and sign in or create an account.',
+    'Under <b>Billing</b>, add a small amount of credit.',
+    'Under <b>API keys</b>, create a new secret key and copy it. It starts with <code>sk-</code>.','Paste it below and save it.']);
+  if(id==='xai')return li(['Open '+a('https://console.x.ai')+' in Chrome, sign up and load the account with credits.',
+    'On the <b>API Keys</b> page, create a key and copy it.','Paste it below and save it.']);
+  if(id==='azure')return'<div style="color:var(--muted)">Microsoft Copilot has no API key of its own; Azure OpenAI is Microsoft\'s route for apps.</div>'+
+    li(['You need an Azure subscription: '+a('https://azure.microsoft.com/pricing/purchase-options/azure-account')+'.',
+    'In '+a('https://portal.azure.com')+' (Chrome), create an <b>Azure OpenAI</b> resource.',
+    'In '+a('https://ai.azure.com')+', open <b>Deployments</b>, tap <b>+ Deploy model</b> → <b>Deploy base model</b> and pick a model that accepts images, e.g. gpt-5-mini. Note its <b>deployment name</b>.',
+    'Back in the portal, open your resource → <b>Resource Management</b> → <b>Keys and Endpoint</b>. Copy the <b>Endpoint</b> and <b>KEY 1</b>.',
+    'Fill in the endpoint, the deployment name and the key below, and save.'])+
+    '<input id="fl-key-endpoint" type="text" autocomplete="off" placeholder="https://your-resource.openai.azure.com" style="'+_FL_IN+'">'+
+    '<input id="fl-key-deployment" type="text" autocomplete="off" placeholder="Deployment name, e.g. gpt-5-mini" style="'+_FL_IN+'">';
+  return li(['Open '+a('https://aistudio.google.com/apikey')+' in Chrome and sign in with your Google account.',
+    'Tap <b>Create API key</b>, accepting the terms if asked.','Copy the key. It starts with <code>AIza</code>.','Paste it below and save it.']);
 }
+var _FL_IN='width:100%;box-sizing:border-box;margin:6px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px';
+function _flKeyHowTo(){
+  return'<div style="font-size:13px;color:var(--text);line-height:1.55"><label style="display:block;color:var(--muted);margin-bottom:4px">Provider</label>'+
+    '<select id="fl-key-prov" onchange="flPickProvider(this.value)" style="'+_FL_IN+'">'+
+    _FL_PROV.map(function(p){return'<option value="'+p.id+'"'+(p.id===_flProv?' selected':'')+'>'+p.label+'</option>';}).join('')+'</select>'+
+    _flKeySteps(_flProv)+'</div>';
+}
+function flPickProvider(v){_flProv=_flProvOf(v).id;_flErr='';_flRender();_flRenderKeyCard();}
 function _flGuideHtml(){
   return _flCard('<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Turn on food logging</div>'+
     '<div style="font-size:13px;color:var(--text);line-height:1.55">Food logging estimates calories and macros with AI on your own API key.</div>'+
     _flKeyHowTo()+
     '<div style="font-size:13px;color:var(--text);line-height:1.55">Your key is stored encrypted on the server and is only ever shown again as its last 4 characters.</div>'+
-    '<input id="fl-key-in" type="password" autocomplete="off" placeholder="AIza…" style="width:100%;box-sizing:border-box;margin:10px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">'+
+    '<input id="fl-key-in" type="password" autocomplete="off" placeholder="'+_flProvOf(_flProv).ph+'" style="width:100%;box-sizing:border-box;margin:10px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">'+
     _flBtn('Save key','flSaveKey()',true)+
     (_flErr?'<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+'</div>':''));
 }
@@ -4173,9 +4198,9 @@ function _flMainHtml(){
 // as well", with a one-step Change). Change saves the new key over the old one, so food
 // logging never pauses in between; the provider follows from the key as everywhere else.
 var _flKeyChanging=false;
-function _flKeyName(){return _flKey&&_flKey.provider==='gemini'?'Gemini':'Anthropic';}
+function _flKeyName(){return _flProvOf(_flKey&&_flKey.provider||'anthropic').name;}
 function _flKeyCardHtml(){
-  var inp='<input id="fl-key-new" type="password" autocomplete="off" placeholder="AIza… or sk-ant-…" style="width:100%;box-sizing:border-box;margin:8px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';
+  var inp='<input id="fl-key-new" type="password" autocomplete="off" placeholder="'+_flProvOf(_flProv).ph+'" style="width:100%;box-sizing:border-box;margin:8px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';
   var b='';
   if(!_flKey)b='<div style="font-size:13px;color:var(--muted)">Could not load your API key status. Check your connection.</div>';
   else if(!_flKey.set)b='<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:6px">No API key yet.</div>'+_flKeyHowTo()+inp+_flBtn('Save key',"flSaveKey('fl-key-new')",true);
@@ -4188,7 +4213,7 @@ function _flKeyCardHtml(){
   return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Food logging · API key</div>'+b+'</div>';}
 function _flRenderKeyCard(){var el=document.getElementById('fl-key-card');if(el)el.innerHTML=_flKeyCardHtml();}
 async function buildFlKeyCard(){try{var r=await fetch(AGENT_URL+'/food-log/key',{headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flRenderKeyCard();}
-function flStartChange(){_flKeyChanging=true;_flErr='';_flRenderKeyCard();}
+function flStartChange(){_flKeyChanging=true;_flErr='';_flProv=_flProvOf(_flKey&&_flKey.provider||'gemini').id;_flRenderKeyCard();}
 function flCancelChange(){_flKeyChanging=false;_flErr='';_flRenderKeyCard();}
 function flOpenKeySettings(){
   if(typeof showPage==='function'&&document.getElementById('page-settings'))showPage('settings');
@@ -4203,12 +4228,13 @@ async function buildFoodLog(){
   if(_flKey&&_flKey.set){var rows=await _flLoadRows(_flDay());if(rows)_flRows=rows;}
   _flRender();
 }
+function _flKeyBody(k){var b={api_key:k,provider:_flProv};if(_flProv==='azure'){var e=document.getElementById('fl-key-endpoint'),d=document.getElementById('fl-key-deployment');b.endpoint=e?String(e.value||'').trim():'';b.deployment=d?String(d.value||'').trim():'';}return b;}
 async function flSaveKey(inputId){var el=document.getElementById(inputId||'fl-key-in');var k=el?String(el.value||'').trim():'';if(!k)return;_flErr='';
-  try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({api_key:k})});var j=await r.json().catch(function(){return{};});
+  try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(_flKeyBody(k))});var j=await r.json().catch(function(){return{};});
     if(!r.ok){_flErr=_flDetail(r,j);_flRender();_flRenderKeyCard();return;}_flKey=j;_flKeyChanging=false;}catch(e){_flErr='Could not reach the server. Check your connection and try again.';_flRender();_flRenderKeyCard();return;}
   _flRenderKeyCard();buildFoodLog();}
 async function flRemoveKey(){if(!confirmGlobalDelete('your API key (food logging stops until you add one again)'))return;
-  try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'DELETE',headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flKeyChanging=false;_flRender();_flRenderKeyCard();}
+  try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'DELETE',headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flKeyChanging=false;_flProv='gemini';_flRender();_flRenderKeyCard();}
 // Photos are shrunk to at most 1024 px on the long side before upload: the
 // estimate does not need more, and it keeps both the upload and the token cost small.
 function _flShrink(file){return new Promise(function(res,rej){var fr=new FileReader();fr.onerror=function(){rej(new Error('read'));};fr.onload=function(){var img=new Image();img.onerror=function(){rej(new Error('image'));};img.onload=function(){var s=Math.min(1,1024/Math.max(img.width,img.height));var c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.8).split(',')[1]);};img.src=fr.result;};fr.readAsDataURL(file);});}
