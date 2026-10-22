@@ -8293,12 +8293,32 @@ console.log('\n── Macro targets (suggested + override) ───────
     await T.setWkMacroPhase('cut');
     check('macro targets: changing phase is saved to the account and asks again',
       pushed.some(p => p['wkt-macro-phase'] === 'cut') && calls.some(u => /phase=cut/.test(u)));
+    // Own targets are protein, carbs and fat; kcal is calculated (Henrik, 2026-10-22: "I want
+    // to add my own target for all macros and have kcal calculated").
     T._wkOverrideOpen = true; T._wkRenderTargets();
-    T.document.getElementById('wk-tg-kcal').value = '3100'; T.document.getElementById('wk-tg-protein').value = '';
+    let f = els['wk-macro-targets'].innerHTML;
+    check('macro targets: the own-targets form asks for protein, carbs and fat, not kcal',
+      /id="wk-tg-protein"/.test(f) && /id="wk-tg-carbs"/.test(f) && /id="wk-tg-fat"/.test(f) && !/id="wk-tg-kcal"/.test(f));
+    T.document.getElementById('wk-tg-protein').value = '213'; T.document.getElementById('wk-tg-carbs').value = '250';
+    T.document.getElementById('wk-tg-fat').value = '';
+    pushed.length = 0;
     T.saveWkMacroTargets();
-    check('macro targets: the manual override wins and is saved to the account',
-      T._macrosTargets.kcal === 3100 && T._macrosTargets.protein === null && pushed.some(p => p['wkt-macro-targets'] && p['wkt-macro-targets'].kcal === 3100) &&
-      /Using your own targets/.test(els['wk-macro-targets'].innerHTML) && /Use suggested/.test(els['wk-macro-targets'].innerHTML));
+    check('  …with one of them missing it says so and saves nothing',
+      /Fill in protein, carbs and fat/.test(els['wk-macro-targets'].innerHTML) && !pushed.some(p => 'wkt-macro-targets' in p));
+    T.document.getElementById('wk-tg-fat').value = '60';
+    T.wkTgCalc();
+    check('  …the kcal is shown as you type: 4/4/9 per gram', /= <b>2392 kcal<\/b>/.test(els['wk-tg-kcal-out'].innerHTML));
+    T.saveWkMacroTargets();
+    const mt = T._macrosTargets;
+    check('macro targets: the manual override wins, with every macro and the calculated kcal, and is saved to the account',
+      mt.kcal === 213 * 4 + 250 * 4 + 60 * 9 && mt.protein === 213 && mt.carbs === 250 && mt.fat === 60 &&
+      pushed.some(p => p['wkt-macro-targets'] && p['wkt-macro-targets'].fat === 60 && p['wkt-macro-targets'].kcal === 2392) &&
+      /Using your own targets: <b>P 213 g · C 250 g · F 60 g = 2392 kcal<\/b>/.test(els['wk-macro-targets'].innerHTML) && /Use suggested/.test(els['wk-macro-targets'].innerHTML));
+    ls['wkt-macro-targets'] = JSON.stringify({kcal: 2400, protein: 213});
+    T._wkApplyTargets();
+    check('macro targets: an override saved before (kcal and protein only) still applies as it was',
+      T._macrosTargets.kcal === 2400 && T._macrosTargets.protein === 213 && !T._macrosTargets.carbs &&
+      /Using your own targets: <b>2400 kcal · 213 g protein/.test(T._wkMacroTargetsHtml()));
     T.clearWkMacroOverride();
     check('macro targets: "Use suggested" returns to the suggestion',
       T._macrosTargets.kcal === 2450 && pushed.some(p => 'wkt-macro-targets' in p && p['wkt-macro-targets'] === null));

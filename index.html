@@ -4064,11 +4064,19 @@ if(!localStorage.getItem('workout_logs_synced_fly')&&getData('workout_logs',[]).
 var _macrosTargets=null,_wkSuggest=null,_wkSuggestQ='',_wkSuggestErr=false,_wkTrainKcal=0,_wkOverrideOpen=false;
 var WK_PHASES=[['reset','Reset'],['cut','Cut'],['recomp','Recomp']];
 function _wkPhase(){var v=getData('wkt-macro-phase','');return(v==='reset'||v==='cut'||v==='recomp')?v:'recomp';}
-function _wkTargetsFrom(v){var k=parseFloat(v&&v.kcal),p=parseFloat(v&&v.protein);k=k>0?Math.round(k):null;p=p>0?Math.round(p):null;return(k||p)?{kcal:k,protein:p}:null;}
+// Your own targets are protein, carbs and fat in grams, and kcal is calculated from them
+// (4/4/9 kcal per g). Henrik, 2026-10-22: "I want to add my own target for all macros and
+// have kcal calculated." An override saved before then holds kcal and protein only and is
+// still honoured as it is.
+var WK_KCAL_PER_G={protein:4,carbs:4,fat:9};
+function _wkKcalOf(p,c,f){return Math.round(p*WK_KCAL_PER_G.protein+c*WK_KCAL_PER_G.carbs+f*WK_KCAL_PER_G.fat);}
+function _wkTargetsFrom(v){var n=function(x){x=parseFloat(x);return x>0?Math.round(x):null;};var p=n(v&&v.protein),c=n(v&&v.carbs),f=n(v&&v.fat);
+  if(p&&c&&f)return{kcal:_wkKcalOf(p,c,f),protein:p,carbs:c,fat:f};
+  var k=n(v&&v.kcal);return(k||p)&&!c&&!f?{kcal:k,protein:p}:null;}
 function _wkLatest(arr,key){var a=(arr||[]).filter(function(e){return e&&e.date&&e[key]>0;}).slice().sort(function(x,y){return x.date<y.date?-1:x.date>y.date?1:0;});return a.length?a[a.length-1][key]:0;}
 function _wkMacroQuery(){var pr=getData('wkt-profile',{})||{};var bw=_wkLatest(weights,'weight')||parseFloat(pr.weight)||0;
   return 'bw='+bw+'&phase='+_wkPhase()+'&on_androgens=false&height_cm='+(parseFloat(pr.height)||0)+'&age='+(parseInt(pr.age)||0)+'&sex='+(pr.gender==='female'?'female':'male')+'&body_fat_pct='+(_wkLatest(bfLog,'bf')||0)+'&train_kcal='+Math.max(0,Math.round(_wkTrainKcal||0))+'&include_training=true&deficit_mode=absolute';}
-function _wkApplyTargets(){var o=_wkTargetsFrom(getData('wkt-macro-targets',null));_macrosTargets=o||(_wkSuggest&&(_wkSuggest.kcal||_wkSuggest.protein)?{kcal:_wkSuggest.kcal,protein:_wkSuggest.protein,carbs:_wkSuggest.carbs,fat:_wkSuggest.fat}:null);}
+function _wkApplyTargets(){var o=_wkTargetsFrom(getData('wkt-macro-targets',null));_macrosTargets=o?Object.assign({},o):(_wkSuggest&&(_wkSuggest.kcal||_wkSuggest.protein)?{kcal:_wkSuggest.kcal,protein:_wkSuggest.protein,carbs:_wkSuggest.carbs,fat:_wkSuggest.fat}:null);}
 function _wkMacroTargetsHtml(){var o=_wkTargetsFrom(getData('wkt-macro-targets',null));var m=_wkSuggest;var ph=_wkPhase();
   var btn=function(l,on,click){return'<button onclick="'+click+'" style="flex:1;background:'+(on?'var(--accent)':'var(--surface2)')+';color:'+(on?'#000':'var(--text)')+';border:1px solid '+(on?'transparent':'var(--border)')+';border-radius:20px;padding:7px 4px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+l+'</button>';};
   var h='<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Daily targets</div>';
@@ -4078,9 +4086,12 @@ function _wkMacroTargetsHtml(){var o=_wkTargetsFrom(getData('wkt-macro-targets',
   else if(m.kcal==null)h+='<div style="font-size:12px;color:var(--text);line-height:1.5">No calorie target yet. It needs <b>'+(m.missing||[]).join(' ')+'</b>: add '+((m.missing||[])[0]==='body weight'?'your body weight':'your height and age in Settings → Profile, or a body-fat reading')+'.'+(m.protein>0?' Protein '+m.protein+' g a day.':'')+'</div>';
   else h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center">'+[['kcal',m.kcal],['protein',m.protein+' g'],['carbs',m.carbs+' g'],['fat',m.fat+' g']].map(function(x){return'<div><div style="font-size:16px;font-weight:700;color:var(--text)">'+x[1]+'</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase">'+x[0]+'</div></div>';}).join('')+'</div>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5">Suggested from your profile and training: maintenance '+m.tdee+' kcal, '+(m.phaseOffset>=0?'+':'')+m.phaseOffset+' kcal for '+ph+'. Same model as Peptide Tracker.</div>';
-  if(o)h+='<div style="font-size:12px;color:var(--text);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">Using your own targets: <b>'+(o.kcal?o.kcal+' kcal':'')+(o.kcal&&o.protein?' · ':'')+(o.protein?o.protein+' g protein':'')+'</b> · <span onclick="clearWkMacroOverride()" style="text-decoration:underline;cursor:pointer">Use suggested</span></div>';
-  if(_wkOverrideOpen){var inp=function(id,v,ph2){return'<input id="'+id+'" inputmode="numeric" pattern="[0-9]*" value="'+(v||'')+'" placeholder="'+ph2+'" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';};var d=o||{};
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:var(--muted);margin-top:10px"><label>Calories (kcal)'+inp('wk-tg-kcal',d.kcal,m&&m.kcal?String(m.kcal):'')+'</label><label>Protein (g)'+inp('wk-tg-protein',d.protein,m&&m.protein?String(m.protein):'')+'</label></div>'+
+  if(o)h+='<div style="font-size:12px;color:var(--text);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">Using your own targets: <b>'+(o.carbs?'P '+o.protein+' g · C '+o.carbs+' g · F '+o.fat+' g = '+o.kcal+' kcal':(o.kcal?o.kcal+' kcal':'')+(o.kcal&&o.protein?' · ':'')+(o.protein?o.protein+' g protein':''))+'</b> · <span onclick="clearWkMacroOverride()" style="text-decoration:underline;cursor:pointer">Use suggested</span></div>';
+  if(_wkOverrideOpen){var inp=function(id,v,ph2){return'<input id="'+id+'" inputmode="numeric" pattern="[0-9]*" value="'+(v||'')+'" placeholder="'+ph2+'" oninput="wkTgCalc()" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';};var d=o||{};
+    var sp=function(k){return m&&m[k]?String(m[k]):'';};
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;color:var(--muted);margin-top:10px"><label>Protein (g)'+inp('wk-tg-protein',d.protein,sp('protein'))+'</label><label>Carbs (g)'+inp('wk-tg-carbs',d.carbs,sp('carbs'))+'</label><label>Fat (g)'+inp('wk-tg-fat',d.fat,sp('fat'))+'</label></div>'+
+      '<div id="wk-tg-kcal-out" style="font-size:12px;color:var(--text);margin-top:6px">'+_wkTgKcalText(d.carbs?d:{})+'</div>'+
+      (_wkOverrideErr?'<div style="font-size:12px;color:var(--danger,#ff3b30);margin-top:6px">'+_wkOverrideErr+'</div>':'')+
       '<button onclick="saveWkMacroTargets()" style="margin-top:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Save my targets</button>';}
   else if(!o)h+='<div style="margin-top:10px;font-size:12px"><span onclick="_wkOverrideOpen=true;_wkRenderTargets()" style="color:var(--muted);text-decoration:underline;cursor:pointer">Set my own targets instead</span></div>';
   else h+='<div style="margin-top:6px;font-size:12px"><span onclick="_wkOverrideOpen=true;_wkRenderTargets()" style="color:var(--muted);text-decoration:underline;cursor:pointer">Change my targets</span></div>';
@@ -4092,8 +4103,14 @@ async function buildWkMacroTargets(){_wkRenderTargets();
   try{var pr=getData('wkt-profile',{})||{};var bw=_wkLatest(weights,'weight')||parseFloat(pr.weight)||0;var r=await fetch(AGENT_URL+'/training-energy?days=14'+(bw?'&bodyweight_kg='+bw:'')+(pr.height?'&height_cm='+pr.height:''),{headers:authHeaders()});if(r.ok){var d=await r.json();_wkTrainKcal=(d&&isFinite(d.avg_per_calendar_day))?d.avg_per_calendar_day:0;}}catch(e){}
   return _wkFetchSuggest();}
 function setWkMacroPhase(p){setData('wkt-macro-phase',p);pushSettingsToAgent({'wkt-macro-phase':p});_wkSuggest=null;_wkRenderTargets();return _wkFetchSuggest();}
-function saveWkMacroTargets(){var g=function(id){var e=document.getElementById(id);return e?e.value:'';};var t=_wkTargetsFrom({kcal:g('wk-tg-kcal'),protein:g('wk-tg-protein')});setData('wkt-macro-targets',t);pushSettingsToAgent({'wkt-macro-targets':t});_wkOverrideOpen=false;_wkRenderTargets();}
-function clearWkMacroOverride(){setData('wkt-macro-targets',null);pushSettingsToAgent({'wkt-macro-targets':null});_wkOverrideOpen=false;_wkRenderTargets();}
+var _wkOverrideErr='';
+function _wkTgRead(){var g=function(id){var e=document.getElementById(id);return e?e.value:'';};return{protein:g('wk-tg-protein'),carbs:g('wk-tg-carbs'),fat:g('wk-tg-fat')};}
+function _wkTgKcalText(v){var t=_wkTargetsFrom(v);return t&&t.carbs?'= <b>'+t.kcal+' kcal</b> a day (4 per g protein and carbs, 9 per g fat)':'Calories are calculated from the three.';}
+function wkTgCalc(){var el=document.getElementById('wk-tg-kcal-out');if(el)el.innerHTML=_wkTgKcalText(_wkTgRead());}
+function saveWkMacroTargets(){var t=_wkTargetsFrom(_wkTgRead());
+  if(!t||!t.carbs){_wkOverrideErr='Fill in protein, carbs and fat.';_wkRenderTargets();return;}
+  _wkOverrideErr='';setData('wkt-macro-targets',t);pushSettingsToAgent({'wkt-macro-targets':t});_wkOverrideOpen=false;_wkRenderTargets();}
+function clearWkMacroOverride(){_wkOverrideErr='';setData('wkt-macro-targets',null);pushSettingsToAgent({'wkt-macro-targets':null});_wkOverrideOpen=false;_wkRenderTargets();}
 // ── Food log (Macros) ─────────────────────────────────────────────────────────
 // Henrik, 2026-10-21: type what you ate or take a photo, it is estimated and SAVED
 // straight away (no confirm step); corrections live on the separate Food Edit tab.
