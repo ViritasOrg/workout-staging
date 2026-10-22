@@ -8266,6 +8266,8 @@ console.log('\n── Macro targets (suggested + override) ───────
   const _blk = _src.slice(_src.indexOf('// ── Macro targets (Workout) ──'), _src.indexOf('// ── Food log (Macros) ──'));
   check('macro targets: the hormone switch is restored from the account on a new device',
     /if\(s\['wkt-on-hormones'\]!==undefined\)setData\('wkt-on-hormones',s\['wkt-on-hormones'\]===true\)/.test(_src));
+  check('macro targets: the training-burn option is restored from the account on a new device',
+    /s\['wkt-macro-include-training'\]/.test(_src));
   check('macro targets: no calorie model in this app, only the backend\'s',
     _blk.length > 500 && /\/macro-targets\?/.test(_blk) && !/370\s*\+\s*21\.6|6\.25\s*\*|\*\s*1\.4\b/.test(_blk));
   const ls = {}, calls = [], pushed = [], els = {};
@@ -8288,6 +8290,10 @@ console.log('\n── Macro targets (suggested + override) ───────
     const q = calls.find(u => /macro-targets/.test(u)) || '';
     check('macro targets: suggested from the profile, latest weight, body fat and training burn',
       /bw=85\.2/.test(q) && /sex=female/.test(q) && /height_cm=168/.test(q) && /age=38/.test(q) && /body_fat_pct=16/.test(q) && /train_kcal=310/.test(q) && /phase=recomp/.test(q) && /on_androgens=false/.test(q));
+    check('macro targets: training burn is left out by default (Henrik, 2026-10-22: "default OFF")',
+      /include_training=false/.test(q) && !/include_training=true/.test(q) &&
+      /id="wk-include-training"(?! checked)/.test(els['wk-macro-targets'].innerHTML) &&
+      /Suggested from your profile: maintenance/.test(els['wk-macro-targets'].innerHTML));
     const h = els['wk-macro-targets'].innerHTML;
     check('macro targets: shows the suggestion and offers a phase choice', /2450/.test(h) && /225 g/.test(h) && /setWkMacroPhase\('cut'\)/.test(h) && /Set my own targets instead/.test(h));
     check('macro targets: the food log reads the suggestion', T._macrosTargets && T._macrosTargets.kcal === 2450 && T._macrosTargets.protein === 225);
@@ -8304,6 +8310,15 @@ console.log('\n── Macro targets (suggested + override) ───────
     calls.length = 0;
     await T.setWkOnHormones(false);
     check('  …switched off again, on_androgens is false', calls.some(u => /on_androgens=false/.test(u)) && pushed.some(p => p['wkt-on-hormones'] === false));
+    calls.length = 0; pushed.length = 0;
+    await T.setWkIncludeTraining(true);
+    check('  …ticking "Count training burn" asks with include_training=true and saves it to the account',
+      calls.some(u => /include_training=true/.test(u)) && pushed.some(p => p['wkt-macro-include-training'] === true) &&
+      /id="wk-include-training" checked/.test(els['wk-macro-targets'].innerHTML) &&
+      /Suggested from your profile and training/.test(els['wk-macro-targets'].innerHTML));
+    calls.length = 0;
+    await T.setWkIncludeTraining(false);
+    check('  …unticked again, include_training is false', calls.some(u => /include_training=false/.test(u)) && pushed.some(p => p['wkt-macro-include-training'] === false));
     calls.length = 0;
     await T.setWkMacroPhase('cut');
     check('macro targets: changing phase is saved to the account and asks again',
