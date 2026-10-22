@@ -8455,6 +8455,51 @@ console.log('\n── Macro targets (suggested + override) ───────
   })().catch(e => { check('food key providers: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
+// ── Food log: import an old log from CSV or Excel (2026-10-22) ──
+// Henrik: "also need an "import" feature Button in Macros tab but actual feature in
+// Settings, so one can import a excel or csv file with an old log".
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
+  check('food import: Settings carries the import card', /<div id="fl-import-card"[^>]*><\/div>/.test(_src));
+  const calls = [], els = {};
+  let reply = {ok: true, status: 200, body: {ok: true, added: 3, duplicates: 2, skipped: 1, problems: [{row: 7, reason: 'no kcal'}]}};
+  const I = vm.createContext({console, Promise, JSON, Math, String, Number, parseFloat, encodeURIComponent,
+    AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
+    document: {getElementById: (id) => { if (!els[id]) { let h = ''; els[id] = {value: ''}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async (url, opt) => { const m = (opt && opt.method) || 'GET'; calls.push({url, method: m, body: opt && opt.body ? JSON.parse(opt.body) : null});
+      if (/import-file$/.test(url)) return {ok: reply.ok, status: reply.status, json: async () => reply.body};
+      return {ok: true, status: 200, json: async () => ({set: true, last4: 'GEMI', provider: 'gemini'})}; },
+  });
+  vm.runInContext(_blk, I);
+  I._flReadB64 = async () => 'Q1NW';
+  I._flKey = {set: true, last4: 'GEMI', provider: 'gemini'}; I._flRows = []; I._flErr = ''; I._flPending = null; I._flBusy = false;
+  const main = I._flMainHtml();
+  check('food import: the Macros page has an Import button that opens Settings', /Import old log/.test(main) && /flOpenImportSettings\(\)/.test(main) && !/fl-import-file/.test(main));
+  (async () => {
+    await I.buildFlKeyCard();
+    let h = els['fl-import-card'].innerHTML;
+    check('food import: opening Settings shows the card: CSV or Excel, needs Date and Kcal',
+      /type="file"/.test(h) && /accept="\.csv,\.xlsx/.test(h) && /<b>Date<\/b>/.test(h) && /<b>Kcal<\/b>/.test(h) && /importing the same file twice is safe/.test(h));
+    const inp = {files: [{name: 'old log.xlsx', size: 1200}], value: 'x'};
+    await I.flImportFile(inp);
+    const post = calls.find(c => /import-file$/.test(c.url));
+    check('  …picking a file sends its name and contents once', calls.filter(c => /import-file$/.test(c.url)).length === 1 &&
+      post.method === 'POST' && post.body.filename === 'old log.xlsx' && post.body.data_b64 === 'Q1NW' && inp.value === '');
+    h = els['fl-import-card'].innerHTML;
+    check('  …and says what was added, what was already there and which rows were skipped',
+      /Added 3 entries\. 2 were already in your log\. 1 row skipped: row 7 \(no kcal\)\./.test(h));
+    reply = {ok: false, status: 400, body: {detail: 'No header row with a date and a kcal column was found.'}};
+    await I.flImportFile({files: [{name: 'x.csv', size: 10}], value: 'x'});
+    h = els['fl-import-card'].innerHTML;
+    check('  …a refused file shows the reason and that nothing was imported', /No header row/.test(h) && /Nothing was imported/.test(h));
+    calls.length = 0;
+    await I.flImportFile({files: [{name: 'huge.csv', size: 6000000}], value: 'x'});
+    check('  …a file over 5 MB is refused without sending it', calls.length === 0 && /larger than 5 MB/.test(els['fl-import-card'].innerHTML));
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('food import: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
 // ── Food Edit: every entry has an editable amount, and correcting it rescales (2026-10-21) ──
 // Henrik: "each entry needs a grams total also, a typo for chicken breast should be possible
 // to Edit instead of forcing me to delete the line".
