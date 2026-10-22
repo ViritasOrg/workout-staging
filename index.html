@@ -404,6 +404,7 @@
       <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;color:var(--muted)">Backup — monthly</span><span style="font-size:13px;" id="s-backup-monthly">—</span></div>
       </div>
     </div>
+    <div id="fl-key-card"></div>
     <div id="s-deploy-card"></div>
     <div id="s-tabs-card" style="margin-top:0"></div>
     <div id="s-appearance-card"></div>
@@ -1344,7 +1345,7 @@ function _diagRenderInto(host){
 function buildStoragePage(){var _el=document.getElementById('page-storage');if(!_el)return;var _esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};_lsDbgKeys=[];for(var _di=0;_di<localStorage.length;_di++){var _dk=localStorage.key(_di);if(_dk!=null)_lsDbgKeys.push(_dk);}_lsDbgKeys.sort();var _rows=_lsDbgKeys.map(function(k,i){var _raw=localStorage.getItem(k)||'';var _extra='';try{var _pv=JSON.parse(_raw);if(Array.isArray(_pv))_extra='array · '+_pv.length+' items';else if(_pv!==null&&typeof _pv==='object')_extra='object · '+Object.keys(_pv).length+' keys';else _extra=typeof _pv;}catch(e){_extra='string';}var _trunc=_raw.length>300;var _disp=_trunc?_raw.slice(0,300)+'…':_raw;return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+'<div><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:600">'+_esc(k)+'</span><span style="font-size:10px;color:var(--muted);margin-left:8px">'+_esc(_extra)+'</span></div>'+'<button onclick="lsDbgCopy('+i+')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 10px;font-size:10px;cursor:pointer;font-family:inherit;flex-shrink:0">Copy</button>'+'</div>'+'<pre style="font-family:monospace;font-size:10px;color:var(--muted);white-space:pre-wrap;word-break:break-all;margin:0;line-height:1.4;max-height:100px;overflow:hidden">'+_esc(_disp)+'</pre>'+'</div>';}).join('');_el.innerHTML='<div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:13px;color:var(--muted)">'+_lsDbgKeys.length+' keys in localStorage</div><div style="display:flex;gap:8px"><button onclick="buildStoragePage()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Refresh</button><button onclick="lsDbgCopyAll()" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Copy All</button></div></div>'+_rows+'</div>';_diagRenderInto(_el);}
 function lsDbgCopy(i){var k=_lsDbgKeys[i];if(k==null)return;var v=localStorage.getItem(k)||'';var out={};try{out[k]=JSON.parse(v);}catch(e){out[k]=v;}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
 function lsDbgCopyAll(){var out={};for(var _ci=0;_ci<localStorage.length;_ci++){var _ck=localStorage.key(_ci);if(!_ck)continue;var _cv=localStorage.getItem(_ck)||'';try{out[_ck]=JSON.parse(_cv);}catch(e){out[_ck]=_cv;}}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
-function showPage(name,btn){localStorage.setItem('wkt-last-page',name);_currentPage=name;var _pr=primaryOf(name);if(_pr){_currentPrimary=_pr;_lastSub[_pr]=name;try{localStorage.setItem('wkt-last-sub-'+_pr,name);}catch(e){}_setPrimaryActive(_pr);_applySubtabVis(_pr);}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs .tab').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');var _tb=document.getElementById('tab-btn-'+name);if(_tb)_tb.classList.add('active');if(name==='macros'){buildWkMacroTargets();buildFoodLog();}if(name==='foodedit')buildFoodEdit();if(name==='today'||name==='plan')buildProgramSettingsCard();if(name==='history')renderHistory();if(name==='progress')renderProgress();if(name==='settings')loadSettings();if(name==='storage')buildStoragePage();if(name==='log'){var _lc=document.getElementById('structured-log');var _hasReps=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});var _curDay=parseInt(document.getElementById('log-day').value)||0;
+function showPage(name,btn){localStorage.setItem('wkt-last-page',name);_currentPage=name;var _pr=primaryOf(name);if(_pr){_currentPrimary=_pr;_lastSub[_pr]=name;try{localStorage.setItem('wkt-last-sub-'+_pr,name);}catch(e){}_setPrimaryActive(_pr);_applySubtabVis(_pr);}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs .tab').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');var _tb=document.getElementById('tab-btn-'+name);if(_tb)_tb.classList.add('active');if(name==='macros'){buildWkMacroTargets();buildFoodLog();}if(name==='foodedit')buildFoodEdit();if(name==='today'||name==='plan')buildProgramSettingsCard();if(name==='history')renderHistory();if(name==='progress')renderProgress();if(name==='settings'){loadSettings();buildFlKeyCard();}if(name==='storage')buildStoragePage();if(name==='log'){var _lc=document.getElementById('structured-log');var _hasReps=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});var _curDay=parseInt(document.getElementById('log-day').value)||0;
     // Re-prefill when the on-screen log was built under a now-stale deload or unit
     // state (both toggles live outside the Log page, so their inline re-prefill only
     // fires when Log is already open). Never blow away a log with reps entered.
@@ -4159,9 +4160,34 @@ function _flMainHtml(){
     var head='<div onclick="flToggleList()" style="display:flex;justify-content:space-between;gap:10px;cursor:pointer;font-size:13px;color:var(--text)"><span>'+_flRows.length+' entr'+(_flRows.length===1?'y':'ies')+' today'+(last?' · last at '+_flEsc(last):'')+'</span><span style="color:var(--muted)">'+(_flListOpen?'Hide ▲':'Show ▼')+'</span></div>';
     h+=_flCard(head+(_flListOpen?'<div style="margin-top:8px">'+_flRows.map(function(r){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)"><span>'+(r.time?'<span style="color:var(--muted);font-variant-numeric:tabular-nums;margin-right:8px">'+_flEsc(r.time)+'</span>':'')+_flEsc(r.food)+(r.amount?' <span style="color:var(--muted)">'+_flEsc(r.amount)+'</span>':'')+'</span><span style="white-space:nowrap">'+Math.round(r.kcal||0)+' kcal</span></div>';}).join('')+'</div>':''));
   }
-  h+='<div style="font-size:12px;color:var(--muted);margin-bottom:14px">'+(_flKey&&_flKey.provider==='gemini'?'Gemini':'Anthropic')+' key ending …'+_flEsc(_flKey&&_flKey.last4||'')+' · <span onclick="flRemoveKey()" style="text-decoration:underline;cursor:pointer">Remove</span></div>';
+  h+='<div style="margin-bottom:14px">'+_flBtn('API key settings','flOpenKeySettings()',false)+'</div>';
   return h;
 }
+// ── API key in Settings (Henrik, 2026-10-22: "move this to Settings but provide the button
+// as well", with a one-step Change). Change saves the new key over the old one, so food
+// logging never pauses in between; the provider follows from the key as everywhere else.
+var _flKeyChanging=false;
+function _flKeyName(){return _flKey&&_flKey.provider==='gemini'?'Gemini':'Anthropic';}
+function _flKeyCardHtml(){
+  var inp='<input id="fl-key-new" type="password" autocomplete="off" placeholder="AIza… or sk-ant-…" style="width:100%;box-sizing:border-box;margin:8px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';
+  var b='';
+  if(!_flKey)b='<div style="font-size:13px;color:var(--muted)">Could not load your API key status. Check your connection.</div>';
+  else if(!_flKey.set)b='<div style="font-size:13px;color:var(--text);line-height:1.5">No API key yet. Food logging on the Macros page shows how to get a free Gemini key.</div>'+inp+_flBtn('Save key',"flSaveKey('fl-key-new')",true);
+  else if(_flKeyChanging)b='<div style="font-size:13px;color:var(--text)">Paste the new key. It replaces the '+_flKeyName()+' key ending …'+_flEsc(_flKey.last4)+'.</div>'+inp+
+    '<div style="display:flex;gap:8px">'+_flBtn('Save new key',"flSaveKey('fl-key-new')",true)+_flBtn('Cancel','flCancelChange()',false)+'</div>';
+  else b='<div style="font-size:13px;color:var(--text)">'+_flKeyName()+' key ending …'+_flEsc(_flKey.last4)+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Change','flStartChange()',true)+_flBtn('Remove','flRemoveKey()',false)+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:8px">One key serves every app and device signed in to your account.</div>';
+  if(_flErr&&_flKey&&(!_flKey.set||_flKeyChanging))b+='<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+'</div>';
+  return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Food logging · API key</div>'+b+'</div>';}
+function _flRenderKeyCard(){var el=document.getElementById('fl-key-card');if(el)el.innerHTML=_flKeyCardHtml();}
+async function buildFlKeyCard(){try{var r=await fetch(AGENT_URL+'/food-log/key',{headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flRenderKeyCard();}
+function flStartChange(){_flKeyChanging=true;_flErr='';_flRenderKeyCard();}
+function flCancelChange(){_flKeyChanging=false;_flErr='';_flRenderKeyCard();}
+function flOpenKeySettings(){
+  if(typeof showPage==='function'&&document.getElementById('page-settings'))showPage('settings');
+  else if(typeof switchTab==='function')switchTab('settings',document.getElementById('tab-btn-settings'));
+  var c=document.getElementById('fl-key-card');if(c&&c.scrollIntoView)c.scrollIntoView({block:'start'});}
 function flToggleList(){_flListOpen=!_flListOpen;_flRender();}
 function _flRender(){var el=document.getElementById('food-log-body');if(!el)return;el.innerHTML=(_flKey&&_flKey.set)?_flMainHtml():(_flKey?_flGuideHtml():_flCard('<div style="font-size:13px;color:var(--muted)">The food log could not be loaded. Check your connection and open this tab again.</div>'));}
 function _flDetail(r,j){return(j&&j.detail&&typeof j.detail==='string')?j.detail:('The server answered '+r.status+'.');}
@@ -4171,12 +4197,12 @@ async function buildFoodLog(){
   if(_flKey&&_flKey.set){var rows=await _flLoadRows(_flDay());if(rows)_flRows=rows;}
   _flRender();
 }
-async function flSaveKey(){var el=document.getElementById('fl-key-in');var k=el?String(el.value||'').trim():'';if(!k)return;_flErr='';
+async function flSaveKey(inputId){var el=document.getElementById(inputId||'fl-key-in');var k=el?String(el.value||'').trim():'';if(!k)return;_flErr='';
   try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({api_key:k})});var j=await r.json().catch(function(){return{};});
-    if(!r.ok){_flErr=_flDetail(r,j);_flRender();return;}_flKey=j;}catch(e){_flErr='Could not reach the server. Check your connection and try again.';_flRender();return;}
-  buildFoodLog();}
+    if(!r.ok){_flErr=_flDetail(r,j);_flRender();_flRenderKeyCard();return;}_flKey=j;_flKeyChanging=false;}catch(e){_flErr='Could not reach the server. Check your connection and try again.';_flRender();_flRenderKeyCard();return;}
+  _flRenderKeyCard();buildFoodLog();}
 async function flRemoveKey(){if(!confirmGlobalDelete('your API key (food logging stops until you add one again)'))return;
-  try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'DELETE',headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flRender();}
+  try{var r=await fetch(AGENT_URL+'/food-log/key',{method:'DELETE',headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flKeyChanging=false;_flRender();_flRenderKeyCard();}
 // Photos are shrunk to at most 1024 px on the long side before upload: the
 // estimate does not need more, and it keeps both the upload and the token cost small.
 function _flShrink(file){return new Promise(function(res,rej){var fr=new FileReader();fr.onerror=function(){rej(new Error('read'));};fr.onload=function(){var img=new Image();img.onerror=function(){rej(new Error('image'));};img.onload=function(){var s=Math.min(1,1024/Math.max(img.width,img.height));var c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.8).split(',')[1]);};img.src=fr.result;};fr.readAsDataURL(file);});}

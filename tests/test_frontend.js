@@ -8162,8 +8162,11 @@ console.log('\n── Food log ────────────────�
   let _flMain = G._flMainHtml();
   check('food log: with a key: text box, Log, Photo and today\'s total',
     /id="fl-text"/.test(_flMain) && /flSubmit\(\)/.test(_flMain) && /fl-photo/.test(_flMain) && /280 kcal/.test(_flMain) && /P 46 g/.test(_flMain));
-  check('food log: the key is shown only by its last 4 characters, with Remove',
-    /ending …WXYZ/.test(_flMain) && /flRemoveKey\(\)/.test(_flMain));
+  check('food log: the Macros page has no key line, only a button to the key settings',
+    !/ending …WXYZ/.test(_flMain) && !/flRemoveKey\(\)/.test(_flMain) && /API key settings/.test(_flMain) && /flOpenKeySettings\(\)/.test(_flMain));
+  G._flKeyChanging = false;
+  check('food log: the Settings card shows the key only by its last 4 characters, with Change and Remove',
+    /ending …WXYZ/.test(G._flKeyCardHtml()) && /flStartChange\(\)/.test(G._flKeyCardHtml()) && /flRemoveKey\(\)/.test(G._flKeyCardHtml()));
   check('food log: food names are escaped', _flMain.indexOf('Steak <b>') < 0 && _flMain.indexOf('Steak &lt;b&gt;') >= 0);
   G._flErr = 'Anthropic error 500. Try again.'; G._flPending = {text: '2 eggs', image_b64: ''};
   _flMain = G._flMainHtml();
@@ -8348,6 +8351,56 @@ console.log('\n── Macro targets (suggested + override) ───────
   })().catch(e => { check('food log photo: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
 }
 
+// ── Food log: the API key lives in Settings, with a one-step Change (2026-10-22) ──
+// Henrik, on how to remove and update the key: "yes, and move this to Settings but provide
+// the button as well." Change swaps the key with one PUT: there is no moment without a key.
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
+  check('food key: Settings carries the key card', /<div id="fl-key-card"[^>]*><\/div>/.test(_src));
+  check('  …and opening Settings loads it', /'settings'\)\{loadSettings\(\);buildFlKeyCard\(\);\}/.test(_src));
+  const calls = [], els = {};
+  const K = vm.createContext({console, Promise, JSON, Math, String, Number, parseFloat, encodeURIComponent,
+    AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
+    document: {getElementById: (id) => { if (!els[id]) { let h = ''; els[id] = {value: ''}; Object.defineProperty(els[id], 'innerHTML', {get: () => h, set: v => { h = v; }}); } return els[id]; }},
+    fetch: async (url, opt) => { const m = (opt && opt.method) || 'GET'; calls.push({url, method: m, body: opt && opt.body ? JSON.parse(opt.body) : null});
+      if (/\/food-log\/key$/.test(url) && m === 'PUT') { const k = JSON.parse(opt.body).api_key;
+        if (k === 'bad') return {ok: false, status: 400, json: async () => ({detail: 'That key was refused.'})};
+        return {ok: true, status: 200, json: async () => ({set: true, last4: k.slice(-4), provider: /^AIza/.test(k) ? 'gemini' : 'anthropic'})}; }
+      if (/\/food-log\/key$/.test(url) && m === 'DELETE') return {ok: true, status: 200, json: async () => ({set: false})};
+      if (/\/food-log\/key$/.test(url)) return {ok: true, status: 200, json: async () => ({set: true, last4: 'WXYZ', provider: 'anthropic'})};
+      return {ok: true, status: 200, json: async () => ([])}; },
+  });
+  vm.runInContext(_blk, K);
+  (async () => {
+    await K.buildFlKeyCard();
+    let h = els['fl-key-card'].innerHTML;
+    check('food key: the card shows the stored key with Change and Remove', /Anthropic key ending …WXYZ/.test(h) && /flStartChange\(\)/.test(h) && /flRemoveKey\(\)/.test(h));
+    K.flStartChange();
+    h = els['fl-key-card'].innerHTML;
+    check('  …Change asks for the new key and says which one it replaces',
+      /id="fl-key-new"/.test(h) && /replaces the Anthropic key ending …WXYZ/.test(h) && /flSaveKey\('fl-key-new'\)/.test(h) && /flCancelChange\(\)/.test(h));
+    K.flCancelChange();
+    check('  …Cancel goes back without sending anything', !/id="fl-key-new"/.test(els['fl-key-card'].innerHTML) && calls.filter(c => c.method !== 'GET').length === 0);
+    K.flStartChange();
+    K.document.getElementById('fl-key-new').value = 'bad';
+    await K.flSaveKey('fl-key-new');
+    h = els['fl-key-card'].innerHTML;
+    check('  …a refused key says why and keeps the old one', /That key was refused/.test(h) && /id="fl-key-new"/.test(h) && K._flKey.last4 === 'WXYZ');
+    calls.length = 0;
+    K.document.getElementById('fl-key-new').value = 'AIzaNEWKEYGEMI';
+    await K.flSaveKey('fl-key-new');
+    h = els['fl-key-card'].innerHTML;
+    check('  …saving swaps it with one PUT and no DELETE',
+      calls.filter(c => c.method === 'PUT' && c.body.api_key === 'AIzaNEWKEYGEMI').length === 1 && !calls.some(c => c.method === 'DELETE'));
+    check('  …and the card then shows the new key', /Gemini key ending …GEMI/.test(h) && !/id="fl-key-new"/.test(h));
+    await K.flRemoveKey();
+    h = els['fl-key-card'].innerHTML;
+    check('  …Remove leaves the card offering to add a key', /No API key yet/.test(h) && /flSaveKey\('fl-key-new'\)/.test(h));
+    if (failed > 0) process.exitCode = 1;
+  })().catch(e => { check('food key: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
 // ── Food Edit: every entry has an editable amount, and correcting it rescales (2026-10-21) ──
 // Henrik: "each entry needs a grams total also, a typo for chicken breast should be possible
 // to Edit instead of forcing me to delete the line".
@@ -8420,11 +8473,11 @@ console.log('\n── Macro targets (suggested + override) ───────
     _fold > 0 && _g.indexOf('https://console.anthropic.com') > _fold && /Use Anthropic \(Claude\) instead, paid/.test(_g));
   G._flErr = ''; G._flPending = null; G._flBusy = false; G._flRows = [];
   G._flKey = {set: true, last4: 'GEMI', provider: 'gemini'};
-  check('  …the key line names the provider: Gemini', /Gemini key ending …GEMI/.test(G._flMainHtml()));
+  check('  …the Settings card names the provider: Gemini', /Gemini key ending …GEMI/.test(G._flKeyCardHtml()));
   G._flKey = {set: true, last4: 'WXYZ', provider: 'anthropic'};
-  check('  …or Anthropic', /Anthropic key ending …WXYZ/.test(G._flMainHtml()));
+  check('  …or Anthropic', /Anthropic key ending …WXYZ/.test(G._flKeyCardHtml()));
   G._flKey = {set: true, last4: 'WXYZ'};
-  check('  …and a key stored before Gemini existed reads as Anthropic', /Anthropic key ending …WXYZ/.test(G._flMainHtml()));
+  check('  …and a key stored before Gemini existed reads as Anthropic', /Anthropic key ending …WXYZ/.test(G._flKeyCardHtml()));
 }
 
 // ── Macros page tweaks (2026-10-22): carbs and fat bars; the day's list starts collapsed ──
