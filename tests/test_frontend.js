@@ -8158,6 +8158,7 @@ console.log('\n── Food log ────────────────�
   G._flKey = {set: true, last4: 'WXYZ'};
   G._flRows = [{id: 'a', food: 'Steak <b>', amount: '202 g', kcal: 280, protein: 46, carbs: 0, fat: 10}];
   G._flErr = ''; G._flPending = null; G._flBusy = false;
+  G._flListOpen = true;  // these checks read the list's rows
   let _flMain = G._flMainHtml();
   check('food log: with a key: text box, Log, Photo and today\'s total',
     /id="fl-text"/.test(_flMain) && /flSubmit\(\)/.test(_flMain) && /fl-photo/.test(_flMain) && /280 kcal/.test(_flMain) && /P 46 g/.test(_flMain));
@@ -8398,6 +8399,7 @@ console.log('\n── Macro targets (suggested + override) ───────
 {
   G._flKey = {set: true, last4: 'WXYZ'}; G._flErr = ''; G._flPending = null; G._flBusy = false;
   G._flRows = [{id: 't1', time: '07:40', food: 'Oats', amount: '80 g', kcal: 300}, {id: 't2', time: '', food: 'Daily total', amount: '', kcal: 2000}];
+  G._flListOpen = true;
   const _h = G._flMainHtml();
   check('food log: the list shows each entry\'s time before the food', /07:40<\/span>Oats/.test(_h));
   check('  …and an entry with no time (an imported daily total) shows none', /<span>Daily total/.test(_h));
@@ -8423,6 +8425,31 @@ console.log('\n── Macro targets (suggested + override) ───────
   check('  …or Anthropic', /Anthropic key ending …WXYZ/.test(G._flMainHtml()));
   G._flKey = {set: true, last4: 'WXYZ'};
   check('  …and a key stored before Gemini existed reads as Anthropic', /Anthropic key ending …WXYZ/.test(G._flMainHtml()));
+}
+
+// ── Macros page tweaks (2026-10-22): carbs and fat bars; the day's list starts collapsed ──
+{
+  G._flKey = {set: true, last4: 'GEMI', provider: 'gemini'}; G._flErr = ''; G._flPending = null; G._flBusy = false;
+  G._flRows = [{id: 'a', time: '07:40', food: 'Oats', amount: '80 g', kcal: 300, protein: 10, carbs: 50, fat: 6},
+               {id: 'b', time: '12:15', food: 'Chicken', amount: '200 g', kcal: 220, protein: 46, carbs: 0, fat: 3}];
+  const _saveT = G._macrosTargets;
+  G._macrosTargets = {kcal: 2574, protein: 213, carbs: 250, fat: 70};
+  G._flListOpen = false;
+  let _h = G._flMainHtml();
+  check('macros: carbs and fat get progress bars too',
+    /Carbs 50 of 250 g/.test(_h) && /200 g left/.test(_h) && /Fat 9 of 70 g/.test(_h) && /61 g left/.test(_h));
+  check('  …in the order calories, protein, carbs, fat',
+    _h.indexOf('Calories 520') < _h.indexOf('Protein 56') && _h.indexOf('Protein 56') < _h.indexOf('Carbs 50') && _h.indexOf('Carbs 50') < _h.indexOf('Fat 9'));
+  G._macrosTargets = {kcal: 2574, protein: 213};
+  check('  …and a target that is not set shows no bar', !/Carbs \d+ of/.test(G._flMainHtml()) && !/Fat \d+ of/.test(G._flMainHtml()));
+  check('macros: the day\'s list starts collapsed, saying how many and when you last ate',
+    /2 entries today · last at 12:15/.test(_h) && /flToggleList\(\)/.test(_h) && /Show ▼/.test(_h) && !/Oats/.test(_h));
+  G.flToggleList();
+  _h = G._flMainHtml();
+  check('  …one tap opens it', G._flListOpen === true && /Oats/.test(_h) && /Chicken/.test(_h) && /Hide ▲/.test(_h));
+  G.flToggleList();
+  check('  …and a second closes it', G._flListOpen === false && !/Oats/.test(G._flMainHtml()));
+  G._macrosTargets = _saveT; G._flRows = [];
 }
 
 setImmediate(() => {
