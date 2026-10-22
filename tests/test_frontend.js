@@ -8480,7 +8480,7 @@ console.log('\n── Macro targets (suggested + override) ───────
     await I.buildFlKeyCard();
     let h = els['fl-import-card'].innerHTML;
     check('food import: opening Settings shows the card: CSV or Excel, needs Date and Kcal',
-      /type="file"/.test(h) && /accept="\.csv,\.xlsx/.test(h) && /<b>Date<\/b>/.test(h) && /<b>Kcal<\/b>/.test(h) && /importing the same file twice is safe/.test(h));
+      /type="file"/.test(h) && /accept="\.csv,\.xlsx,\.txt,\.tsv,/.test(h) && /<b>Date<\/b>/.test(h) && /<b>Kcal<\/b>/.test(h) && /importing the same file twice is safe/.test(h));
     const inp = {files: [{name: 'old log.xlsx', size: 1200}], value: 'x'};
     await I.flImportFile(inp);
     const post = calls.find(c => /import-file$/.test(c.url));
