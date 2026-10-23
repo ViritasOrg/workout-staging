@@ -852,15 +852,16 @@ console.log('\n── Key functions ──────────────�
   const sv = {alert: G.alert};
   const draft = (extra) => Object.assign({ v: 2, day: '2', date: '2026-09-30', tmpl: { 'Bench Press': { kg: ['80'], reps: ['8'] } }, custom: [] }, extra || {});
   const run = (resp, logId) => { const cur = G.fetch; G.fetch = async () => resp; const p = G._pushSavedLog({ id: logId, date: '2026-09-30' }); G.fetch = cur; return p; };
-  // Runs after the upload-report block above: both stub the shared fetch/alert.
-  globalThis.__uploadChecks.then(function(){
+  // Runs after the upload-report block above: both stub the shared fetch/alert. Chained (and
+  // its promise returned) so the next block waits for its draft DELETEs instead of seeing them.
+  globalThis.__uploadChecks = globalThis.__uploadChecks.then(function(){
   G.alert = () => {};
   G.setData('wkt-draft', draft());
   check('an unsaved workout with reps is the active draft', !!G._activeDraft());
   G.setData('wkt-draft', draft({ savedLogId: 111 }));
   check('once saved as a log it stops being the active draft (never restored twice)', G._activeDraft() === null);
   check('…but it is still stored until the upload succeeds', G.getData('wkt-draft', null) !== null);
-  run({ ok: false, status: 401 }, 111).then(function(){
+  return run({ ok: false, status: 401 }, 111).then(function(){
     check('a failed upload keeps the saved workout\'s draft', G.getData('wkt-draft', null) !== null);
     return run({ ok: true, status: 200 }, 999);
   }).then(function(){
@@ -945,7 +946,9 @@ console.log('\n── Key functions ──────────────�
   check('a different session on the same day does not hide it', G._activeDraft() !== null);
   check('a log with no start time never matches', G._draftLog(Object.assign({}, d, { startedAt: undefined })) === null);
   G.logs = sv.logs; G.localStorage.removeItem('wkt-draft');
-  globalThis.__uploadChecks = globalThis.__uploadChecks.then(function(){
+  // Let any draft request an earlier block queued (its _pushSavedLog → DELETE) finish first,
+  // or it lands on this block's recording fetch and reads as an extra DELETE.
+  globalThis.__uploadChecks = globalThis.__uploadChecks.then(() => G._draftQ).then(function(){
     // Ordering: the first PUT is slow; the DELETE must not start until it has finished.
     const seen = []; let release; const cur = G.fetch;
     G.fetch = (u, o) => { seen.push(o.method + ':start'); if (o.method === 'PUT') return new Promise(r => { release = () => { seen.push('PUT:end'); r({ ok: true }); }; }); seen.push(o.method + ':end'); return Promise.resolve({ ok: true }); };
@@ -960,8 +963,9 @@ console.log('\n── Key functions ──────────────�
       G.setData('wkt-draft', d);
       const keep = { logs: G.logs, stored: G.getData('workout_logs', []) };
       G.fetch = async (u, o) => { calls.push((o && o.method) || 'GET'); return (o && o.method) ? { ok: true } : { ok: true, json: async () => [{ id: 1790769301363, date: '2026-09-30', day: 2, started_at: st, exercises: [] }] }; };
-      const p = G.syncWorkoutLogsFromAgent(); G.fetch = cur;
-      return p.then(() => G._draftQ).then(function(){
+      // fetch stays stubbed until the DELETE the sync queues has gone out: restoring it right
+      // after the call sent that DELETE to the real fetch, unseen.
+      return G.syncWorkoutLogsFromAgent().then(() => G._draftQ).then(function(){
         check('the backend holding the saved session deletes the stale draft', G.getData('wkt-draft', null) === null && calls.indexOf('DELETE') >= 0, calls.join(','));
         G.fetch = cur; G.logs = keep.logs; G.setData('workout_logs', keep.stored);
       });
@@ -8755,7 +8759,16 @@ console.log('\n── Macro targets (suggested + override) ───────
   G._macrosTargets = _saveT; G._flRows = [];
 }
 
-setImmediate(() => {
+// Print the summary only when every async check has finished: on beforeExit, which fires once
+// nothing is left pending. Exiting on setImmediate skipped any check that waits on a timer or a
+// few promise turns (the draft-ordering block, the food-stats retries), so they ran, and could
+// fail, only on a slow machine. The unref'd timer is a backstop if something never settles.
+let _summarised = false;
+const _summary = () => {
+  if (_summarised) return; _summarised = true;
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
-  process.exit(failed === 0 ? 0 : 1);
-});
+  process.exit(failed === 0 && !process.exitCode ? 0 : 1);
+};
+Promise.resolve(globalThis.__uploadChecks).catch(e => { check('async upload checks ran', false, String(e && e.stack || e)); });
+process.on('beforeExit', _summary);
+setTimeout(() => { check('every async check finished within 30 s', false); _summary(); }, 30000).unref();
