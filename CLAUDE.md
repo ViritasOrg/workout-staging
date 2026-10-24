@@ -1082,7 +1082,7 @@ asks for that specific change in that conversation turn.
 - Picking reps IS picking the tag: `_progSetSets()` writes the derived tag and refreshes the
   read-only chip. An illegal reps/tag pair can no longer be authored by hand.
 
-### The Setup Wizard's App Overview and the "What's new" card (rule 2026-10-24)
+### The Setup Wizard's animated tour and the "What's new" card (rule 2026-10-24)
 Henrik: *"does it highlight new features as AI macro tracking or the stick man info cards?"* It
 did not. The wizard's last step still described a five-tab app, and nothing told an existing
 user what had shipped since they onboarded. Both are fixed; both go stale unless every feature
@@ -1102,11 +1102,31 @@ PR maintains them.
   (localStorage + `/user-settings`); "Got it" marks the current `VERSION`. An onboarded account
   with no seen version gets every row; `obFinish` marks a new account as seen, since the wizard
   just showed it everything. Never reset or clear the seen version to "make sure they see it".
-- **The App Overview step (`_obHtml5`) lists every visible tab in the tab bar.** Adding, removing
-  or renaming a tab means editing that list in the same PR; a test reads the tab bar from the
-  HTML and fails on a missing tab. Its descriptions name the features behind each tab (the ? on
-  Today, text-or-photo on Macros): when a tab gains such a feature, update its line.
-- Peptide Tracker has neither of these yet (noted 2026-10-24).
+- **The last wizard step is an animated tour, not a list** (Henrik, same day: *"the onboarding never
+  shows how to create a program or how to log a workout or how to check the stick figures. I want a
+  animated movie running as onboarding showing the main features incl macro tracking"*). `TOUR_SCENES`
+  plays program → log → sketch → macros → tabs, each a CSS-animated mock of the phone screen built by
+  `_tourSceneHtml` (simulated taps, typing, bars filling) with one caption. No video file: it is
+  markup in `index.html`, so it plays offline. The sketch scene calls `skPanels` on a real catalogue
+  sketch. Tap the stage to pause; a dot jumps; the last scene stays and shows the tab list.
+- **The movie follows the wizard's answers** (Henrik: *"ask the onboarding questions first so a male
+  user gets a Hypertrophy in the gym movie and a female a female aesthetics at home movie"*).
+  `_tourProfile()` reads `_obData.gender` (step 2; the tour is step 5): female → Feminine Aesthetic at
+  Home (bodyweight), Bodyweight Squat logged as BW, Bulgarian Split Squat sketch; otherwise →
+  Hypertrophy in the Gym, Squat. **Day and exercise names are what `_generateWorkoutProgram` really
+  writes** for that goal at 4 days / 12 sets; tests generate both programs and fail on a name the
+  generator does not produce or that has no sketch. Do not invent a prettier exercise for the movie.
+- **"Watch the intro again" sits at the top of Settings** (Henrik: *"in settings/More add a button on
+  top to re run the intro for users who want to see it again"*). `openTour()` opens the overlay on the
+  tour with the saved profile's gender and `_obTourOnly` set: no Back, no dots, Done or Skip just
+  close it. Nothing is saved: the profile and the weight log are only written by a real wizard finish.
+- **A feature worth a `WHATS_NEW` row usually gets a tour scene too**, or a line in the scene it
+  belongs to. Keep scenes to roughly 8 seconds and one idea each.
+- **`TOUR_TABS` lists every visible tab in the tab bar** and renders as the closing scene plus the list
+  under it. Adding, removing or renaming a tab means editing it in the same PR; a test reads the tab
+  bar from the HTML and fails on a missing tab. Its descriptions name the features behind each tab
+  (the ? on Today, text-or-photo on Macros): when a tab gains such a feature, update its line.
+- Peptide Tracker has none of this yet (noted 2026-10-24).
 
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
