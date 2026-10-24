@@ -1082,6 +1082,32 @@ asks for that specific change in that conversation turn.
 - Picking reps IS picking the tag: `_progSetSets()` writes the derived tag and refreshes the
   read-only chip. An illegal reps/tag pair can no longer be authored by hand.
 
+### The Setup Wizard's App Overview and the "What's new" card (rule 2026-10-24)
+Henrik: *"does it highlight new features as AI macro tracking or the stick man info cards?"* It
+did not. The wizard's last step still described a five-tab app, and nothing told an existing
+user what had shipped since they onboarded. Both are fixed; both go stale unless every feature
+PR maintains them.
+
+- **A feature a user would not find on their own gets a row in `WHATS_NEW` in the same PR.**
+  A new tab, a new button on an existing screen (the blue **?** sketches), a new way to enter
+  data (food by photo), a new wizard step. Not a bug fix, not a reworded label, not a change
+  inside a feature the user already uses daily.
+- **Key the row to the version the PR ships AS**: the bump it will get after merge, which is
+  `version.json` on `main` plus one (`1.304` on main → the row says `1.305`). The runtime filter
+  hides a row until the build reaches its version, so the row and the bump arrive together. A
+  test fails on a row more than one bump ahead.
+- **Newest first**, one title and one or two sentences in plain words, saying where the user
+  taps. A test asserts the order.
+- **The card shows what the account has not dismissed.** `wkt-whatsnew-seen` is per account
+  (localStorage + `/user-settings`); "Got it" marks the current `VERSION`. An onboarded account
+  with no seen version gets every row; `obFinish` marks a new account as seen, since the wizard
+  just showed it everything. Never reset or clear the seen version to "make sure they see it".
+- **The App Overview step (`_obHtml5`) lists every visible tab in the tab bar.** Adding, removing
+  or renaming a tab means editing that list in the same PR; a test reads the tab bar from the
+  HTML and fails on a missing tab. Its descriptions name the features behind each tab (the ? on
+  Today, text-or-photo on Macros): when a tab gains such a feature, update its line.
+- Peptide Tracker has neither of these yet (noted 2026-10-24).
+
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 

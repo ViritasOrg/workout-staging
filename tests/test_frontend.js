@@ -8781,7 +8781,9 @@ console.log('\n── Onboarding overview + What\'s new ────────
   check('WHATS_NEW: every entry has a version, a title and a text',
     Array.isArray(WN) && WN.length >= 2 && WN.every(e => /^\d+\.\d+$/.test(e.v) && e.title && e.text));
   check('  …sorted newest first', WN.every((e, i) => i === 0 || G._verNum(WN[i - 1].v) > G._verNum(e.v)));
-  check('  …none newer than the app itself', WN.every(e => G._verNum(e.v) <= G._verNum(G.VERSION)));
+  // An entry is keyed to the version its PR ships AS, i.e. the bump after merge: one past
+  // the VERSION in this file. Further ahead is a typo; behind is a feature already shipped.
+  check('  …none further ahead than the next bump', WN.every(e => G._verNum(e.v) <= G._verNum(G.VERSION) + 1));
   check('  …it names the AI macro tracking and the exercise sketches',
     WN.some(e => /Macros/.test(e.title) && /photo/.test(e.text)) && WN.some(e => /sketch/i.test(e.title) && /\?/.test(e.text)));
   check('version compare is numeric, not lexical', G._verNum('1.100') > G._verNum('1.99') && G._verNum('2.0') > G._verNum('1.999'));
