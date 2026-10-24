@@ -1126,7 +1126,10 @@ PR maintains them.
   under it. Adding, removing or renaming a tab means editing it in the same PR; a test reads the tab
   bar from the HTML and fails on a missing tab. Its descriptions name the features behind each tab
   (the ? on Today, text-or-photo on Macros): when a tab gains such a feature, update its line.
-- Peptide Tracker has none of this yet (noted 2026-10-24).
+- **Peptide Tracker has the same three things** since 2026-10-24 (`peptidetracker-staging` #1394:
+  `pep-whatsnew-seen`, `TOUR_SCENES`, `TOUR_TABS`, `openTour`). A change to the mechanism is made in
+  both apps in the same session; its tour names plans from the backend-served templates, never a
+  compound written into the repo.
 
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
