@@ -8759,6 +8759,83 @@ console.log('\n── Macro targets (suggested + override) ───────
   G._macrosTargets = _saveT; G._flRows = [];
 }
 
+// ── Onboarding overview matches the tab bar; "What's new" card on Today (2026-10-24) ──
+// Henrik: "does it highlight new features as AI macro tracking or the stick man info cards?"
+// It did not: the wizard's App Overview still listed the five tabs of an older app, and
+// nothing told an existing user what had shipped since they onboarded.
+console.log('\n── Onboarding overview + What\'s new ──────────────────────');
+{
+  // The visible tab bar is the source of truth; the overview must name every button on it.
+  const tabBar = [...html.matchAll(/<button class="tab[^"]*" id="tab-btn-([a-z]+)"([^>]*)>([^<]+)</g)]
+    .filter(m => !/display:none/.test(m[2])).map(m => m[3].trim().toUpperCase());
+  const overview = G._obHtml5();
+  check('App Overview names every visible tab in the tab bar', tabBar.length >= 8 && tabBar.every(t => overview.includes('>' + t + '<')),
+    tabBar.filter(t => !overview.includes('>' + t + '<')).join(', ') || undefined);
+  check('  …and names nothing that is not a tab', !/>PROGRAM</.test(overview) && !/>STORAGE</.test(overview));
+  check('  …its count comes from the list, not a literal', /tabs\.length\+' sections/.test(String(G._obHtml5)) && overview.includes(tabBar.length + ' sections'));
+  check('  …it tells the user about the AI food log', /MACROS/.test(overview) && /photo/i.test(overview) && /AI estimates/.test(overview));
+  check('  …and about the ? sketches', /blue \?/.test(overview) && /sketch/i.test(overview));
+
+  // The What's new list is well formed and only holds versions the app has reached.
+  const WN = G.WHATS_NEW;
+  check('WHATS_NEW: every entry has a version, a title and a text',
+    Array.isArray(WN) && WN.length >= 2 && WN.every(e => /^\d+\.\d+$/.test(e.v) && e.title && e.text));
+  check('  …sorted newest first', WN.every((e, i) => i === 0 || G._verNum(WN[i - 1].v) > G._verNum(e.v)));
+  check('  …none newer than the app itself', WN.every(e => G._verNum(e.v) <= G._verNum(G.VERSION)));
+  check('  …it names the AI macro tracking and the exercise sketches',
+    WN.some(e => /Macros/.test(e.title) && /photo/.test(e.text)) && WN.some(e => /sketch/i.test(e.title) && /\?/.test(e.text)));
+  check('version compare is numeric, not lexical', G._verNum('1.100') > G._verNum('1.99') && G._verNum('2.0') > G._verNum('1.999'));
+
+  const ls = sandbox.localStorage._s;
+  const saveLs = Object.assign({}, ls);
+  const reset = () => { for (const k of Object.keys(ls)) delete ls[k]; };
+  const pushes = []; const _savePush = G.pushSettingsToAgent; G.pushSettingsToAgent = kv => { pushes.push(kv); };
+  const _saveV = G.VERSION;
+
+  // Nothing seen yet, not onboarded: a new account is in the wizard, the card stays away.
+  reset();
+  check('a brand-new account (no profile) gets no card', G._whatsNewEntries().length === 0 && G._whatsNewHtml(G._whatsNewEntries()) === '');
+  // Nothing seen yet, already onboarded: an existing user who predates the card gets the whole list.
+  reset(); ls['wkt-profile'] = JSON.stringify({ onboarded: true });
+  check('an onboarded account that never saw the card gets every entry', G._whatsNewEntries().length === WN.length);
+  let h = G._whatsNewHtml(G._whatsNewEntries());
+  check('  …the card lists them, titled WHAT\'S NEW, with a Got it button',
+    /WHAT'S NEW/.test(h) && /dismissWhatsNew\(\)/.test(h) && /Got it/.test(h) && WN.every(e => h.includes(e.title)));
+  check('  …text is escaped on the way in', G._whatsNewHtml([{ v: '1.1', title: 'a<b', text: 'c&d' }]).includes('a&lt;b') && G._whatsNewHtml([{ v: '1.1', title: 't', text: 'c&d' }]).includes('c&amp;d'));
+  // Only entries newer than the version last seen show.
+  ls['wkt-whatsnew-seen'] = JSON.stringify(WN[WN.length - 1].v);
+  check('entries at or below the seen version are hidden', G._whatsNewEntries().length === WN.length - 1 && !G._whatsNewEntries().some(e => e.v === WN[WN.length - 1].v));
+  ls['wkt-whatsnew-seen'] = JSON.stringify(G.VERSION);
+  check('seen at the current version: nothing to show', G._whatsNewEntries().length === 0);
+  // An entry for a version this device has not reached (an old cached build) is not shown yet.
+  G.VERSION = WN[WN.length - 1].v; ls['wkt-whatsnew-seen'] = JSON.stringify('0');
+  check('a build older than an entry does not announce it', G._whatsNewEntries().every(e => G._verNum(e.v) <= G._verNum(G.VERSION)) && G._whatsNewEntries().length === 1);
+  G.VERSION = _saveV;
+  // Got it: stored locally AND pushed to the backend, card rebuilt empty.
+  reset(); ls['wkt-profile'] = JSON.stringify({ onboarded: true }); pushes.length = 0;
+  delete _idStore['whats-new']; _idStore['whats-new'] = makeTrackingEl();
+  G.dismissWhatsNew();
+  check('Got it stores the current version as seen', JSON.parse(ls['wkt-whatsnew-seen']) === G.VERSION);
+  check('  …and pushes it to /user-settings in the same call', pushes.length === 1 && pushes[0]['wkt-whatsnew-seen'] === G.VERSION);
+  check('  …after which nothing is left to show', G._whatsNewEntries().length === 0);
+  // Wiring: the card is built on Today, at start-up, and when settings come back from the backend.
+  check('showPage(today) rebuilds the card', /if\(name==='today'\)buildWhatsNewCard\(\);/.test(rawScript));
+  check('start-up builds the card', /initPrograms\(\);buildWhatsNewCard\(\);/.test(rawScript));
+  check('the seen version comes back from the backend after a cache wipe',
+    String(G.syncSettingsFromAgent).includes("setData('wkt-whatsnew-seen',String(s['wkt-whatsnew-seen']))") && String(G.syncSettingsFromAgent).includes('buildWhatsNewCard()'));
+  check('the Today page has the slot the card renders into', /id="page-today">\s*<div id="whats-new"><\/div>/.test(html));
+  // A new account finishing the wizard has just seen everything: obFinish marks it as seen.
+  reset(); pushes.length = 0;
+  G._obData = { gender: 'male', age: '30', height: '180', weight: '', neck: '', waist: '', hips: '', theme: 3 };
+  G.obFinish();
+  check('finishing the wizard marks the current version as seen',
+    JSON.parse(ls['wkt-whatsnew-seen']) === G.VERSION && pushes.some(kv => kv['wkt-whatsnew-seen'] === G.VERSION && kv['wkt-profile']));
+  check('  …but an existing seen version is left alone (Edit profile is not a new account)',
+    (() => { ls['wkt-whatsnew-seen'] = JSON.stringify('1.1'); G.obFinish(); return JSON.parse(ls['wkt-whatsnew-seen']) === '1.1'; })());
+
+  G.pushSettingsToAgent = _savePush; reset(); Object.assign(ls, saveLs);
+}
+
 // Print the summary only when every async check has finished: on beforeExit, which fires once
 // nothing is left pending. Exiting on setImmediate skipped any check that waits on a timer or a
 // few promise turns (the draft-ordering block, the food-stats retries), so they ran, and could
