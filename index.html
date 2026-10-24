@@ -4077,13 +4077,17 @@ function dismissWhatsNew(){setData('wkt-whatsnew-seen',VERSION);pushSettingsToAg
 function obFinish(){
   var bf=calcNavyBF();
   var profile={gender:_obData.gender,age:_obData.age?parseInt(_obData.age):null,height:_obData.height?parseDec(_obData.height):null,weight:_obData.weight?unitToKg(_obData.weight):null,neck:_obData.neck?parseDec(_obData.neck):null,waist:_obData.waist?parseDec(_obData.waist):null,hips:_obData.hips?parseDec(_obData.hips):null,bf:bf,onboarded:true};
+  // Was this account onboarded before this finish? A re-run from Settings is not a new account.
+  var _wasOnboarded=!!(getData('wkt-profile',null)||{}).onboarded;
   setData('wkt-profile',profile);
   var _pf={};if(profile.gender)_pf['user_sex']=profile.gender;if(profile.age)_pf['user_age']=String(profile.age);if(profile.height)_pf['user_height']=String(profile.height);if(profile.weight)_pf['user_weight']=String(profile.weight);
   // The whole profile, not just the four shared user_* fields. neck/waist/hips
   // (the Navy BF inputs) and the onboarded flag lived only in localStorage, so a
   // cache wipe lost the measurements and replayed onboarding as if new.
-  // The wizard's App Overview just showed this account every feature, so nothing is new.
-  if(getData('wkt-whatsnew-seen',null)===null){setData('wkt-whatsnew-seen',VERSION);_pf['wkt-whatsnew-seen']=VERSION;}
+  // A NEW account has just been shown every feature by the App Overview, so nothing is new.
+  // An existing account re-running the wizard keeps its card: on 2026-10-24 a re-run marked
+  // the card seen before Henrik had read it, and nothing could bring it back.
+  if(!_wasOnboarded&&getData('wkt-whatsnew-seen',null)===null){setData('wkt-whatsnew-seen',VERSION);_pf['wkt-whatsnew-seen']=VERSION;}
   _pf['wkt-profile']=profile;
   pushSettingsToAgent(_pf);
   buildWhatsNewCard();

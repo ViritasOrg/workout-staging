@@ -8834,6 +8834,12 @@ console.log('\n── Onboarding overview + What\'s new ────────
     JSON.parse(ls['wkt-whatsnew-seen']) === G.VERSION && pushes.some(kv => kv['wkt-whatsnew-seen'] === G.VERSION && kv['wkt-profile']));
   check('  …but an existing seen version is left alone (Edit profile is not a new account)',
     (() => { ls['wkt-whatsnew-seen'] = JSON.stringify('1.1'); G.obFinish(); return JSON.parse(ls['wkt-whatsnew-seen']) === '1.1'; })());
+  // 2026-10-24: Henrik re-ran the wizard from Settings before reading the card; obFinish marked
+  // the card seen and it was gone for good. An already-onboarded account keeps its card.
+  reset(); pushes.length = 0; ls['wkt-profile'] = JSON.stringify({ onboarded: true, gender: 'male' });
+  G.obFinish();
+  check('re-running the wizard on an onboarded account does NOT mark the card seen',
+    ls['wkt-whatsnew-seen'] === undefined && !pushes.some(kv => 'wkt-whatsnew-seen' in kv) && G._whatsNewEntries().length === WN.length);
 
   G.pushSettingsToAgent = _savePush; reset(); Object.assign(ls, saveLs);
 }
