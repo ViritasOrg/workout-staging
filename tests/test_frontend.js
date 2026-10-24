@@ -8772,7 +8772,7 @@ console.log('\n── Onboarding overview + What\'s new ────────
   check('App Overview names every visible tab in the tab bar', tabBar.length >= 8 && tabBar.every(t => overview.includes('>' + t + '<')),
     tabBar.filter(t => !overview.includes('>' + t + '<')).join(', ') || undefined);
   check('  …and names nothing that is not a tab', !/>PROGRAM</.test(overview) && !/>STORAGE</.test(overview));
-  check('  …its count comes from the list, not a literal', /tabs\.length\+' sections/.test(String(G._obHtml5)) && overview.includes(tabBar.length + ' sections'));
+  check('  …its count comes from the list, not a literal', /TOUR_TABS\.length\+' sections/.test(String(G._obHtml5)) && overview.includes(tabBar.length + ' sections'));
   check('  …it tells the user about the AI food log', /MACROS/.test(overview) && /photo/i.test(overview) && /AI estimates/.test(overview));
   check('  …and about the ? sketches', /blue \?/.test(overview) && /sketch/i.test(overview));
 
@@ -8787,6 +8787,8 @@ console.log('\n── Onboarding overview + What\'s new ────────
   check('  …it names the AI macro tracking and the exercise sketches',
     WN.some(e => /Macros/.test(e.title) && /photo/.test(e.text)) && WN.some(e => /sketch/i.test(e.title) && /\?/.test(e.text)));
   check('version compare is numeric, not lexical', G._verNum('1.100') > G._verNum('1.99') && G._verNum('2.0') > G._verNum('1.999'));
+  // A row keyed to the NEXT bump (the version this branch ships as) is hidden until the build reaches it.
+  const reached = WN.filter(e => G._verNum(e.v) <= G._verNum(G.VERSION));
 
   const ls = sandbox.localStorage._s;
   const saveLs = Object.assign({}, ls);
@@ -8799,14 +8801,14 @@ console.log('\n── Onboarding overview + What\'s new ────────
   check('a brand-new account (no profile) gets no card', G._whatsNewEntries().length === 0 && G._whatsNewHtml(G._whatsNewEntries()) === '');
   // Nothing seen yet, already onboarded: an existing user who predates the card gets the whole list.
   reset(); ls['wkt-profile'] = JSON.stringify({ onboarded: true });
-  check('an onboarded account that never saw the card gets every entry', G._whatsNewEntries().length === WN.length);
+  check('an onboarded account that never saw the card gets every entry the build has reached', G._whatsNewEntries().length === reached.length && reached.length >= 5);
   let h = G._whatsNewHtml(G._whatsNewEntries());
   check('  …the card lists them, titled WHAT\'S NEW, with a Got it button',
-    /WHAT'S NEW/.test(h) && /dismissWhatsNew\(\)/.test(h) && /Got it/.test(h) && WN.every(e => h.includes(e.title)));
+    /WHAT'S NEW/.test(h) && /dismissWhatsNew\(\)/.test(h) && /Got it/.test(h) && reached.every(e => h.includes(e.title)));
   check('  …text is escaped on the way in', G._whatsNewHtml([{ v: '1.1', title: 'a<b', text: 'c&d' }]).includes('a&lt;b') && G._whatsNewHtml([{ v: '1.1', title: 't', text: 'c&d' }]).includes('c&amp;d'));
   // Only entries newer than the version last seen show.
   ls['wkt-whatsnew-seen'] = JSON.stringify(WN[WN.length - 1].v);
-  check('entries at or below the seen version are hidden', G._whatsNewEntries().length === WN.length - 1 && !G._whatsNewEntries().some(e => e.v === WN[WN.length - 1].v));
+  check('entries at or below the seen version are hidden', G._whatsNewEntries().length === reached.length - 1 && !G._whatsNewEntries().some(e => e.v === WN[WN.length - 1].v));
   ls['wkt-whatsnew-seen'] = JSON.stringify(G.VERSION);
   check('seen at the current version: nothing to show', G._whatsNewEntries().length === 0);
   // An entry for a version this device has not reached (an old cached build) is not shown yet.
@@ -8839,9 +8841,105 @@ console.log('\n── Onboarding overview + What\'s new ────────
   reset(); pushes.length = 0; ls['wkt-profile'] = JSON.stringify({ onboarded: true, gender: 'male' });
   G.obFinish();
   check('re-running the wizard on an onboarded account does NOT mark the card seen',
-    ls['wkt-whatsnew-seen'] === undefined && !pushes.some(kv => 'wkt-whatsnew-seen' in kv) && G._whatsNewEntries().length === WN.length);
+    ls['wkt-whatsnew-seen'] === undefined && !pushes.some(kv => 'wkt-whatsnew-seen' in kv) && G._whatsNewEntries().length === reached.length);
 
   G.pushSettingsToAgent = _savePush; reset(); Object.assign(ls, saveLs);
+}
+
+// ── The onboarding tour (2026-10-24) ─────────────────────────────────────────────
+// Henrik: "the onboarding never shows how to create a program or how to log a workout or how to
+// check the stick figures. I want a animated movie running as onboarding showing the main features
+// incl macro tracking." Then: "ask the onboarding questions first so a male user gets a Hypertrophy
+// in the gym movie and a female a female aesthetics at home movie."
+console.log('\n── Onboarding tour ──────────────────────────────────────────');
+{
+  const S = G.TOUR_SCENES;
+  check('tour: five scenes, program → log → sketch → macros → tabs',
+    S.map(s => s.id).join(',') === 'program,log,sketch,macros,tabs');
+  check('  …each animated scene plays for at least 5 s and the last one stays',
+    S.slice(0, -1).every(s => s.ms >= 5000 && s.title && s.cap) && S[S.length - 1].ms === 0);
+  check('  …the tour step is the LAST wizard step, after the gender question (step 2)',
+    /if\(_obStep===5\)_tourShow\(0\);else _tourStop\(\);/.test(String(G.obRender)) && /_obStep===2\)html=_obHtml2/.test(String(G.obRender)) && /Biological Sex/.test(G._obHtml2()));
+  check('  …finishing or skipping the wizard stops the timer', /^function obFinish\(\)\{\s*_tourStop\(\);/m.test(rawScript));
+  check('  …the welcome step promises the tour', /animated tour/.test(G._obHtml0()));
+
+  const saveOb = G._obData;
+  const scenes = html5 => [...html5.matchAll(/data-tour-scene="([a-z]+)"/g)].map(m => m[1]);
+  // Male (and unset): Hypertrophy in the gym, Squat.
+  G._obData = Object.assign({}, saveOb, { gender: 'male' });
+  let h = G._obHtml5();
+  check('male: the program scene builds a Hypertrophy program in the Gym',
+    scenes(h).join(',') === 'program,log,sketch,macros,tabs' && /Goal<b>Hypertrophy</.test(h) && />Gym</.test(h) && /4-Day Hypertrophy/.test(h) && /Generate Program/.test(h) && !/Feminine/.test(h));
+  check('  …logs a Squat in kg and saves', /tour-h" style="margin:0">Squat</.test(h) && />100</.test(h) && /SAVE WORKOUT/.test(h));
+  check('  …and the ? scene shows the real Squat sketch, start and finish',
+    (h.match(/<svg/g) || []).length >= 2 && h.includes(G._escP(G._exSketchSpec('Squat').cue)) && />SQUAT</.test(h));
+  G._obData = Object.assign({}, saveOb, { gender: null });
+  check('  …unset gender gets the same movie', /4-Day Hypertrophy/.test(G._obHtml5()));
+  // Female: Feminine Aesthetic at home, the program's own exercises.
+  G._obData = Object.assign({}, saveOb, { gender: 'female' });
+  h = G._obHtml5();
+  check('female: the program scene builds a Feminine Aesthetic program at Home',
+    /Goal<b>Feminine Aesthetic</.test(h) && />Home</.test(h) && /4-Day Feminine Aesthetic/.test(h) && /Quad &amp; Glute/.test(h) && !/Hypertrophy/.test(h));
+  check('  …logs a bodyweight exercise (BW, no kg)', /tour-h" style="margin:0">Bodyweight Squat</.test(h) && />BW</.test(h) && !/>100</.test(h));
+  check('  …and the ? scene shows the real Bulgarian Split Squat sketch',
+    h.includes(G._escP(G._exSketchSpec('Bulgarian Split Squat').cue)) && />BULGARIAN SPLIT SQUAT</.test(h));
+  // The movie names only exercises the app can really generate and sketch.
+  const named = [];
+  for (const g of ['male', 'female']) { G._obData = Object.assign({}, saveOb, { gender: g }); const p = G._tourProfile();
+    p.days.forEach(d => d[1].split(' · ').forEach(n => named.push(n))); named.push(p.logEx, p.sketchEx); }
+  const alias = { 'Incline Bench': 'Incline Bench Press' };
+  const missing = named.map(n => alias[n] || n).filter(n => !G._exSketchSpec(n));
+  check('every exercise the movie names has a sketch', missing.length === 0, missing.join(', '));
+  const genNames = new Set();
+  [['hypertrophy', 'balanced', null], ['aesthetic', 'fullbody', 'home-bw']].forEach(([g, sub, eq]) => {
+    Object.values(G._generateWorkoutProgram(g, sub, 4, 'x', 12, [], eq).days).forEach(d => d.exercises.forEach(e => genNames.add(e.name))); });
+  const notGen = named.map(n => alias[n] || n).filter(n => !genNames.has(n));
+  check('  …and is one the generator really writes for that goal', notGen.length === 0, notGen.join(', '));
+  // Macros scene is shared.
+  check('macros scene: typing what you ate, Photo, Log, then the bars fill',
+    /What did you eat\?/.test(h) && /202 g steak/.test(h) && /Photo/.test(h) && /tourFill/.test(h) && /kcal/.test(h));
+  G._obData = saveOb;
+
+  // The scheduler flips one scene on, moves the dot and shows the tab list only on the last scene.
+  const trk = id => { delete _idStore[id]; _idStore[id] = makeTrackingEl(); return _idStore[id]; };
+  const st = trk('tour-stage'), s0 = trk('tour-s0'), s2 = trk('tour-s2'), s4 = trk('tour-s4'), d2 = trk('tour-d2'), tl = trk('tour-tablist');
+  G._tourShow(2);
+  check('_tourShow(2) shows scene 2 only and marks its dot', s2._classes.has('on') && !s0._classes.has('on') && !s4._classes.has('on') && d2._classes.has('active') && !tl._classes.has('on'));
+  G._tourShow(4);
+  check('  …the last scene shows the tab list under the stage', s4._classes.has('on') && !s2._classes.has('on') && tl._classes.has('on') && !d2._classes.has('active'));
+  G._tourShow(1);
+  check('  …and an earlier scene hides it again', !tl._classes.has('on'));
+  G._tourToggle();
+  check('tap pauses the animations', st._classes.has('paused') && G._tour.paused === true);
+  G._tourToggle();
+  check('  …a second tap resumes', !st._classes.has('paused') && G._tour.paused === false);
+  G._tourShow(4); G._tourToggle();
+  check('  …the last scene has nothing to pause', !st._classes.has('paused'));
+  G._tourStop();
+  check('WHATS_NEW announces the tour and where to replay it', G.WHATS_NEW.some(e => /tour/i.test(e.title) && /top of Settings/.test(e.text)));
+
+  // Henrik: "in settings/More add a button on top to re run the intro for users who want to see it again."
+  check('Settings opens with a "Watch the intro again" button, before the first section',
+    /id="page-settings"[^>]*>\s*<button id="tour-replay-btn" onclick="openTour\(\)"[^>]*>[^<]*<span[^>]*>▶<\/span>Watch the intro again<\/button>/.test(html));
+  const ov = trk('onboarding-overlay'); ov.classList.add('hidden');
+  const dots = trk('ob-dots'), backB = trk('ob-back'), nextB = trk('ob-next');
+  sandbox.localStorage._s['wkt-profile'] = JSON.stringify({ onboarded: true, gender: 'female', weight: 60 });
+  G._obData = Object.assign({}, saveOb, { gender: null });
+  G.openTour();
+  check('openTour opens the overlay straight on the tour with the saved profile\'s gender',
+    !ov._classes.has('hidden') && G._obStep === 5 && G._obData.gender === 'female' && G._obTourOnly === true);
+  check('  …no Back, no dots, and the button says Done', backB.style.display === 'none' && dots.style.visibility === 'hidden');
+  const pushesBefore = [];
+  const _sp2 = G.pushSettingsToAgent; G.pushSettingsToAgent = kv => pushesBefore.push(kv);
+  const wBefore = JSON.stringify(G.weights);
+  G.obNext();
+  check('  …Done closes it without saving a profile or a weight', ov._classes.has('hidden') && G._obTourOnly === false && pushesBefore.length === 0 && JSON.stringify(G.weights) === wBefore);
+  G.openTour(); G.obSkip();
+  check('  …Skip closes it the same way', ov._classes.has('hidden') && pushesBefore.length === 0);
+  G.pushSettingsToAgent = _sp2;
+  G.openOnboarding();
+  check('a real re-run of the wizard clears tour-only mode', G._obTourOnly === false && G._obStep === 0);
+  G._obData = saveOb; ov.classList.add('hidden');
 }
 
 // Print the summary only when every async check has finished: on beforeExit, which fires once
