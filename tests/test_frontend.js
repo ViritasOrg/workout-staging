@@ -8942,6 +8942,68 @@ console.log('\n── Onboarding tour ──────────────
   G._obData = saveOb; ov.classList.add('hidden');
 }
 
+
+// ── Macro targets per day (2026-10-24) ─────────────────────────────────────────────
+// Henrik: "I imported my old logs but the targets has changed since … the targets must be
+// saved for each day so real stats can be generated later." Food Edit shows the goals in force
+// on a day and saves a row on that date; /food-log/stats then measures every later day against
+// it until the next recorded change.
+console.log('\n── Macro targets per day ───────────────────────────────────');
+{
+  const goals = [{ date: '2026-10-20', kcal: 2400, protein: 213, carbs: 285, fat: 51 },
+                 { date: '2026-07-15', kcal: 2100, protein: 190, carbs: 200, fat: 55 }];
+  check('_flGoalFor: a row on the day is exact', JSON.stringify(G._flGoalFor('2026-10-20', goals)) === JSON.stringify({ goal: goals[0], origin: 'exact' }));
+  check('  …a later day inherits the latest row on or before it', G._flGoalFor('2026-09-01', goals).goal.kcal === 2100 && G._flGoalFor('2026-09-01', goals).origin === 'inherited');
+  check('  …a day before every row uses the first on record, as /stats does', G._flGoalFor('2026-06-01', goals).goal.kcal === 2100 && G._flGoalFor('2026-06-01', goals).origin === 'first');
+  check('  …no rows at all is null', G._flGoalFor('2026-06-01', []) === null && G._flGoalFor('2026-06-01', null) === null);
+  check('  …and the input order does not matter', G._flGoalFor('2026-10-25', goals.slice().reverse()).goal.kcal === 2400);
+
+  const saveGoals = G._flGoals, saveDate = G._flEditDate;
+  G._flGoals = goals; G._flEditDate = '2026-09-01';
+  let h = G._flEditHtml([], '2026-09-01');
+  check('Food Edit shows the targets card even on a day with nothing logged',
+    /Targets from this day/.test(h) && h.indexOf('Targets from this day') < h.indexOf('Nothing logged on this day'));
+  check('  …prefilled with the goals in force and saying where they come from',
+    /id="flg-kcal" value="2100"/.test(h) && /id="flg-protein" value="190"/.test(h) && /Inherited from 15 Jul 2026/.test(h) && /flGoalSave\(\)/.test(h) && !/flGoalDelete/.test(h));
+  h = G._flEditHtml([], '2026-10-20');
+  check('  …a day with its own row offers Remove this change', /Set on this day\./.test(h) && /flGoalDelete\(\)/.test(h) && /id="flg-kcal" value="2400"/.test(h));
+  h = G._flEditHtml([], '2026-06-01');
+  check('  …a day before the first row says so', /first on record \(15 Jul 2026\)/.test(h));
+  G._flGoals = [];
+  check('  …and no rows yet is said plainly', /No targets recorded yet/.test(G._flEditHtml([], '2026-06-01')) && /value=""/.test(G._flEditHtml([], '2026-06-01')));
+  G._flGoals = goals;
+  check('  …today says the Macros page re-records it', /re-recorded from the Macros page/.test(G._flEditHtml([], G._flDay())));
+
+  // Save PUTs a goal row on the edit date. flGoalSave is async, but its first await IS the
+  // fetch, so the request is observable synchronously; the global fetch is restored at once so
+  // no other test's recording is disturbed (the continuation then runs on the default stub).
+  const calls = []; const _fetch = G.fetch;
+  const vals = { kcal: '2100', protein: '190', carbs: '', fat: '55,5' };
+  const _gebi = G.document.getElementById;
+  G.document.getElementById = id => (id.indexOf('flg-') === 0 ? { value: vals[id.slice(4)] } : _gebi(id));
+  G._flEditDate = '2026-07-15';
+  G.fetch = async (url, opt) => { calls.push({ url, opt }); return { ok: true, status: 200, json: async () => ({ goals: [] }) }; };
+  G.flGoalSave(); G.fetch = _fetch;
+  const put = calls.find(c => c.opt && c.opt.method === 'PUT');
+  check('Save targets PUTs /food-log/goals for the edited date, with blanks as null and a comma decimal read',
+    calls.length === 1 && !!put && /\/food-log\/goals$/.test(put.url) && JSON.stringify(JSON.parse(put.opt.body)) === JSON.stringify({ date: '2026-07-15', kcal: 2100, protein: 190, carbs: null, fat: 55.5 }));
+  check('  …then reloads the goals, the stats, the Macros page and Food Edit',
+    /_flLoadGoals\(\)/.test(String(G._flGoalsChanged)) && /_flLoadStats\(\)/.test(String(G._flGoalsChanged)) && /buildFoodEdit\(_flEditDate\)/.test(String(G._flGoalsChanged)) && /await _flGoalsChanged\(\)/.test(String(G.flGoalSave)));
+  calls.length = 0; vals.kcal = '';
+  const alerts = []; const _alert = G.alert; G.alert = m => alerts.push(String(m));
+  G.fetch = async (url, opt) => { calls.push({ url, opt }); return { ok: false, json: async () => ({}) }; };
+  G.flGoalSave(); G.fetch = _fetch; G.alert = _alert;
+  check('  …no kcal: nothing is sent and the user is told', calls.length === 0 && alerts.length === 1 && /kcal/.test(alerts[0]));
+  G.fetch = async (url, opt) => { calls.push({ url, opt }); return { ok: false, json: async () => ({}) }; };
+  G.flGoalDelete(); G.fetch = _fetch;
+  check('Remove this change asks the global-delete confirmation first (declined here: nothing sent)',
+    calls.length === 0 && /confirmGlobalDelete\('the target change recorded on this day'\)/.test(String(G.flGoalDelete)));
+  check('  …and deletes /food-log/goals/<date> when confirmed', /\/food-log\/goals\/'\+_flEditDate/.test(String(G.flGoalDelete)) && /method:'DELETE'/.test(String(G.flGoalDelete)));
+  check('buildFoodEdit loads the recorded goals before rendering', /if\(_flGoals===null\)await _flLoadGoals\(\);/.test(String(G.buildFoodEdit)));
+  check('WHATS_NEW announces it', G.WHATS_NEW.some(e => /Macro targets per day/.test(e.title) && /Food Edit/.test(e.text)));
+  G.document.getElementById = _gebi; G._flGoals = saveGoals; G._flEditDate = saveDate;
+}
+
 // Print the summary only when every async check has finished: on beforeExit, which fires once
 // nothing is left pending. Exiting on setImmediate skipped any check that waits on a timer or a
 // few promise turns (the draft-ordering block, the food-stats retries), so they ran, and could

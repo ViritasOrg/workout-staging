@@ -4198,6 +4198,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.309',title:'Macro targets per day',text:'Food Edit shows the targets in force on any day and lets you set them from that day onward, so the history card measures each day against the right goals. Use it to fill in the periods of an imported log.'},
   {v:'1.307',title:'Animated tour',text:'The Setup Wizard ends with a short animated tour: building a program, logging a workout, the ? sketches and tracking macros. Watch it again from the button at the top of Settings.'},
   {v:'1.287',title:'Today and Plan',text:'The Program tab is now Today (your next session) and Plan (your program library and templates).'},
   {v:'1.283',title:'Macros: AI food logging',text:'Type what you ate, or take a photo of the food or its label, and the calories and macros are estimated and saved. Daily targets are suggested from your goal and weight; Food Edit fixes an entry.'},
@@ -4539,9 +4540,41 @@ async function _flSend(p){if(_flBusy)return;_flBusy=true;_flErr='';_flPending=p;
 // instead of forcing me to delete the line"). The amount is read from the stored text
 // ("300g", "115 g", "300ml"); anything else ("2 cups") has no number to scale from.
 function _flGrams(a){var m=String(a==null?'':a).match(/^\s*(\d+(?:[.,]\d+)?)\s*(g|ml)?\s*$/i);return m?{n:parseFloat(m[1].replace(',','.')),u:(m[2]||'g').toLowerCase()}:null;}
+// ── Targets per day ── Henrik, 2026-10-24: "the targets must be saved for each day so real stats
+// can be generated later." They are: _flRecordGoal writes a goal row for today whenever the Macros
+// page shows targets, and /food-log/stats measures each day against the latest row recorded on or
+// before it. What an imported log needs is a way to set the targets for a PAST date: this card in
+// Food Edit shows the goals in force on the chosen day, where they come from, and saves a row on
+// that date, which then holds for every day after it until the next recorded change.
+var _flGoals=null;
+async function _flLoadGoals(){try{var r=await fetch(AGENT_URL+'/food-log/goals',{headers:authHeaders()});if(r.ok)_flGoals=((await r.json())||{}).goals||[];}catch(e){}}
+// The goals in force on `date`: the latest row recorded on or before it, else the first on record,
+// which is what /food-log/stats does. origin: 'exact' (a row on this date), 'inherited', 'first'.
+function _flGoalFor(date,goals){var g=(goals||[]).slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0;});if(!g.length)return null;
+  var on=null;for(var i=0;i<g.length;i++){if(g[i].date<=date)on=g[i];}var row=on||g[0];return {goal:row,origin:on?(on.date===date?'exact':'inherited'):'first'};}
+function _flGoalsCardHtml(date){var f=_flGoalFor(date,_flGoals||[]),g=f?f.goal:null;
+  var inp=function(k,v){return'<label style="font-size:11px;color:var(--muted)">'+k+'<input id="flg-'+k.toLowerCase()+'" value="'+_flEsc(v==null?'':v)+'" inputmode="decimal" style="width:100%;box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px"></label>';};
+  var note=!f?'No targets recorded yet.':f.origin==='exact'?'Set on this day.':f.origin==='inherited'?'Inherited from '+_flShortDate(g.date)+'.':'Nothing recorded on or before this day, so the first on record ('+_flShortDate(g.date)+') is used.';
+  if(date===_flDay())note+=' Today\'s targets are also re-recorded from the Macros page whenever it is open.';
+  return _flCard('<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Targets from this day</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'+inp('kcal',g&&g.kcal)+inp('Protein',g&&g.protein)+inp('Carbs',g&&g.carbs)+inp('Fat',g&&g.fat)+'</div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">'+note+' Save sets the targets from this day onward, until the next recorded change; the history card measures each day against them.</div>'+
+    '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Save targets','flGoalSave()',true)+(f&&f.origin==='exact'?_flBtn('Remove this change','flGoalDelete()',false):'')+'</div>');}
+async function _flGoalsChanged(){_flGoalSent='';await _flLoadGoals();await _flLoadStats();if(typeof _flRender==='function')_flRender();buildFoodEdit(_flEditDate);}
+async function flGoalSave(){var v=function(id){var e=document.getElementById('flg-'+id);var n=parseFloat(String(e?e.value:'').replace(',','.'));return isFinite(n)&&n>=0?n:null;};
+  var kcal=v('kcal');if(!(kcal>0)){alert('Enter the kcal target for this day.');return;}
+  var body={date:_flEditDate,kcal:kcal,protein:v('protein'),carbs:v('carbs'),fat:v('fat')};
+  try{var r=await fetch(AGENT_URL+'/food-log/goals',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(body)});if(!r.ok){alert('The targets were not saved: the server answered '+r.status+'.');return;}}
+  catch(e){alert('Network error: the targets were not saved.');return;}
+  await _flGoalsChanged();}
+async function flGoalDelete(){if(!confirmGlobalDelete('the target change recorded on this day'))return;
+  try{var r=await fetch(AGENT_URL+'/food-log/goals/'+_flEditDate,{method:'DELETE',headers:authHeaders()});if(!r.ok){alert('The change was not removed: the server answered '+r.status+'.');return;}}
+  catch(e){alert('Network error: the change was not removed.');return;}
+  await _flGoalsChanged();}
 function _flEditHtml(rows,date){
   var inp=function(id,f,v,w,num){return'<input id="fle-'+f+'-'+id+'" value="'+_flEsc(v)+'"'+(num?' inputmode="decimal"':'')+' style="width:'+w+';box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">';};
   var h=_flCard('<div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;color:var(--muted)">Day</span><input id="fle-date" type="date" value="'+_flEsc(date)+'" onchange="buildFoodEdit(this.value)" style="padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px"></div>');
+  h+=_flGoalsCardHtml(date);
   if(!rows.length)return h+_flCard('<div style="font-size:13px;color:var(--muted)">Nothing logged on this day. Food is logged on the Macros tab.</div>');
   var t=_flTotals(rows);
   h+='<div style="font-size:13px;color:var(--text);margin:0 0 4px 2px"><b>'+t.kcal+' kcal</b> · P '+t.protein+' · C '+t.carbs+' · F '+t.fat+'</div>';
@@ -4552,7 +4585,7 @@ function _flEditHtml(rows,date){
       '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;font-size:11px;color:var(--muted)"><label>kcal'+inp(id,'kcal',r.kcal,'100%',1)+'</label><label>Protein'+inp(id,'protein',r.protein,'100%',1)+'</label><label>Carbs'+inp(id,'carbs',r.carbs,'100%',1)+'</label><label>Fat'+inp(id,'fat',r.fat,'100%',1)+'</label></div>'+
       '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Save',"flEditSave('"+id+"')",true)+_flBtn('Delete',"flEditDelete('"+id+"')",false)+'</div>');});
   return h;}
-async function buildFoodEdit(date){_flEditDate=date||_flEditDate||_flDay();var rows=await _flLoadRows(_flEditDate);_flEditRows=rows||[];var el=document.getElementById('food-edit-body');if(el)el.innerHTML=rows?_flEditHtml(_flEditRows,_flEditDate):_flCard('<div style="font-size:13px;color:var(--muted)">Could not load the food log. Check your connection.</div>');}
+async function buildFoodEdit(date){_flEditDate=date||_flEditDate||_flDay();if(_flGoals===null)await _flLoadGoals();var rows=await _flLoadRows(_flEditDate);_flEditRows=rows||[];var el=document.getElementById('food-edit-body');if(el)el.innerHTML=rows?_flEditHtml(_flEditRows,_flEditDate):_flCard('<div style="font-size:13px;color:var(--muted)">Could not load the food log. Check your connection.</div>');}
 async function flEditSave(id){var g=function(f){var e=document.getElementById('fle-'+f+'-'+id);return e?e.value:'';};
   var body={food:String(g('food')).trim().slice(0,120),kcal:_flNum(g('kcal')),protein:_flNum(g('protein')),carbs:_flNum(g('carbs')),fat:_flNum(g('fat'))};
   var row=_flEditRows.find(function(x){return String(x.id)===String(id);})||{};var g0=_flGrams(row.amount);var gNew=_flNum(String(g('grams')).replace(',','.'));
