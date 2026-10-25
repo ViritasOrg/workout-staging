@@ -1,20 +1,65 @@
 # Workout Staging — Claude Instructions
 
-## Verify before you speak (Henrik's standing rule)
+<!-- BEGIN ORG-WIDE RULES v1. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
+## Org-wide rules: every ViritasOrg repo (canonical v1, 2026-10-25)
 
+These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules further down in this file add repo-specific detail. If one of them seems to contradict this block, say so to Henrik instead of silently picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent).
+
+### Verify before you speak (Henrik's standing rule)
 - Before telling Henrik a cause, a fix, or a step to take, check the facts yourself first: read the config, logs, code, settings or live state. Never present a guess as the answer.
 - Never send him to repeat something he may already have done; check whether it is already done first.
 - If something can't be verified, say exactly what is unverified, instead of giving an instruction built on an assumption.
 - If you notice you'd have to write "let me find the actual cause instead of guessing", you already broke this rule: the checking belongs before the first answer, not after he pushes back.
 
-
-## Answer first (Henrik, 2026-10-10)
-
-- **Answer first, then say what you will do before doing it** ("You're right. I'll answer first and say what I'm doing before I start."). A question gets its answer in the first lines, before any tool call. Before starting any work (a workflow, a PR, a deploy, waiting on CI), say in one line what you are about to do and why; never disappear into tool calls on a simple question.
+### Talking to Henrik
+- **Answer first, then say what you will do before doing it** (Henrik, 2026-10-10: "You're right. I'll answer first and say what I'm doing before I start."). A question gets its answer in the first lines, before any tool call. Before starting any work (a workflow, a PR, a deploy, waiting on CI), say in one line what you are about to do and why; never disappear into tool calls on a simple question.
 - **Every request carries context** (Henrik, 2026-10-10: "add context to requests so I have a clue what you are talking about"). When you ask Henrik to do or check something, say what it is for, where it fits in the overall task (step N of what), and what he should see when it worked. Never a bare instruction that assumes he remembers the thread.
-- **Don't stop for minor things — decide and do it** (Henrik, 2026-10-12: *"don't stop for minor things like this, show a little self confidence"*). A small, reversible call inside the task (an estimate, a naming choice, an obvious adjacent fix) is made, shipped and reported in the reply — not turned into a question. Ask only when the choice is genuinely Henrik's: it changes what he asked for, touches prod, deletes something, or picks between real trade-offs he would care about.
-- **Every step Henrik must do comes with its commands, in the same message** (Henrik, 2026-10-10: "you must always provide detailed instructions and commands for stuff like this"). When a reply mentions anything he will have to do (merge, deploy, change a config, restart, check), give the full instructions and the exact, complete, copy-paste commands right there, saying which machine each runs on. Never "I'll give you the command when…" or "deploy as usual": he should never have to ask for the how.
-- **Henrik uses Chrome, on his iPhone and his Macs, unless something forces him to use another browser** (Henrik, 2026-10-17: *"update all repos that I only use Chrome unless forced to"*). Every browser step is written for Chrome: open links in Chrome, and on iPhone add a page to the home screen through Chrome's **Share → Add to Home Screen**. Name Safari only when iOS genuinely requires it for that step, and say why.
+- **Number questions** (Henrik, 2026-10-15: "if you give me more than one question at the time always remember to enumerate them pls"). Two or more questions in one message are a numbered list, so he can answer "1 yes 2 no".
+- **Don't stop for minor things: decide and do it** (Henrik, 2026-10-12: "don't stop for minor things like this, show a little self confidence"). A small, reversible call inside the task (an estimate, a naming choice, an obvious adjacent fix) is made, shipped and reported in the reply, not turned into a question. Ask only when the choice is genuinely Henrik's: it changes what he asked for, touches prod, deletes something, or picks between real trade-offs he would care about.
+- **Once Henrik has answered, carry on** (Henrik, 2026-10-16: "Never stop like this if I answered the questions", https://github.com/ViritasOrg/Flyt/issues/582). Never end a turn on "shall I go ahead?" or anything else his answer already settles; build up to the next point that truly needs him.
+- **Every reference is a clickable link, its full URL visible** (Henrik, 2026-10-14: "give me only ever clickable links … this is unacceptable!!!", https://github.com/ViritasOrg/Flyt/issues/425). Every issue, PR, Claude session, Actions run, commit, file or page named to Henrik is written as its full `https://` URL, visible as the text itself, inside the sentence. Never link text that hides the URL (`[session](…)`, `[#299](…)`), never a bare `#299`, `owner/repo#n` or file path, never a URL in bold, in code formatting or on a line of its own apart from its sentence. Claude session links above all: the Claude app shows a named link to a session but doesn't open it.
+
+### Steps Henrik has to do
+- **Every step Henrik must do comes with its commands, in the same message** (Henrik, 2026-10-10: "you must always provide detailed instructions and commands for stuff like this"). Give the full instructions and the exact, complete, copy-paste commands right there, saying which machine each runs on. Never "I'll give you the command when…" or "deploy as usual". **Never point back in the chat** (Henrik, 2026-10-22, https://github.com/ViritasOrg/Flyt/issues/679: "never ask me to search backwards in a session chatt , just show me the needed bash to copy into terminal!!!"): a message that asks him to run something carries the complete command itself, never "the command above", "as before" or "scroll up".
+- **Henrik's computer is a Mac: macOS with zsh, never bash** (Henrik, 2026-10-07). Commands he runs on his own computer must work as typed in zsh: `read -s "T?Prompt: "` (never `read -p`), BSD tools (`sed -i ''`, `base64 -D`, `date -v`, no `grep -P`, no `${!var}`, `open` not `xdg-open`). Fly machines, CI and the Pi are Linux/bash: say which machine each command runs on.
+- **Henrik's Macs have EU keyboards: the Option key is labelled `alt`** (Henrik, 2026-10-11: "no option on eu keyboards only alt"). Write **alt (⌥)**, never "Option", and **cmd (⌘)**, not "Command".
+- **Henrik uses Chrome, on his iPhone and his Macs, unless something forces him to use another browser** (Henrik, 2026-10-17: "update all repos that I only use Chrome unless forced to"). Every browser step is written for Chrome; on iPhone a page goes to the home screen through Chrome's **Share → Add to Home Screen**. Name Safari only when iOS genuinely requires it for that step, and say why.
+- **Passwords: Henrik types them, Claude never routes them** (Henrik, 2026-10-15, https://github.com/ViritasOrg/Flyt/issues/530: "I will never put passwords on clipboard … you dont need to deal with passwords ever"). He types a password, or pastes it from his password manager, into the prompt that asks for it. Never a command that feeds a password from `pbpaste`, the clipboard, a shell variable, a heredoc or `sudo -S`; never ask him to paste a token, key or password into the chat, and never print one into a reply.
+- **Henrik's home connection has no fixed IP: never ask for a home-IP whitelist** (Henrik, 2026-10-23, https://github.com/ViritasOrg/flyt/issues/761: "update md files in all repos to never ask something as stupid again"). Never tell him to allow-list his home IP for a partner key (Revolut X, Kraken, bunq, Stripe, anything later), never print his IP for one, never write such a step into a doc. A key is kept small by its permissions and, where offered, an expiry date; leave the partner's IP field empty.
+
+### No legal advice unless Henrik asks for it (Henrik, 2026-10-21, https://github.com/ViritasOrg/Flyt/issues/646)
+> "update all md files to never provide unsolicited legal advice, I need a real laywer not pointless discussions with Claude or any AI/LLM."
+- Claude is the development team, not legal counsel. Never, unless Henrik asks in that conversation: legal opinions, caveats, warnings, "check with a lawyer", "may need a licence", regulatory risk notes or compliance discussion, in chat, issues, PRs, code comments, docs or research reports.
+- A technical choice that depends on a legal answer gets one line asking for Henrik's call ("needs your call: A or B"), then Claude builds what he decides. Never argue it, never repeat it.
+- Provider facts that decide what works technically are stated plainly in one line with their source, without legal commentary.
+- Existing legal lists (e.g. Flyt's "Legal questions", https://github.com/ViritasOrg/Flyt/issues/313) are his record: never add to them or comment on them unless he asks.
+
+### Nothing half-built is ever visible (Henrik, 2026-10-15, https://github.com/ViritasOrg/Flyt/issues/544)
+> "update all claude.md in all repos to warn for this to ever happen again, this is very stupid!"
+- Anything a user, vendor, buyer or Henrik's family can see, use or rely on stays switched off (a flag or setting off by default, off in production) until every step of its flow works end to end outside production and Henrik gives the go. Turning it on is its own change.
+- Splitting work into issues never makes a part shippable on its own.
+- User-facing docs describe what production runs, never a switched-off feature.
+
+### "btcpay" is Henrik's own Pi service, never the other product (Henrik, 2026-10-15, https://github.com/ViritasOrg/btcpay/issues/112)
+> "add rules to all repos to never mention BTCPay ever again"
+- **btcpay** always means Henrik's own Bitcoin payment queue on the Raspberry Pi 4 (repo `ViritasOrg/btcpay`). There is an unrelated open-source payment server with a similar name: never name it, link it, quote its docs or use it as a mental model ("store", "pull payment", "payout processor", "Greenfield" and the like exist nowhere here).
+- Answers about payouts, holds, funding or addresses come from `ViritasOrg/btcpay`'s own `docs/` and Flyt's `docs/`. Unsure which is meant? It is this one.
+
+### Every repo lives under `ViritasOrg`: the old owner name is dead (Henrik, 2026-10-16)
+> "update md files in all repos to forget the old name henrikschaub for the repos."
+- Repos, PRs, runs, files and Pages sites are written and linked as `ViritasOrg/<repo>` and `https://viritasorg.github.io/<repo>/`, never `henrikschaub/<repo>` or `henrikschaub.github.io`. GitHub still redirects the old names (a GET works, a POST silently doesn't), which is how they survive unnoticed.
+- A session whose repository scope, clone remote or task prompt shows `henrikschaub/<repo>` is misconfigured: do the work, and tell Henrik which setting carries the old name. (`henrikschaub` is still Henrik's personal GitHub user; only repo owners moved.)
+
+### Credentials are replaced, never just deleted (Henrik, 2026-10-08: "update all md files to make sure you don't do the same mistake ever again")
+- A credential that must go is replaced in one step: new value generated, set where the server reads it and where the caller reads it, verified with a real call. Never a delete with the replacement left for later.
+- Never advise deleting, revoking, rotating or unsetting a credential, env var, secret, file, branch or data store before establishing what reads it. Grep for it first.
+- An env var reference (`$CLAUDE_READONLY_API_KEY`) in a file is correct practice, not a leak; only a literal secret value committed to a file is, and then name the exact file and line.
+
+### A verified error in an md file gets fixed immediately (Henrik, 2026-08-08: "When you find verified errors in md files always fix em instantly.")
+- If you establish that something in a `CLAUDE.md` (or any md in these repos) is wrong, correct it in that session, in every repo that repeats it. Verified means you checked (read the workflow, ran the command, saw the run); a hunch is not a finding.
+- Say what was wrong and why in the commit and the reply. This does not license rewriting rules you disagree with: those are Henrik's call. A SETTLED marker still wins: raise it, don't edit.
+- An org-wide rule is changed in the canonical file first, then copied into every repo's block in the same session.
+<!-- END ORG-WIDE RULES v1 -->
 
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
 **The free-T / plasma curve is always in pmol/L. There is no second unit and there must
@@ -1160,26 +1205,6 @@ PR maintains them.
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 
-## ⚠️ A VERIFIED ERROR IN AN md FILE GETS FIXED IMMEDIATELY ⚠️
-Henrik, 2026-08-08: *"When you find verified errors in md files always fix em
-instantly."*
-
-If you establish that something in a `CLAUDE.md` (or any md in these repos) is
-**wrong** — not merely stale-sounding or awkward — correct it in that session. Do
-not flag it and wait, do not add it to a TODO, do not ask whether to bother.
-
-- **Verified** means you checked: you read the workflow, ran the command, or saw
-  the run. A hunch is not a finding, and "this reads oddly" is not an error.
-- Fix it where it is wrong, in every writable repo that repeats the claim — these
-  files are copied between repos, so one wrong sentence usually exists in several.
-- Say what was wrong and why in the commit and in your reply, so the next session
-  can tell a correction from a drive-by edit.
-- **This does not license rewriting rules you disagree with.** A rule you think is
-  mistaken is Henrik's call — say so and leave it. This is for statements of fact
-  that are demonstrably untrue: a workflow that does not do what the file says, a
-  file credited with behaviour it does not have, a value that no longer matches.
-- A SETTLED marker still wins. If a value is marked settled, raise it, do not edit.
-
 ## Git workflow — ALWAYS follow this
 ### ⚠️ CLAUDE ALWAYS CREATES AND MERGES ITS OWN PRS — NEVER ASK HENRIK ⚠️
 **Claude must NEVER ask Henrik to create a PR, merge a PR, or do anything with GitHub.**
@@ -1352,7 +1377,6 @@ const IS_STAGING = (window.location.pathname||'').startsWith('/workout-staging')
 
 The `IS_STAGING` constant is declared at the top of the `<script>` block, right after `const VERSION`.
 Use it to gate any staging-only UI (e.g., `if(IS_STAGING)buildDeployCard();`).
-
 
 ## 🔎 DEFERRED — CodeQL findings on the promoted apps (raised 2026-08-02)
 
