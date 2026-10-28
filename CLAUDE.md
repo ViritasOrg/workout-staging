@@ -1,7 +1,7 @@
 # Workout Staging — Claude Instructions
 
-<!-- BEGIN ORG-WIDE RULES v2. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
-## Org-wide rules: every ViritasOrg repo (canonical v2, 2026-10-26)
+<!-- BEGIN ORG-WIDE RULES v3. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
+## Org-wide rules: every ViritasOrg repo (canonical v3, 2026-10-28)
 
 These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules further down in this file add repo-specific detail. If one of them seems to contradict this block, say so to Henrik instead of silently picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent).
 
@@ -63,11 +63,19 @@ These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules 
 - Still never: push to a protected branch, change branch protection, merge red or conflicted, or merge a PR that lists a step Henrik must do or check before merging (ask for that step first).
 - Henrik can still merge anything himself. A repo whose rules keep production behind his own step keeps it: `peptidetracker` and `workout` reach production only through his Push to Prod.
 
+### Every repo has CI and tests (Henrik, 2026-10-28, https://github.com/ViritasOrg/flyt/issues/982)
+> "I want CI setup and tests written and that all claude.md files for all repos future and present include this requirement."
+- Every repo has a GitHub Actions workflow that runs its tests on every pull request and on every push to its main branch. A repo without one, or without tests, gets both in its own PR before the next change to its code merges.
+- A new repo gets its CI workflow and first tests in its first PR, its line in `REPOS` in `ViritasOrg/claude-agent-backend` `scripts/check_org_rules.py`, and this block in its `CLAUDE.md`.
+- New or changed behaviour comes with tests in the same PR. A bug fix comes with a regression test that fails on the code before the fix.
+- Tests call the code and check what it returns; a test that only greps the source for a string doesn't count as covering behaviour. Tests in CI never call a real partner or need a real secret: stub them.
+- A PR merges only after its tests ran green in CI on its latest commit. No checks at all is not green. Never skip, disable or loosen a test, a coverage floor or a CI step to get a change through.
+
 ### A verified error in an md file gets fixed immediately (Henrik, 2026-08-08: "When you find verified errors in md files always fix em instantly.")
 - If you establish that something in a `CLAUDE.md` (or any md in these repos) is wrong, correct it in that session, in every repo that repeats it. Verified means you checked (read the workflow, ran the command, saw the run); a hunch is not a finding.
 - Say what was wrong and why in the commit and the reply. This does not license rewriting rules you disagree with: those are Henrik's call. A SETTLED marker still wins: raise it, don't edit.
 - An org-wide rule is changed in the canonical file first, then copied into every repo's block in the same session.
-<!-- END ORG-WIDE RULES v2 -->
+<!-- END ORG-WIDE RULES v3 -->
 
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
 **The free-T / plasma curve is always in pmol/L. There is no second unit and there must
