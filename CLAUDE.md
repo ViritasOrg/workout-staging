@@ -69,7 +69,7 @@ These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules 
 - A new repo gets its CI workflow and first tests in its first PR, its line in `REPOS` in `ViritasOrg/claude-agent-backend` `scripts/check_org_rules.py`, and this block in its `CLAUDE.md`.
 - New or changed behaviour comes with tests in the same PR. A bug fix comes with a regression test that fails on the code before the fix.
 - Tests call the code and check what it returns; a test that only greps the source for a string doesn't count as covering behaviour. Tests in CI never call a real partner or need a real secret: stub them.
-- A PR merges only after the repo's CI ran green on its latest commit; no checks at all is not green. The one exception is a docs-only PR in a repo that has no CI yet. Never skip, disable or loosen a test, a coverage floor or a CI step to get a change through.
+- A PR merges only after the repo's CI ran green on its latest commit; no checks at all is not green. The one exception is a docs-only PR in a repo whose CI doesn't run on pull requests yet. Never skip, disable or loosen a test, a coverage floor or a CI step to get a change through.
 
 ### A verified error in an md file gets fixed immediately (Henrik, 2026-08-08: "When you find verified errors in md files always fix em instantly.")
 - If you establish that something in a `CLAUDE.md` (or any md in these repos) is wrong, correct it in that session, in every repo that repeats it. Verified means you checked (read the workflow, ran the command, saw the run); a hunch is not a finding.
