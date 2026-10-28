@@ -1,7 +1,7 @@
 # Workout Staging — Claude Instructions
 
 <!-- BEGIN ORG-WIDE RULES v4. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
-## Org-wide rules: every ViritasOrg repo (canonical v4, 2026-10-28)
+## Org-wide rules: every ViritasOrg repo (canonical v5, 2026-10-28)
 
 These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules further down in this file add repo-specific detail. If one of them seems to contradict this block, say so to Henrik instead of silently picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent).
 
@@ -20,6 +20,15 @@ These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules 
 - **Once Henrik has answered, carry on** (Henrik, 2026-10-16: "Never stop like this if I answered the questions", https://github.com/ViritasOrg/Flyt/issues/582). Never end a turn on "shall I go ahead?" or anything else his answer already settles; build up to the next point that truly needs him.
 - **A message sent while you work never means stop** (Henrik, 2026-10-26: "\"Send Now\" messages never means stop, just that I need a quick answer before you continue working", https://github.com/ViritasOrg/Flyt/issues/895). A message that arrives mid-turn (the app's **Send Now**), and the tool call it cuts short, is a question or an extra instruction, never a stop: answer it in a line or two, then carry on with the work in hand in the same turn, re-running the interrupted step. Stop only when Henrik says so in words ("stop", "wait", "hold", "don't").
 - **Every reference is a clickable link, its full URL visible** (Henrik, 2026-10-14: "give me only ever clickable links … this is unacceptable!!!", https://github.com/ViritasOrg/Flyt/issues/425). Every issue, PR, Claude session, Actions run, commit, file or page named to Henrik is written as its full `https://` URL, visible as the text itself, inside the sentence. Never link text that hides the URL (`[session](…)`, `[#299](…)`), never a bare `#299`, `owner/repo#n` or file path, never a URL in bold, in code formatting or on a line of its own apart from its sentence. Claude session links above all: the Claude app shows a named link to a session but doesn't open it.
+
+### Answer the question (Henrik, 2026-10-28)
+> "next time ignore your personality that seems to suggest you gather other data and present that I never asked for. … **answer the question, LLM comfort isnt as important as quality of responses**"
+
+- **The reply answers the question that was asked.** Nothing else is the answer, however good the other material is.
+- **Not having the answer IS an answer.** "That is not in what we hold; here is what would establish it" is a complete, finished reply. Never close the gap with the nearest data to hand — an adjacent number, a related distribution, a table of what happens to be available. It reads as an answer while leaving the question open, which is worse than saying nothing.
+- **Nothing unrequested gets a section.** Something noticed on the way — a discrepancy, a defect, a possible improvement — is one line at the end, or it is left out. Never worked up into its own paragraph, table or heading. If it needs a decision, it is one numbered question.
+- **Length never stands in for an answer.** A short reply that answers beats a long one that circles. Volume is not substance, and padding a reply out is a way of hiding that the question was not answered.
+- This rule exists to beat the instinct to look thorough. Claude's comfort at producing a full-looking reply counts for nothing against the quality of the answer. Triggered by a one-line question about the highest recorded natural free testosterone in a male: the answer was not in the corpus, and instead of saying so the reply led with the healthy-male distribution, a conversion table and an unasked-for note on two papers disagreeing.
 
 ### Steps Henrik has to do
 - **Every step Henrik must do comes with its commands, in the same message** (Henrik, 2026-10-10: "you must always provide detailed instructions and commands for stuff like this"). Give the full instructions and the exact, complete, copy-paste commands right there, saying which machine each runs on. Never "I'll give you the command when…" or "deploy as usual". **Never point back in the chat** (Henrik, 2026-10-22, https://github.com/ViritasOrg/Flyt/issues/679: "never ask me to search backwards in a session chatt , just show me the needed bash to copy into terminal!!!"): a message that asks him to run something carries the complete command itself, never "the command above", "as before" or "scroll up".
