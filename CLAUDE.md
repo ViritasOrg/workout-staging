@@ -1,7 +1,7 @@
 # Workout Staging — Claude Instructions
 
-<!-- BEGIN ORG-WIDE RULES v5. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
-## Org-wide rules: every ViritasOrg repo (canonical v5, 2026-10-28)
+<!-- BEGIN ORG-WIDE RULES v6. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
+## Org-wide rules: every ViritasOrg repo (canonical v6, 2026-10-28)
 
 These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules further down in this file add repo-specific detail. If one of them seems to contradict this block, say so to Henrik instead of silently picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent).
 
@@ -90,11 +90,18 @@ Triggered by: asked for the highest recorded natural free testosterone in a male
 - Tests call the code and check what it returns. A test that greps the source is a structural guard (a trust split, a banned call, a registry), never coverage of behaviour; such guards stay, next to tests that call the code. Tests in CI never call a real partner or need a real secret: stub them.
 - A PR merges only after the repo's CI ran green on its latest commit; no checks at all is not green. The one exception is a docs-only PR in a repo whose CI doesn't run on pull requests yet. Never skip, disable or loosen a test, a coverage floor or a CI step to get a change through.
 
+### Every background job has a readable name (Henrik, 2026-10-28, https://github.com/ViritasOrg/flyt/issues/1004)
+> "I want everything to have understandable names" … "fix all these names to correct ones, this is a mess, also update the central claude.md rule book to avoid this in the future"
+- macOS System Settings → General → Login Items names a LaunchAgent or LaunchDaemon after the file its plist starts. A plist that starts `node`, `python`, `bash` or any other interpreter directly shows up as "node" or "python" from an "unidentified developer", and nobody can tell what it is.
+- Every LaunchAgent or LaunchDaemon an installer writes starts a link or wrapper named after what it is, never a bare interpreter: Flyt's `~/.flyt-launchers/<name>` (`packages/shared/launch-name`), btcpay's console venv link, the podcast worker's `venv/bin/Podcast Voice`. The name says the product and the service, as Henrik would call it (`Flyt Ops Board (production)`, `btcpay CFO Console`), and is unique.
+- A Python job's link sits in its venv's `bin/` next to `python`, so Python still finds the venv.
+- A new background job gets its name in the same PR that adds it, with a test that its plist starts the named link.
+
 ### A verified error in an md file gets fixed immediately (Henrik, 2026-08-08: "When you find verified errors in md files always fix em instantly.")
 - If you establish that something in a `CLAUDE.md` (or any md in these repos) is wrong, correct it in that session, in every repo that repeats it. Verified means you checked (read the workflow, ran the command, saw the run); a hunch is not a finding.
 - Say what was wrong and why in the commit and the reply. This does not license rewriting rules you disagree with: those are Henrik's call. A SETTLED marker still wins: raise it, don't edit.
 - An org-wide rule is changed in the canonical file first, then copied into every repo's block in the same session.
-<!-- END ORG-WIDE RULES v5 -->
+<!-- END ORG-WIDE RULES v6 -->
 
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
 **The free-T / plasma curve is always in pmol/L. There is no second unit and there must
