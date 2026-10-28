@@ -1,6 +1,6 @@
 # Workout Staging — Claude Instructions
 
-<!-- BEGIN ORG-WIDE RULES v4. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
+<!-- BEGIN ORG-WIDE RULES v5. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
 ## Org-wide rules: every ViritasOrg repo (canonical v5, 2026-10-28)
 
 These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules further down in this file add repo-specific detail. If one of them seems to contradict this block, say so to Henrik instead of silently picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent).
@@ -22,13 +22,14 @@ These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules 
 - **Every reference is a clickable link, its full URL visible** (Henrik, 2026-10-14: "give me only ever clickable links … this is unacceptable!!!", https://github.com/ViritasOrg/Flyt/issues/425). Every issue, PR, Claude session, Actions run, commit, file or page named to Henrik is written as its full `https://` URL, visible as the text itself, inside the sentence. Never link text that hides the URL (`[session](…)`, `[#299](…)`), never a bare `#299`, `owner/repo#n` or file path, never a URL in bold, in code formatting or on a line of its own apart from its sentence. Claude session links above all: the Claude app shows a named link to a session but doesn't open it.
 
 ### Answer the question (Henrik, 2026-10-28)
-> "next time ignore your personality that seems to suggest you gather other data and present that I never asked for. … **answer the question, LLM comfort isnt as important as quality of responses**"
+> "answer the question, LLM comfort isnt as important as quality of responses" / "a wall o[f] words I wont read regardless, it waste[s] your time and my token budget"
 
-- **The reply answers the question that was asked.** Nothing else is the answer, however good the other material is.
-- **Not having the answer IS an answer.** "That is not in what we hold; here is what would establish it" is a complete, finished reply. Never close the gap with the nearest data to hand — an adjacent number, a related distribution, a table of what happens to be available. It reads as an answer while leaving the question open, which is worse than saying nothing.
-- **Nothing unrequested gets a section.** Something noticed on the way — a discrepancy, a defect, a possible improvement — is one line at the end, or it is left out. Never worked up into its own paragraph, table or heading. If it needs a decision, it is one numbered question.
-- **Length never stands in for an answer.** A short reply that answers beats a long one that circles. Volume is not substance, and padding a reply out is a way of hiding that the question was not answered.
-- This rule exists to beat the instinct to look thorough. Claude's comfort at producing a full-looking reply counts for nothing against the quality of the answer. Triggered by a one-line question about the highest recorded natural free testosterone in a male: the answer was not in the corpus, and instead of saying so the reply led with the healthy-male distribution, a conversion table and an unasked-for note on two papers disagreeing.
+- **The answer goes first, in the first line.** If the opening line is not the information he asked for, the reply has failed, whatever else is in it.
+- **No answer is a complete answer: say so and stop.** "Not in what we hold — X would establish it" is finished. Never fill the gap with the nearest data you happen to have: that reads as an answer while leaving the question open.
+- **Everything unasked-for is cut.** Context, caveats, related findings, tables of what is available — one line at the end at most, usually nothing. Never its own section.
+- **He will not read a wall of text.** It burns his token budget and your time and tells him nothing. Short and answering beats long and circling, every time.
+
+Triggered by: asked for the highest recorded natural free testosterone in a male, and got the healthy-male distribution, a conversion table and an unasked-for note on two papers disagreeing — everything except the answer, which was "not in the corpus".
 
 ### Steps Henrik has to do
 - **Every step Henrik must do comes with its commands, in the same message** (Henrik, 2026-10-10: "you must always provide detailed instructions and commands for stuff like this"). Give the full instructions and the exact, complete, copy-paste commands right there, saying which machine each runs on. Never "I'll give you the command when…" or "deploy as usual". **Never point back in the chat** (Henrik, 2026-10-22, https://github.com/ViritasOrg/Flyt/issues/679: "never ask me to search backwards in a session chatt , just show me the needed bash to copy into terminal!!!"): a message that asks him to run something carries the complete command itself, never "the command above", "as before" or "scroll up".
@@ -93,7 +94,7 @@ These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules 
 - If you establish that something in a `CLAUDE.md` (or any md in these repos) is wrong, correct it in that session, in every repo that repeats it. Verified means you checked (read the workflow, ran the command, saw the run); a hunch is not a finding.
 - Say what was wrong and why in the commit and the reply. This does not license rewriting rules you disagree with: those are Henrik's call. A SETTLED marker still wins: raise it, don't edit.
 - An org-wide rule is changed in the canonical file first, then copied into every repo's block in the same session.
-<!-- END ORG-WIDE RULES v4 -->
+<!-- END ORG-WIDE RULES v5 -->
 
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
 **The free-T / plasma curve is always in pmol/L. There is no second unit and there must
