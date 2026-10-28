@@ -1,0 +1,37 @@
+name: Quality report
+
+# Engineering quality report (ViritasOrg/claude-agent-backend routers/quality.py, Henrik 2026-10-29):
+# on every push to main this commit's LOC, test LOC, test cases, merged PRs and the line coverage of
+# tests/test_frontend.js (V8 precise coverage of the app code it loads) go to the agent API's
+# /quality/ingest. The script is served by the backend, so every repo runs the same counting rules.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    if: "github.actor != 'github-actions[bot]'"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # merged PRs are counted over the whole history
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Measure and send
+        env:
+          QUALITY_INGEST_TOKEN: ${{ secrets.QUALITY_INGEST_TOKEN }}
+          AGENT: https://claude-agent-api-aged-sun-3616.fly.dev
+        run: |
+          if [ -z "$QUALITY_INGEST_TOKEN" ]; then echo "::warning::QUALITY_INGEST_TOKEN is not set (rekey.sh quality); no quality row sent"; exit 0; fi
+          curl -fsS "$AGENT/quality/tools/quality_metrics.py" -o "$RUNNER_TEMP/quality_metrics.py"
+          curl -fsS "$AGENT/quality/tools/v8cov.js" -o "$RUNNER_TEMP/v8cov.js"
+          python3 "$RUNNER_TEMP/quality_metrics.py" record --repo workout-staging --dir . --node node \
+            --post "$AGENT/quality/ingest"
