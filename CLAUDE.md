@@ -1,7 +1,7 @@
 # Workout Staging — Claude Instructions
 
-<!-- BEGIN ORG-WIDE RULES v6. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
-## Org-wide rules: every ViritasOrg repo (canonical v6, 2026-10-28)
+<!-- BEGIN ORG-WIDE RULES v7. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there, then copy this block unchanged into every ViritasOrg repo's CLAUDE.md (scripts/check_org_rules.py finds drift). -->
+## Org-wide rules: every ViritasOrg repo (canonical v7, 2026-10-28)
 
 These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules further down in this file add repo-specific detail. If one of them seems to contradict this block, say so to Henrik instead of silently picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent).
 
@@ -33,6 +33,7 @@ Triggered by: asked for the highest recorded natural free testosterone in a male
 
 ### Steps Henrik has to do
 - **Every step Henrik must do comes with its commands, in the same message** (Henrik, 2026-10-10: "you must always provide detailed instructions and commands for stuff like this"). Give the full instructions and the exact, complete, copy-paste commands right there, saying which machine each runs on. Never "I'll give you the command when…" or "deploy as usual". **Never point back in the chat** (Henrik, 2026-10-22, https://github.com/ViritasOrg/Flyt/issues/679: "never ask me to search backwards in a session chatt , just show me the needed bash to copy into terminal!!!"): a message that asks him to run something carries the complete command itself, never "the command above", "as before" or "scroll up".
+- **Every step on a page links that exact page** (Henrik, 2026-10-28, https://github.com/ViritasOrg/flyt/issues/1015: "I want to make a org wide rule to always provide clickable links so I dont have to spend time on it when doing this!!!"). A step Henrik does in a browser (try a feature on staging, press a button in Admin, change a GitHub setting, open a board or console) carries the full `https://` URL of the page where he does it, inside that step's own sentence, the deepest page Claude can name (the new-link form, not the site's front page). Look the URL up (routes in the code, the app's host in its config) before writing it; never "on staging", "in Admin", "on the dashboard" or "the release PR" without its URL. The clickable-link rule above holds for the rest: full URL visible, never hidden behind link text. Triggered by a staging test that said "On staging, make a 20 EUR Direct card payment link and open it" with no link, and named the release PR as `[ViritasOrg/flyt#1013](…)`.
 - **Henrik's computer is a Mac: macOS with zsh, never bash** (Henrik, 2026-10-07). Commands he runs on his own computer must work as typed in zsh: `read -s "T?Prompt: "` (never `read -p`), BSD tools (`sed -i ''`, `base64 -D`, `date -v`, no `grep -P`, no `${!var}`, `open` not `xdg-open`). Fly machines, CI and the Pi are Linux/bash: say which machine each command runs on.
 - **Henrik's Macs have EU keyboards: the Option key is labelled `alt`** (Henrik, 2026-10-11: "no option on eu keyboards only alt"). Write **alt (⌥)**, never "Option", and **cmd (⌘)**, not "Command".
 - **Henrik uses Chrome, on his iPhone and his Macs, unless something forces him to use another browser** (Henrik, 2026-10-17: "update all repos that I only use Chrome unless forced to"). Every browser step is written for Chrome; on iPhone a page goes to the home screen through Chrome's **Share → Add to Home Screen**. Name Safari only when iOS genuinely requires it for that step, and say why.
@@ -101,7 +102,7 @@ Triggered by: asked for the highest recorded natural free testosterone in a male
 - If you establish that something in a `CLAUDE.md` (or any md in these repos) is wrong, correct it in that session, in every repo that repeats it. Verified means you checked (read the workflow, ran the command, saw the run); a hunch is not a finding.
 - Say what was wrong and why in the commit and the reply. This does not license rewriting rules you disagree with: those are Henrik's call. A SETTLED marker still wins: raise it, don't edit.
 - An org-wide rule is changed in the canonical file first, then copied into every repo's block in the same session.
-<!-- END ORG-WIDE RULES v6 -->
+<!-- END ORG-WIDE RULES v7 -->
 
 ## ⚠️ NEVER SWITCH UNITS — pmol/L IS THE ONLY FREE-T UNIT ⚠️
 **The free-T / plasma curve is always in pmol/L. There is no second unit and there must
