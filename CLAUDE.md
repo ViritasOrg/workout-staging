@@ -68,7 +68,7 @@ These rules are identical in every repo's `CLAUDE.md` under `ViritasOrg`. Rules 
 - Every repo has a GitHub Actions workflow that runs its tests on every pull request and on every push to its main branch. A repo without one, or without tests, gets both in its own PR before the next change to its code merges.
 - A new repo gets its CI workflow and first tests in its first PR, its line in `REPOS` in `ViritasOrg/claude-agent-backend` `scripts/check_org_rules.py`, and this block in its `CLAUDE.md`.
 - New or changed behaviour comes with tests in the same PR. A bug fix comes with a regression test that fails on the code before the fix.
-- Tests call the code and check what it returns; a test that only greps the source for a string doesn't count as covering behaviour. Tests in CI never call a real partner or need a real secret: stub them.
+- Tests call the code and check what it returns. A test that greps the source is a structural guard (a trust split, a banned call, a registry), never coverage of behaviour; such guards stay, next to tests that call the code. Tests in CI never call a real partner or need a real secret: stub them.
 - A PR merges only after the repo's CI ran green on its latest commit; no checks at all is not green. The one exception is a docs-only PR in a repo whose CI doesn't run on pull requests yet. Never skip, disable or loosen a test, a coverage floor or a CI step to get a change through.
 
 ### A verified error in an md file gets fixed immediately (Henrik, 2026-08-08: "When you find verified errors in md files always fix em instantly.")
