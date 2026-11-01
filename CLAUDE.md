@@ -842,6 +842,8 @@ its questions: *"Remove rest timers. 1 yes 2 no remove the timers totally 3 yes 
 
 - **No rest timers, anywhere.** The per-card ⏱, the REST TIMER button and the timer bar are gone, with their
   code. Do not bring one back as a "small helper". `restSecsForTag` stays: the session-length estimate uses it.
+  The Program day view's "⏱ 60–90 s rest between sets" line went too (Henrik, 2026-11-01: "remove the timer
+  from the Workout app, I nevr use it"), with `getProgramRest`.
 - **Card = name, blue ?, ⋯.** Swap, the equipment toggles (½ gear, 2× cable, two dumbbells) and Remove live in
   the ⋯ menu (`exMenuModal`, z-index 500). The toggles are still the card's own gear buttons, kept in a hidden
   `.gear-slot` and clicked by the menu, so `toggleGear`/`toggleGear2`/`toggleDb` and their storage are unchanged.
