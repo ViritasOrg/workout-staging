@@ -9039,6 +9039,9 @@ console.log('\n── Water ─────────────────�
   G._wlOwn = 0; G._wlTarget = null; G._wlRows = [];
   _h = G._wlHtml();
   check('  …without a weight it asks for one instead of inventing a target', /add your weight/.test(_h) && !/Undo last/.test(_h));
+  check('water: the target uses the newest weigh-in, not the profile weight (dates are not zero-padded)',
+    G._wlLatestWeight([{date:'2026-6-12',weight:89.8},{date:'2026-10-25',weight:88.0},{date:'2026-10-3',weight:87}]).weight === 88 &&
+    G._wlLatestWeight([]) === null && /fetch\(AGENT_URL\+'\/weights'/.test(_wb));
   check('water: undo is a global delete and says so', /confirmGlobalDelete\(/.test(_wb));
   check('water: the own target is written to the backend with the device copy',
     /\/user-settings',\{method:'POST'/.test(_src.slice(_src.indexOf('async function wlSetOwn'), _src.indexOf('async function wlSetOwn') + 1200)));

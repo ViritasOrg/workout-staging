@@ -4633,7 +4633,13 @@ function _wlHtml(){
   return _flCard(h);
 }
 function _wlRender(){var el=document.getElementById('water-log-body');if(el)el.innerHTML=_wlHtml();}
-async function _wlLoadTarget(){var p=_wlProfile();_wlTarget=null;if(!(p.weight>=25))return;
+// The latest WEIGHED weight wins over the profile's weight, which is only typed once
+// (2026-11-01: the profile still said 85.2 kg while the weight log said 88.0).
+function _wlDateNum(d){var p=String(d||'').split('-');return p.length===3?(+p[0])*10000+(+p[1])*100+(+p[2]):0;}
+function _wlLatestWeight(rows){var best=null;(rows||[]).forEach(function(r){var w=parseFloat(r&&(r.weight!=null?r.weight:r.kg));if(!(w>=25))return;if(!best||_wlDateNum(r.date)>_wlDateNum(best.date))best={date:r.date,weight:w};});return best;}
+async function _wlLoadTarget(){var p=_wlProfile();_wlTarget=null;
+  try{var rw=await fetch(AGENT_URL+'/weights',{headers:authHeaders()});if(rw.ok){var lw=_wlLatestWeight(await rw.json());if(lw)p.weight=lw.weight;}}catch(e){}
+  if(!(p.weight>=25))return;
   var q='weight_kg='+encodeURIComponent(p.weight)+'&sex='+encodeURIComponent(p.sex)+(p.age?'&age='+encodeURIComponent(p.age):'')+'&athlete=true';
   try{var r=await fetch(AGENT_URL+'/water-log/target?'+q,{headers:authHeaders()});if(r.ok)_wlTarget=await r.json();}catch(e){}}
 async function _wlLoadOwn(){_wlOwn=parseInt(localStorage.getItem('water-goal-ml')||'0')||0;
