@@ -1355,15 +1355,18 @@ out of date.)*
 
 **PEPTIDE_WORKOUT_PROD_TOKEN secret (renamed 2026-11-01, was `PROMOTE_TOKEN`):** the promotion
 workflow checks out, pushes to, opens and merges the PR on the prod repo with this repository
-secret: a fine-grained GitHub PAT for `ViritasOrg/peptidetracker` and `ViritasOrg/workout` with
-Contents, Pull requests and Workflows read and write, and Checks and Commit statuses read. The same
+secret: a classic GitHub token with the
+scopes `repo` and `workflow` (fine-grained tokens have no Checks permission, and the workflow reads the
+prod PR's check runs). The same
 token is set in both staging repos (Settings → Secrets and variables → Actions); its value lives in
 Bitwarden, item `PEPTIDE_WORKOUT_PROD_TOKEN`, folder `rekey`. Henrik, 2026-11-01: "POMOTE_TOKEN is too
 generic a name, I want a better one especially since it is for prod repos". The old token answered
 `Bad credentials` on every run from 2026-10-24 to 2026-11-01, so Push to Prod failed at its first step
 and the app's Deploy status never moved; an earlier version of this note said it "runs green".
-Claude has no tool to create or edit repo secrets: when the run says `Bad credentials`, the token is
-replaced by Henrik.
+It moves from Bitwarden into both staging repos with `~/ClaudeCode/rekey/rekey.sh prod-push` on the M1 Max
+(ViritasOrg/flyt `infra/rekey/`, flyt#1167), which first checks it can push to both prod repos. Claude has
+no tool to create or edit repo secrets: when the run says `Bad credentials`, Henrik regenerates the token,
+saves it in that Bitwarden item and runs that phase; never a copy-paste into GitHub's settings.
 
 ## ⚠️ NEVER HARDCODE PERSONAL USER DATA — GDPR / DATA ISOLATION ⚠️
 Personal data belonging to a specific real user must **NEVER** be hardcoded anywhere in the codebase.
