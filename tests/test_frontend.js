@@ -75,6 +75,7 @@ const patched = rawScript
   .replace('const DAYS=',            'var DAYS=')
   .replace('const DAY_TEMPLATES=',   'var DAY_TEMPLATES=')
   .replace('const THEMES=',          'var THEMES=')
+  .replace("const BUILD_NO='",       "var BUILD_NO='")
   .replace("const VERSION='",        "var VERSION='")
   .replace('const AGENT_URL=',       'var AGENT_URL=')
   .replace('let _googleToken=',      'var _googleToken=')
@@ -8787,18 +8788,18 @@ console.log('\n── Onboarding overview + What\'s new ────────
   check('  …sorted newest first', WN.every((e, i) => i === 0 || G._verNum(WN[i - 1].v) > G._verNum(e.v)));
   // An entry is keyed to the version its PR ships AS, i.e. the bump after merge: one past
   // the VERSION in this file. Further ahead is a typo; behind is a feature already shipped.
-  check('  …none further ahead than the next bump', WN.every(e => G._verNum(e.v) <= G._verNum(G.VERSION) + 1));
+  check('  …none further ahead than the next bump', WN.every(e => G._verNum(e.v) <= G._verNum(G.BUILD_NO) + 1));
   check('  …it names the AI macro tracking and the exercise sketches',
     WN.some(e => /Macros/.test(e.title) && /photo/.test(e.text)) && WN.some(e => /sketch/i.test(e.title) && /\?/.test(e.text)));
   check('version compare is numeric, not lexical', G._verNum('1.100') > G._verNum('1.99') && G._verNum('2.0') > G._verNum('1.999'));
   // A row keyed to the NEXT bump (the version this branch ships as) is hidden until the build reaches it.
-  const reached = WN.filter(e => G._verNum(e.v) <= G._verNum(G.VERSION));
+  const reached = WN.filter(e => G._verNum(e.v) <= G._verNum(G.BUILD_NO));
 
   const ls = sandbox.localStorage._s;
   const saveLs = Object.assign({}, ls);
   const reset = () => { for (const k of Object.keys(ls)) delete ls[k]; };
   const pushes = []; const _savePush = G.pushSettingsToAgent; G.pushSettingsToAgent = kv => { pushes.push(kv); };
-  const _saveV = G.VERSION;
+  const _saveV = G.BUILD_NO;
 
   // Nothing seen yet, not onboarded: a new account is in the wizard, the card stays away.
   reset();
@@ -8806,6 +8807,12 @@ console.log('\n── Onboarding overview + What\'s new ────────
   // Nothing seen yet, already onboarded: an existing user who predates the card gets the whole list.
   reset(); ls['wkt-profile'] = JSON.stringify({ onboarded: true });
   check('an onboarded account that never saw the card gets every entry the build has reached', G._whatsNewEntries().length === reached.length && reached.length >= 5);
+  // Push to Prod resets VERSION to prod's own counter (1.243 against staging's 1.326, 2026-11-01): the rows
+  // are keyed to BUILD_NO, so the promoted copy shows the same rows and its tests pass.
+  { const _pv = G.VERSION; G.VERSION = '1.0';
+    check('a promoted copy (VERSION reset to prod\'s counter) still shows every reached row', G._whatsNewEntries().length === reached.length);
+    G.VERSION = _pv; }
+  check('Version Bump keeps BUILD_NO in step with VERSION', /const BUILD_NO='\[0-9\.\]\*'\/const BUILD_NO='\$\{NEW\}'/.test(require('fs').readFileSync(require('path').join(__dirname, '../.github/workflows/version-bump.yml'), 'utf8')));
   let h = G._whatsNewHtml(G._whatsNewEntries());
   check('  …the card lists them, titled WHAT\'S NEW, with a Got it button',
     /WHAT'S NEW/.test(h) && /dismissWhatsNew\(\)/.test(h) && /Got it/.test(h) && reached.every(e => h.includes(e.title)));
@@ -8813,18 +8820,18 @@ console.log('\n── Onboarding overview + What\'s new ────────
   // Only entries newer than the version last seen show.
   ls['wkt-whatsnew-seen'] = JSON.stringify(WN[WN.length - 1].v);
   check('entries at or below the seen version are hidden', G._whatsNewEntries().length === reached.length - 1 && !G._whatsNewEntries().some(e => e.v === WN[WN.length - 1].v));
-  ls['wkt-whatsnew-seen'] = JSON.stringify(G.VERSION);
+  ls['wkt-whatsnew-seen'] = JSON.stringify(G.BUILD_NO);
   check('seen at the current version: nothing to show', G._whatsNewEntries().length === 0);
   // An entry for a version this device has not reached (an old cached build) is not shown yet.
-  G.VERSION = WN[WN.length - 1].v; ls['wkt-whatsnew-seen'] = JSON.stringify('0');
-  check('a build older than an entry does not announce it', G._whatsNewEntries().every(e => G._verNum(e.v) <= G._verNum(G.VERSION)) && G._whatsNewEntries().length === 1);
-  G.VERSION = _saveV;
+  G.BUILD_NO = WN[WN.length - 1].v; ls['wkt-whatsnew-seen'] = JSON.stringify('0');
+  check('a build older than an entry does not announce it', G._whatsNewEntries().every(e => G._verNum(e.v) <= G._verNum(G.BUILD_NO)) && G._whatsNewEntries().length === 1);
+  G.BUILD_NO = _saveV;
   // Got it: stored locally AND pushed to the backend, card rebuilt empty.
   reset(); ls['wkt-profile'] = JSON.stringify({ onboarded: true }); pushes.length = 0;
   delete _idStore['whats-new']; _idStore['whats-new'] = makeTrackingEl();
   G.dismissWhatsNew();
-  check('Got it stores the current version as seen', JSON.parse(ls['wkt-whatsnew-seen']) === G.VERSION);
-  check('  …and pushes it to /user-settings in the same call', pushes.length === 1 && pushes[0]['wkt-whatsnew-seen'] === G.VERSION);
+  check('Got it stores the current version as seen', JSON.parse(ls['wkt-whatsnew-seen']) === G.BUILD_NO);
+  check('  …and pushes it to /user-settings in the same call', pushes.length === 1 && pushes[0]['wkt-whatsnew-seen'] === G.BUILD_NO);
   check('  …after which nothing is left to show', G._whatsNewEntries().length === 0);
   // Wiring: the card is built on Today, at start-up, and when settings come back from the backend.
   check('showPage(today) rebuilds the card', /if\(name==='today'\)buildWhatsNewCard\(\);/.test(rawScript));
@@ -8837,7 +8844,7 @@ console.log('\n── Onboarding overview + What\'s new ────────
   G._obData = { gender: 'male', age: '30', height: '180', weight: '', neck: '', waist: '', hips: '', theme: 3 };
   G.obFinish();
   check('finishing the wizard marks the current version as seen',
-    JSON.parse(ls['wkt-whatsnew-seen']) === G.VERSION && pushes.some(kv => kv['wkt-whatsnew-seen'] === G.VERSION && kv['wkt-profile']));
+    JSON.parse(ls['wkt-whatsnew-seen']) === G.BUILD_NO && pushes.some(kv => kv['wkt-whatsnew-seen'] === G.BUILD_NO && kv['wkt-profile']));
   check('  …but an existing seen version is left alone (Edit profile is not a new account)',
     (() => { ls['wkt-whatsnew-seen'] = JSON.stringify('1.1'); G.obFinish(); return JSON.parse(ls['wkt-whatsnew-seen']) === '1.1'; })());
   // 2026-10-24: Henrik re-ran the wizard from Settings before reading the card; obFinish marked
