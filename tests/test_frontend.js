@@ -1509,16 +1509,20 @@ check('sync: source has no byDate dedup key',   !rawScript.includes('byDate'));
   check('sync merge: remote overwrites local on same ID', Object.values(_byId2)[0].notes === 'remote', `got "${Object.values(_byId2)[0].notes}"`);
 }
 
-// ── 34. getProgramRest — rest recommendation by program goal ──────────────────
-console.log('\n── getProgramRest — rest by program goal ────────────────────');
-check('getProgramRest defined', typeof G.getProgramRest === 'function');
-check('getProgramRest: strength → 3–5 min',     G.getProgramRest({goal:'strength'}).includes('3') && G.getProgramRest({goal:'strength'}).includes('5'));
-check('getProgramRest: hypertrophy → 60–90 s',  G.getProgramRest({goal:'hypertrophy'}).includes('60'));
-check('getProgramRest: aesthetic → 60–90 s',    G.getProgramRest({goal:'aesthetic'}).includes('60'));
-check('getProgramRest: rehab → 90 s – 2 min',   G.getProgramRest({goal:'rehab'}).includes('90'));
-check('getProgramRest: null prog → default (hypertrophy)', G.getProgramRest(null).includes('60'));
-check('getProgramRest: no goal → default (hypertrophy)',   G.getProgramRest({}).includes('60'));
-check('getProgramRest: strength label is string', typeof G.getProgramRest({goal:'strength'}) === 'string');
+// ── 34. No rest-timer line on the Program day view (Henrik 2026-11-01: "remove the timer … I nevr use it")
+console.log('\n── Program day view has no rest timer ───────────────────────');
+check('getProgramRest is gone', typeof G.getProgramRest === 'undefined');
+{
+  const _gd = G.getActiveProgramDay, _gp = G.getActiveProgram, _doc = G.document;
+  let html = null;
+  G.getActiveProgramDay = () => ({ name: 'Day 1 — Push', exercises: [{ name: 'Bench Press', sets: '8-8-8', scheme: '3×8', tag: 'volume', kg: 0 }] });
+  G.getActiveProgram = () => ({ goal: 'strength', days: [] });
+  G.document = { getElementById: (id) => id === 'workout-display' ? { set innerHTML(v) { html = v; } } : null };
+  try { G.renderWorkout(1); } catch (e) { html = 'THREW ' + e; }
+  G.getActiveProgramDay = _gd; G.getActiveProgram = _gp; G.document = _doc;
+  check('the day view still renders the day and its exercise', !!html && html.includes('Day 1 — Push') && html.includes('Bench Press'), String(html).slice(0, 120));
+  check('…with no ⏱ and no rest-between-sets line', !!html && !html.includes('⏱') && !/rest between sets/.test(html));
+}
 
 // ── 34b. restSecsForTag — rest preset by exercise tag ────────────────────────
 console.log('\n── restSecsForTag — rest preset by tag ──────────────────────────');
