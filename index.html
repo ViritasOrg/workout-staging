@@ -331,7 +331,7 @@
       <div class="log-savebar"><button class="btn btn-primary" onclick="saveLog()">SAVE WORKOUT</button><div id="log-progress"></div></div>
     </div>
   </div>
-  <div class="page" id="page-macros"><div id="food-log-body"></div><div id="wk-macro-targets"></div></div>
+  <div class="page" id="page-macros"><div id="water-log-body"></div><div id="food-log-body"></div><div id="wk-macro-targets"></div></div>
   <div class="page" id="page-foodedit"><div id="food-edit-body"></div></div>
   <div class="page" id="page-history">
     <div id="history-list"><div class="empty"><div class="empty-icon">📋</div>No workouts logged yet.</div></div>
@@ -1394,7 +1394,7 @@ function _diagRenderInto(host){
 function buildStoragePage(){var _el=document.getElementById('page-storage');if(!_el)return;var _esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};_lsDbgKeys=[];for(var _di=0;_di<localStorage.length;_di++){var _dk=localStorage.key(_di);if(_dk!=null)_lsDbgKeys.push(_dk);}_lsDbgKeys.sort();var _rows=_lsDbgKeys.map(function(k,i){var _raw=localStorage.getItem(k)||'';var _extra='';try{var _pv=JSON.parse(_raw);if(Array.isArray(_pv))_extra='array · '+_pv.length+' items';else if(_pv!==null&&typeof _pv==='object')_extra='object · '+Object.keys(_pv).length+' keys';else _extra=typeof _pv;}catch(e){_extra='string';}var _trunc=_raw.length>300;var _disp=_trunc?_raw.slice(0,300)+'…':_raw;return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+'<div><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:600">'+_esc(k)+'</span><span style="font-size:10px;color:var(--muted);margin-left:8px">'+_esc(_extra)+'</span></div>'+'<button onclick="lsDbgCopy('+i+')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 10px;font-size:10px;cursor:pointer;font-family:inherit;flex-shrink:0">Copy</button>'+'</div>'+'<pre style="font-family:monospace;font-size:10px;color:var(--muted);white-space:pre-wrap;word-break:break-all;margin:0;line-height:1.4;max-height:100px;overflow:hidden">'+_esc(_disp)+'</pre>'+'</div>';}).join('');_el.innerHTML='<div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:13px;color:var(--muted)">'+_lsDbgKeys.length+' keys in localStorage</div><div style="display:flex;gap:8px"><button onclick="buildStoragePage()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Refresh</button><button onclick="lsDbgCopyAll()" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Copy All</button></div></div>'+_rows+'</div>';_diagRenderInto(_el);}
 function lsDbgCopy(i){var k=_lsDbgKeys[i];if(k==null)return;var v=localStorage.getItem(k)||'';var out={};try{out[k]=JSON.parse(v);}catch(e){out[k]=v;}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
 function lsDbgCopyAll(){var out={};for(var _ci=0;_ci<localStorage.length;_ci++){var _ck=localStorage.key(_ci);if(!_ck)continue;var _cv=localStorage.getItem(_ck)||'';try{out[_ck]=JSON.parse(_cv);}catch(e){out[_ck]=_cv;}}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
-function showPage(name,btn){localStorage.setItem('wkt-last-page',name);_currentPage=name;var _pr=primaryOf(name);if(_pr){_currentPrimary=_pr;_lastSub[_pr]=name;try{localStorage.setItem('wkt-last-sub-'+_pr,name);}catch(e){}_setPrimaryActive(_pr);_applySubtabVis(_pr);}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs .tab').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');var _tb=document.getElementById('tab-btn-'+name);if(_tb)_tb.classList.add('active');if(name==='macros'){buildWkMacroTargets();buildFoodLog();}if(name==='foodedit')buildFoodEdit();if(name==='today'||name==='plan')buildProgramSettingsCard();if(name==='today')buildWhatsNewCard();if(name==='history')renderHistory();if(name==='progress')renderProgress();if(name==='settings'){loadSettings();buildFlKeyCard();}if(name==='storage')buildStoragePage();if(name==='log'){var _lc=document.getElementById('structured-log');var _hasReps=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});var _curDay=parseInt(document.getElementById('log-day').value)||0;
+function showPage(name,btn){localStorage.setItem('wkt-last-page',name);_currentPage=name;var _pr=primaryOf(name);if(_pr){_currentPrimary=_pr;_lastSub[_pr]=name;try{localStorage.setItem('wkt-last-sub-'+_pr,name);}catch(e){}_setPrimaryActive(_pr);_applySubtabVis(_pr);}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs .tab').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');var _tb=document.getElementById('tab-btn-'+name);if(_tb)_tb.classList.add('active');if(name==='macros'){buildWkMacroTargets();buildWaterLog();buildFoodLog();}if(name==='foodedit')buildFoodEdit();if(name==='today'||name==='plan')buildProgramSettingsCard();if(name==='today')buildWhatsNewCard();if(name==='history')renderHistory();if(name==='progress')renderProgress();if(name==='settings'){loadSettings();buildFlKeyCard();}if(name==='storage')buildStoragePage();if(name==='log'){var _lc=document.getElementById('structured-log');var _hasReps=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});var _curDay=parseInt(document.getElementById('log-day').value)||0;
     // Re-prefill when the on-screen log was built under a now-stale deload or unit
     // state (both toggles live outside the Log page, so their inline re-prefill only
     // fires when Log is already open). Never blow away a log with reps entered.
@@ -4066,7 +4066,7 @@ var TOUR_TABS=[
   {icon:'▤',name:'TODAY',desc:'Your next session: tap a day card to see its exercises, rep schemes and last weights. Tap the blue ? on any exercise for a stick-figure sketch of how to do it.'},
   {icon:'📋',name:'PLAN',desc:'Your program library and templates. Build a program with the wizard — gym or home, with the equipment you have.'},
   {icon:'💪',name:'LOG WORKOUT',desc:'After training, log your sets, weights, and reps. State is preserved while you train — even if you switch apps.'},
-  {icon:'🍽️',name:'MACROS',desc:'Type what you ate, or take a photo of the food or its label, and the AI estimates the calories and macros and saves them against your daily targets.'},
+  {icon:'🍽️',name:'MACROS',desc:'Type what you ate, or take a photo of the food or its label, and the AI estimates the calories and macros and saves them against your daily targets. Log water there too.'},
   {icon:'✏️',name:'FOOD EDIT',desc:'Fix or delete a food entry, or change how much of it you ate.'},
   {icon:'📅',name:'HISTORY',desc:'Review all past sessions with full exercise and set details.'},
   {icon:'📈',name:'PROGRESS',desc:'Track bodyweight trends, weekly volume per muscle group, and estimated 1RM strength over time.'},
@@ -4198,6 +4198,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.322',title:'Water',text:'Macros now logs water: tap + 250 ml or + 500 ml. The daily target is worked out from your body weight, sex and age, or set your own.'},
   {v:'1.309',title:'Macro targets per day',text:'Food Edit shows the targets in force on any day and lets you set them from that day onward, so the history card measures each day against the right goals. Use it to fill in the periods of an imported log.'},
   {v:'1.307',title:'Animated tour',text:'The Setup Wizard ends with a short animated tour: building a program, logging a workout, the ? sketches and tracking macros. Watch it again from the button at the top of Settings.'},
   {v:'1.287',title:'Today and Plan',text:'The Program tab is now Today (your next session) and Plan (your program library and templates).'},
@@ -4600,6 +4601,69 @@ async function flEditDelete(id){if(!confirmGlobalDelete('this food entry'))retur
   try{var r=await fetch(AGENT_URL+'/food-log/'+encodeURIComponent(id),{method:'DELETE',headers:authHeaders()});if(!r.ok){alert('Not deleted: the server answered '+r.status+'.');return;}}catch(e){alert('Not deleted: could not reach the server.');return;}
   buildFoodEdit(_flEditDate);}
 // ── end food log ──
+// ── Water (Macros) ────────────────────────────────────────────────────────────
+// Henrik, 2026-11-01: "add water intake to macros tracking". The same block is in Peptide
+// Tracker and Workout, which share one log on the backend (/water-log). The daily target is
+// served by the backend (/water-log/target, Yamada 2022 eq. 1 from the user's weight, sex and
+// age; research in claude-agent-backend docs/enhanced-bodybuilding/22-water-intake.md) unless
+// the user has typed their own (user setting "water-goal-ml"). Nothing here lives only on the device.
+var _wlRows=[],_wlTarget=null,_wlOwn=0,_wlBusy=false,_wlErr='';
+var WL_STEPS=[250,500];
+function _wlProfile(){
+  if(typeof _userProfile==='function'){var p=_userProfile();return{weight:p.weight_kg||0,sex:p.sex||'male',age:p.age||0};}
+  var w=(typeof getData==='function'?getData('wkt-profile',{}):{})||{};
+  return{weight:parseFloat(w.weight)||0,sex:w.gender==='female'?'female':'male',age:parseInt(w.age)||0};
+}
+function _wlTotal(rows){return(rows||[]).reduce(function(a,r){return a+(Number(r.ml)||0);},0);}
+function _wlL(ml){return(Math.round(ml/100)/10).toFixed(1)+' L';}
+function _wlGoal(){return _wlOwn>0?_wlOwn:(_wlTarget&&_wlTarget.ml)||0;}
+function _wlHtml(){
+  var tot=_wlTotal(_wlRows),goal=_wlGoal();
+  var pct=goal>0?Math.min(100,Math.round(tot/goal*100)):0;
+  var basis=_wlOwn>0?'your own target':(_wlTarget?'from your body weight, sex and age (Yamada 2022)':'add your weight in your profile to get a target');
+  var h='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span style="font-size:12px;color:var(--muted)">Water today</span>'+
+    '<span style="font-size:15px;color:var(--text)"><b>'+_wlL(tot)+'</b>'+(goal?' / '+_wlL(goal):'')+'</span></div>';
+  if(goal)h+='<div style="height:8px;border-radius:4px;background:var(--surface2);margin:8px 0 4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:#4fb3ff"></div></div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+(goal?'Target '+_wlL(goal)+', ':'')+basis+' · <span onclick="wlSetOwn()" style="text-decoration:underline;cursor:pointer">'+(_wlOwn>0?'Change':'Set my own')+'</span></div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    (_wlBusy?'<div style="font-size:14px;color:var(--muted);padding:10px 0">Saving…</div>':
+      WL_STEPS.map(function(ml){return _flBtn('+ '+ml+' ml','wlAdd('+ml+')',ml===WL_STEPS[0]);}).join('')+
+      (_wlRows.length?_flBtn('Undo last','wlUndo()',false):''))+'</div>';
+  if(_wlErr)h+='<div style="margin-top:8px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_wlErr)+'</div>';
+  return _flCard(h);
+}
+function _wlRender(){var el=document.getElementById('water-log-body');if(el)el.innerHTML=_wlHtml();}
+// The latest WEIGHED weight wins over the profile's weight, which is only typed once
+// (2026-11-01: the profile still said 85.2 kg while the weight log said 88.0).
+function _wlDateNum(d){var p=String(d||'').split('-');return p.length===3?(+p[0])*10000+(+p[1])*100+(+p[2]):0;}
+function _wlLatestWeight(rows){var best=null;(rows||[]).forEach(function(r){var w=parseFloat(r&&(r.weight!=null?r.weight:r.kg));if(!(w>=25))return;if(!best||_wlDateNum(r.date)>_wlDateNum(best.date))best={date:r.date,weight:w};});return best;}
+async function _wlLoadTarget(){var p=_wlProfile();_wlTarget=null;
+  try{var rw=await fetch(AGENT_URL+'/weights',{headers:authHeaders()});if(rw.ok){var lw=_wlLatestWeight(await rw.json());if(lw)p.weight=lw.weight;}}catch(e){}
+  if(!(p.weight>=25))return;
+  var q='weight_kg='+encodeURIComponent(p.weight)+'&sex='+encodeURIComponent(p.sex)+(p.age?'&age='+encodeURIComponent(p.age):'')+'&athlete=true';
+  try{var r=await fetch(AGENT_URL+'/water-log/target?'+q,{headers:authHeaders()});if(r.ok)_wlTarget=await r.json();}catch(e){}}
+async function _wlLoadOwn(){_wlOwn=parseInt(localStorage.getItem('water-goal-ml')||'0')||0;
+  try{var r=await fetch(AGENT_URL+'/user-settings',{headers:authHeaders()});if(r.ok){var s=await r.json();var v=parseInt((s||{})['water-goal-ml'])||0;_wlOwn=v;if(v)localStorage.setItem('water-goal-ml',String(v));else localStorage.removeItem('water-goal-ml');}}catch(e){}}
+async function buildWaterLog(){_wlErr='';_wlRender();
+  try{var r=await fetch(AGENT_URL+'/water-log?date='+_flDay(),{headers:authHeaders()});if(r.ok)_wlRows=await r.json();else _wlErr='Water could not be loaded: the server answered '+r.status+'.';}catch(e){_wlErr='Water could not be loaded: no connection.';}
+  await Promise.all([_wlLoadTarget(),_wlLoadOwn()]);_wlRender();}
+async function wlAdd(ml){if(_wlBusy)return;_wlBusy=true;_wlErr='';_wlRender();
+  var n=new Date(),t=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  try{var r=await fetch(AGENT_URL+'/water-log',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({date:_flDay(),ml:ml,time:t})});
+    if(r.ok){var j=await r.json();if(j&&j.row)_wlRows.push(j.row);}else _wlErr='Not saved: the server answered '+r.status+'.';}catch(e){_wlErr='Not saved: could not reach the server.';}
+  _wlBusy=false;_wlRender();}
+async function wlUndo(){var last=_wlRows.slice().sort(function(a,b){return(a.created_at||0)-(b.created_at||0);}).pop();if(!last)return;
+  if(typeof confirmGlobalDelete==='function'&&!confirmGlobalDelete('the last water entry ('+last.ml+' ml)'))return;
+  try{var r=await fetch(AGENT_URL+'/water-log/'+encodeURIComponent(last.id),{method:'DELETE',headers:authHeaders()});
+    if(r.ok||r.status===404)_wlRows=_wlRows.filter(function(x){return x.id!==last.id;});else _wlErr='Not deleted: the server answered '+r.status+'.';}catch(e){_wlErr='Not deleted: could not reach the server.';}
+  _wlRender();}
+function _wlParseLitres(s){s=String(s==null?'':s).trim().replace(',','.');if(s==='')return 0;var v=parseFloat(s);if(!(v>0))return -1;var ml=v<=10?v*1000:v;ml=Math.round(ml/50)*50;return(ml>=500&&ml<=10000)?ml:-1;}
+async function wlSetOwn(){var cur=_wlOwn>0?(_wlOwn/1000).toFixed(2):'';
+  var s=prompt('Your daily water target in litres (e.g. 3.5). Leave empty to use the target from your body weight.',cur);if(s===null)return;
+  var ml=_wlParseLitres(s);if(ml<0){alert('Type litres between 0.5 and 10, e.g. 3.5');return;}
+  try{var r=await fetch(AGENT_URL+'/user-settings',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({settings:{'water-goal-ml':ml||null}})});
+    if(!r.ok){alert('Not saved: the server answered '+r.status+'.');return;}}catch(e){alert('Not saved: could not reach the server.');return;}
+  _wlOwn=ml;if(ml)localStorage.setItem('water-goal-ml',String(ml));else localStorage.removeItem('water-goal-ml');_wlRender();}
 </script>
 </body>
 </html>

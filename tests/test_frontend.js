@@ -9013,6 +9013,40 @@ console.log('\n── Macro targets per day ────────────
 // few promise turns (the draft-ordering block, the food-stats retries), so they ran, and could
 // fail, only on a slow machine. The unref'd timer is a backstop if something never settles.
 let _summarised = false;
+// ── Water on the Macros page (2026-11-01) ───────────────────────────────────
+// Same block in both apps; drinks go to /water-log, the target comes from /water-log/target.
+console.log('\n── Water ───────────────────────────────────────────────────');
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _wb = _src.slice(_src.indexOf('// ── Water (Macros)'), _src.indexOf('async function wlSetOwn'));
+  check('water: block present and outside the food-log block',
+    _wb.length > 1000 && _src.indexOf('// ── Water (Macros)') > _src.indexOf('// ── end food log ──'));
+  check('water: a water card sits above the food log on the Macros page',
+    /<div id="water-log-body"><\/div>\s*<div id="food-log-body">/.test(_src));
+  check('water: opening Macros builds it', /buildWaterLog\(\);buildFoodLog\(\)/.test(_src));
+  check('water: litres parse, empty means "use the research target"',
+    G._wlParseLitres('3.5') === 3500 && G._wlParseLitres('3,5') === 3500 && G._wlParseLitres('3500') === 3500 &&
+    G._wlParseLitres('') === 0 && G._wlParseLitres('0.1') === -1 && G._wlParseLitres('abc') === -1 && G._wlParseLitres('20') === -1);
+  G._wlRows = [{id: 'a', ml: 500, created_at: 1}, {id: 'b', ml: 250, created_at: 2}];
+  G._wlTarget = {ml: 3100}; G._wlOwn = 0; G._wlBusy = false; G._wlErr = '';
+  let _h = G._wlHtml();
+  check('water: shows the day\'s total against the target', /0\.8 L<\/b> \/ 3\.1 L/.test(_h) && /width:24%/.test(_h));
+  check('  …says where the target comes from', /Yamada 2022/.test(_h) && /Set my own/.test(_h));
+  check('  …with one-tap amounts and an undo', /wlAdd\(250\)/.test(_h) && /wlAdd\(500\)/.test(_h) && /wlUndo\(\)/.test(_h));
+  G._wlOwn = 3500;
+  _h = G._wlHtml();
+  check('  …and an own target replaces the research one', /\/ 3\.5 L/.test(_h) && /your own target/.test(_h) && !/Yamada/.test(_h));
+  G._wlOwn = 0; G._wlTarget = null; G._wlRows = [];
+  _h = G._wlHtml();
+  check('  …without a weight it asks for one instead of inventing a target', /add your weight/.test(_h) && !/Undo last/.test(_h));
+  check('water: the target uses the newest weigh-in, not the profile weight (dates are not zero-padded)',
+    G._wlLatestWeight([{date:'2026-6-12',weight:89.8},{date:'2026-10-25',weight:88.0},{date:'2026-10-3',weight:87}]).weight === 88 &&
+    G._wlLatestWeight([]) === null && /fetch\(AGENT_URL\+'\/weights'/.test(_wb));
+  check('water: undo is a global delete and says so', /confirmGlobalDelete\(/.test(_wb));
+  check('water: the own target is written to the backend with the device copy',
+    /\/user-settings',\{method:'POST'/.test(_src.slice(_src.indexOf('async function wlSetOwn'), _src.indexOf('async function wlSetOwn') + 1200)));
+}
+
 const _summary = () => {
   if (_summarised) return; _summarised = true;
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
