@@ -9047,6 +9047,22 @@ console.log('\n── Water ─────────────────�
     /\/user-settings',\{method:'POST'/.test(_src.slice(_src.indexOf('async function wlSetOwn'), _src.indexOf('async function wlSetOwn') + 1200)));
 }
 
+// ── Water from drinks logged as food (2026-11-01: "the water in milk needs to be counted") ──
+{
+  const _svF = G._flRows, _svW = G._wlRows, _svT = G._wlTarget, _svO = G._wlOwn;
+  G._wlRows = [{id: 'w', ml: 500, created_at: 1}]; G._wlTarget = {ml: 3000}; G._wlOwn = 0; G._wlBusy = false; G._wlErr = '';
+  G._flRows = [{id: 'a', food: 'Milk', amount: '300 ml', kcal: 150, water_ml: 268}, {id: 'b', food: 'Bread', amount: '50 g', kcal: 130, water_ml: 0},
+               {id: 'c', food: 'Old row', amount: '200 ml', kcal: 90}];
+  const h = G._wlHtml();
+  check('water: drinks in the food log count (500 + 268 = 0.8 L)', /0\.8 L<\/b> \/ 3\.0 L/.test(h) && /Includes 268 ml from drinks in the food log/.test(h));
+  G._flRows = [];
+  check('  …and without drinks there is no such line', !/from drinks/.test(G._wlHtml()));
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  check('water: a change to the food log redraws the water card', /function _flRender\(\)\{if\(typeof _wlRender==='function'\)_wlRender\(\);/.test(_src));
+  check('food edit: a corrected amount rescales the water in a drink', /body\.water_ml=_flNum\(_flNum\(row\.water_ml\)\*gNew\/g0\.n\)/.test(_src));
+  G._flRows = _svF; G._wlRows = _svW; G._wlTarget = _svT; G._wlOwn = _svO;
+}
+
 const _summary = () => {
   if (_summarised) return; _summarised = true;
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
