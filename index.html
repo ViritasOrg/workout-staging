@@ -4503,7 +4503,7 @@ function _flStatsHtml(){var s=_flStats;if(!s)return'';
     '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5">'+s.days+' day'+(s.days===1?'':'s')+' logged, '+_flShortDate(s.from)+' to '+_flShortDate(s.to)+'. Today is not included. Each day is measured against that day\'s goals.'+
     (s.before_first_goal?' The '+s.before_first_goal+' day'+(s.before_first_goal===1?'':'s')+' before '+_flShortDate(s.first_goal_date)+' use the goals recorded that day, the first on record.':'')+'</div>';
   return _flCard(h);}
-function _flRender(){var el=document.getElementById('food-log-body');if(!el)return;if(_flKey&&_flKey.set)_flRecordGoal();el.innerHTML=(_flKey&&_flKey.set)?_flMainHtml():(_flKey?_flGuideHtml():_flCard('<div style="font-size:13px;color:var(--muted)">The food log could not be loaded. Check your connection and open this tab again.</div>'));}
+function _flRender(){if(typeof _wlRender==='function')_wlRender();var el=document.getElementById('food-log-body');if(!el)return;if(_flKey&&_flKey.set)_flRecordGoal();el.innerHTML=(_flKey&&_flKey.set)?_flMainHtml():(_flKey?_flGuideHtml():_flCard('<div style="font-size:13px;color:var(--muted)">The food log could not be loaded. Check your connection and open this tab again.</div>'));}
 function _flDetail(r,j){return(j&&j.detail&&typeof j.detail==='string')?j.detail:('The server answered '+r.status+'.');}
 async function _flLoadRows(date){try{var r=await fetch(AGENT_URL+'/food-log?date='+date,{headers:authHeaders()});if(!r.ok)return null;return await r.json();}catch(e){return null;}}
 async function buildFoodLog(){
@@ -4594,7 +4594,9 @@ async function flEditSave(id){var g=function(f){var e=document.getElementById('f
     // A corrected amount rescales the numbers, unless they were typed over too: then what
     // was typed wins.
     var same=['kcal','protein','carbs','fat'].every(function(k){return Math.abs(body[k]-_flNum(row[k]))<0.05;});
-    if(g0&&g0.n>0&&gNew!==g0.n&&same)['kcal','protein','carbs','fat'].forEach(function(k){body[k]=_flNum(_flNum(row[k])*gNew/g0.n);});}
+    if(g0&&g0.n>0&&gNew!==g0.n&&same)['kcal','protein','carbs','fat'].forEach(function(k){body[k]=_flNum(_flNum(row[k])*gNew/g0.n);});
+    // The water in a drink follows its amount; it has no field of its own to type over.
+    if(g0&&g0.n>0&&gNew!==g0.n&&_flNum(row.water_ml)>0)body.water_ml=_flNum(_flNum(row.water_ml)*gNew/g0.n);}
   try{var r=await fetch(AGENT_URL+'/food-log/'+encodeURIComponent(id),{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(body)});if(!r.ok){alert('Not saved: the server answered '+r.status+'.');return;}}catch(e){alert('Not saved: could not reach the server.');return;}
   buildFoodEdit(_flEditDate);}
 async function flEditDelete(id){if(!confirmGlobalDelete('this food entry'))return;
@@ -4615,16 +4617,19 @@ function _wlProfile(){
   return{weight:parseFloat(w.weight)||0,sex:w.gender==='female'?'female':'male',age:parseInt(w.age)||0};
 }
 function _wlTotal(rows){return(rows||[]).reduce(function(a,r){return a+(Number(r.ml)||0);},0);}
+// Drinks logged as food count too (2026-11-01, Henrik: "the water in milk needs to be counted even if
+// it is entered in the food tab"): the estimate stores water_ml on a drink's row, 0 for solid food.
+function _wlFoodMl(){return(typeof _flRows!=='undefined'?_flRows:[]).reduce(function(a,r){return a+(Number(r&&r.water_ml)||0);},0);}
 function _wlL(ml){return(Math.round(ml/100)/10).toFixed(1)+' L';}
 function _wlGoal(){return _wlOwn>0?_wlOwn:(_wlTarget&&_wlTarget.ml)||0;}
 function _wlHtml(){
-  var tot=_wlTotal(_wlRows),goal=_wlGoal();
+  var food=Math.round(_wlFoodMl()),tot=_wlTotal(_wlRows)+food,goal=_wlGoal();
   var pct=goal>0?Math.min(100,Math.round(tot/goal*100)):0;
   var basis=_wlOwn>0?'your own target':(_wlTarget?'from your body weight, sex and age (Yamada 2022)':'add your weight in your profile to get a target');
   var h='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span style="font-size:12px;color:var(--muted)">Water today</span>'+
     '<span style="font-size:15px;color:var(--text)"><b>'+_wlL(tot)+'</b>'+(goal?' / '+_wlL(goal):'')+'</span></div>';
   if(goal)h+='<div style="height:8px;border-radius:4px;background:var(--surface2);margin:8px 0 4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:#4fb3ff"></div></div>';
-  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+(goal?'Target '+_wlL(goal)+', ':'')+basis+' · <span onclick="wlSetOwn()" style="text-decoration:underline;cursor:pointer">'+(_wlOwn>0?'Change':'Set my own')+'</span></div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+(food?'Includes '+food+' ml from drinks in the food log. ':'')+(goal?'Target '+_wlL(goal)+', ':'')+basis+' · <span onclick="wlSetOwn()" style="text-decoration:underline;cursor:pointer">'+(_wlOwn>0?'Change':'Set my own')+'</span></div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+
     (_wlBusy?'<div style="font-size:14px;color:var(--muted);padding:10px 0">Saving…</div>':
       WL_STEPS.map(function(ml){return _flBtn('+ '+ml+' ml','wlAdd('+ml+')',ml===WL_STEPS[0]);}).join('')+
