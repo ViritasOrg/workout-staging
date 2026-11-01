@@ -4609,7 +4609,7 @@ async function flEditDelete(id){if(!confirmGlobalDelete('this food entry'))retur
 // served by the backend (/water-log/target, Yamada 2022 eq. 1 from the user's weight, sex and
 // age; research in claude-agent-backend docs/enhanced-bodybuilding/22-water-intake.md) unless
 // the user has typed their own (user setting "water-goal-ml"). Nothing here lives only on the device.
-var _wlRows=[],_wlTarget=null,_wlOwn=0,_wlBusy=false,_wlErr='';
+var _wlRows=[],_wlTarget=null,_wlOwn=0,_wlBusy=false,_wlErr='',_wlTargetFail=false;
 var WL_STEPS=[250,500];
 function _wlProfile(){
   if(typeof _userProfile==='function'){var p=_userProfile();return{weight:p.weight_kg||0,sex:p.sex||'male',age:p.age||0};}
@@ -4625,7 +4625,9 @@ function _wlGoal(){return _wlOwn>0?_wlOwn:(_wlTarget&&_wlTarget.ml)||0;}
 function _wlHtml(){
   var food=Math.round(_wlFoodMl()),tot=_wlTotal(_wlRows)+food,goal=_wlGoal();
   var pct=goal>0?Math.min(100,Math.round(tot/goal*100)):0;
-  var basis=_wlOwn>0?'your own target':(_wlTarget?'from your body weight, sex and age (Yamada 2022)':'add your weight in your profile to get a target');
+  // A failed request is said as such, never as a missing weight (2026-11-01: the backend restarted
+  // mid-request and the card told a user with 88 kg logged to add his weight).
+  var basis=_wlOwn>0?'your own target':(_wlTarget?'from your body weight, sex and age (Yamada 2022)':(_wlTargetFail?'the target could not be loaded <span onclick="buildWaterLog()" style="text-decoration:underline;cursor:pointer">Try again</span>':'add your weight in your profile to get a target'));
   var h='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span style="font-size:12px;color:var(--muted)">Water today</span>'+
     '<span style="font-size:15px;color:var(--text)"><b>'+_wlL(tot)+'</b>'+(goal?' / '+_wlL(goal):'')+'</span></div>';
   if(goal)h+='<div style="height:8px;border-radius:4px;background:var(--surface2);margin:8px 0 4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:#4fb3ff"></div></div>';
@@ -4642,11 +4644,11 @@ function _wlRender(){var el=document.getElementById('water-log-body');if(el)el.i
 // (2026-11-01: the profile still said 85.2 kg while the weight log said 88.0).
 function _wlDateNum(d){var p=String(d||'').split('-');return p.length===3?(+p[0])*10000+(+p[1])*100+(+p[2]):0;}
 function _wlLatestWeight(rows){var best=null;(rows||[]).forEach(function(r){var w=parseFloat(r&&(r.weight!=null?r.weight:r.kg));if(!(w>=25))return;if(!best||_wlDateNum(r.date)>_wlDateNum(best.date))best={date:r.date,weight:w};});return best;}
-async function _wlLoadTarget(){var p=_wlProfile();_wlTarget=null;
-  try{var rw=await fetch(AGENT_URL+'/weights',{headers:authHeaders()});if(rw.ok){var lw=_wlLatestWeight(await rw.json());if(lw)p.weight=lw.weight;}}catch(e){}
-  if(!(p.weight>=25))return;
+async function _wlLoadTarget(){var p=_wlProfile();_wlTarget=null;_wlTargetFail=false;
+  try{var rw=await fetch(AGENT_URL+'/weights',{headers:authHeaders()});if(rw.ok){var lw=_wlLatestWeight(await rw.json());if(lw)p.weight=lw.weight;}else _wlTargetFail=true;}catch(e){_wlTargetFail=true;}
+  if(!(p.weight>=25))return;_wlTargetFail=false;
   var q='weight_kg='+encodeURIComponent(p.weight)+'&sex='+encodeURIComponent(p.sex)+(p.age?'&age='+encodeURIComponent(p.age):'')+'&athlete=true';
-  try{var r=await fetch(AGENT_URL+'/water-log/target?'+q,{headers:authHeaders()});if(r.ok)_wlTarget=await r.json();}catch(e){}}
+  try{var r=await fetch(AGENT_URL+'/water-log/target?'+q,{headers:authHeaders()});if(r.ok)_wlTarget=await r.json();else _wlTargetFail=true;}catch(e){_wlTargetFail=true;}}
 async function _wlLoadOwn(){_wlOwn=parseInt(localStorage.getItem('water-goal-ml')||'0')||0;
   try{var r=await fetch(AGENT_URL+'/user-settings',{headers:authHeaders()});if(r.ok){var s=await r.json();var v=parseInt((s||{})['water-goal-ml'])||0;_wlOwn=v;if(v)localStorage.setItem('water-goal-ml',String(v));else localStorage.removeItem('water-goal-ml');}}catch(e){}}
 async function buildWaterLog(){_wlErr='';_wlRender();

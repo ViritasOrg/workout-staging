@@ -9063,6 +9063,21 @@ console.log('\n── Water ─────────────────�
   G._flRows = _svF; G._wlRows = _svW; G._wlTarget = _svT; G._wlOwn = _svO;
 }
 
+// ── Water: a failed target request is said as such (2026-11-01) ──────────────
+// The backend restarted mid-request and the card told a user with 88 kg logged to add his weight.
+{
+  const _sv = {t: G._wlTarget, f: G._wlTargetFail, o: G._wlOwn, r: G._wlRows, fl: G._flRows};
+  G._wlTarget = null; G._wlOwn = 0; G._wlRows = []; G._flRows = []; G._wlBusy = false; G._wlErr = '';
+  G._wlTargetFail = true;
+  let h = G._wlHtml();
+  check('water: a failed target request says so and offers a retry, not "add your weight"',
+    /could not be loaded/.test(h) && /buildWaterLog\(\)/.test(h) && !/add your weight/.test(h));
+  G._wlTargetFail = false;
+  h = G._wlHtml();
+  check('  …while a missing weight still asks for one', /add your weight/.test(h) && !/could not be loaded/.test(h));
+  G._wlTarget = _sv.t; G._wlTargetFail = _sv.f; G._wlOwn = _sv.o; G._wlRows = _sv.r; G._flRows = _sv.fl;
+}
+
 const _summary = () => {
   if (_summarised) return; _summarised = true;
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
