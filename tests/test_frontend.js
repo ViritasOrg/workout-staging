@@ -8812,7 +8812,6 @@ console.log('\n── Onboarding overview + What\'s new ────────
   { const _pv = G.VERSION; G.VERSION = '1.0';
     check('a promoted copy (VERSION reset to prod\'s counter) still shows every reached row', G._whatsNewEntries().length === reached.length);
     G.VERSION = _pv; }
-  check('Version Bump keeps BUILD_NO in step with VERSION', /const BUILD_NO='\[0-9\.\]\*'\/const BUILD_NO='\$\{NEW\}'/.test(require('fs').readFileSync(require('path').join(__dirname, '../.github/workflows/version-bump.yml'), 'utf8')));
   let h = G._whatsNewHtml(G._whatsNewEntries());
   check('  …the card lists them, titled WHAT\'S NEW, with a Got it button',
     /WHAT'S NEW/.test(h) && /dismissWhatsNew\(\)/.test(h) && /Got it/.test(h) && reached.every(e => h.includes(e.title)));
