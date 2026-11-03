@@ -1266,6 +1266,23 @@ PR maintains them.
   both apps in the same session; its tour names plans from the backend-served templates, never a
   compound written into the repo.
 
+### Ask AI to change the program (rule 2026-11-03)
+Henrik: *"use [the Claude key] to allow AI guided changes to training programs ... Use cheapest model still capable of this."*
+- The **Ask AI** card on Plan sends the request, the active program's day and exercise names, today's day and the exercise
+  catalogue (`_exCatalogue`, read from `EX_OPTS_HTML`) to `POST /program-ai` in claude-agent-backend. That runs on the
+  user's own food-log key; for an Anthropic key it is Claude Haiku 5.5, the cheapest current Claude model.
+- **The AI returns operations, never a program**: `remove`, `replace`, `add` (on numbered days), `today` (a one-off
+  session) or `cannot`. `_applyAiOps` (pure) applies them to a COPY, so everything not named keeps its weights, schemes,
+  markers and order. A name outside the catalogue or a target that is not in the program blocks the whole change.
+  New exercises go through `snapReps`/`applyTagFromReps`; a replaced exercise keeps its sets and gets `kg:0`.
+- Nothing is saved until **Apply** on the preview; Apply on a program change is the user's explicit edit of a stored program.
+- **A one-off session never changes the program.** It is `wkt-oneoff` (phone + `/user-settings`), holds for its own date,
+  and after that only while an unsaved draft started on it is open (`d.oneOff`). `_planDay` serves it to Today, the Log
+  prefill and `saveLog`; its save does not overwrite `template_weights_day<N>` of the day it replaced, and clears it.
+- **An extra session the same day** (Henrik, 2026-11-03: *"i did pull b earlier today but want a new pull session now
+  (same day) gimme a suggestion of exercises"*) is op `extra`: a one-off with `extra:true` filed under `_extraDay()`, the
+  day trained last, so saving it leaves `_nextTrainingDay` where it was. The request carries `done_today` (today's logs).
+
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 
