@@ -4616,13 +4616,15 @@ function flOpenImportSettings(){_flOpenSettingsAt('fl-import-card','flimport');}
 // rows already in the log are skipped, so the same file can be imported twice safely.
 var _flImp={busy:false,msg:'',err:''};
 function _flImportCardHtml(){
-  var s='';
-  if(_flImp.busy)s='<div style="margin-top:10px;font-size:13px;color:var(--muted)">Importing…</div>';
-  else if(_flImp.err)s='<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flImp.err)+'</div>';
-  else if(_flImp.msg)s='<div style="margin-top:10px;font-size:13px;color:var(--text)">'+_flEsc(_flImp.msg)+'</div>';
+  // The app can open straight onto Settings before this file has declared _flImp (the startup page
+  // restore runs first); an undefined state threw here and left both food-log cards blank.
+  var imp=(typeof _flImp!=='undefined'&&_flImp)||{busy:false,msg:'',err:''},s='';
+  if(imp.busy)s='<div style="margin-top:10px;font-size:13px;color:var(--muted)">Importing…</div>';
+  else if(imp.err)s='<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(imp.err)+'</div>';
+  else if(imp.msg)s='<div style="margin-top:10px;font-size:13px;color:var(--text)">'+_flEsc(imp.msg)+'</div>';
   return _flSecCard('flimport','Food log · Import old log',
     '<div style="font-size:13px;color:var(--text);line-height:1.5">Choose a CSV or Excel (.xlsx) file. It needs a header row with at least <b>Date</b> and <b>Kcal</b>; Food, Amount, Time, Protein, Carbs and Fat are read when present. Entries already in your log are skipped, so importing the same file twice is safe.</div>'+
-    '<input id="fl-import-file" type="file" accept=".csv,.xlsx,.txt,.tsv,text/csv,text/plain" onchange="flImportFile(this)"'+(_flImp.busy?' disabled':'')+' style="margin-top:10px;font-size:14px;color:var(--text)">'+s);}
+    '<input id="fl-import-file" type="file" accept=".csv,.xlsx,.txt,.tsv,text/csv,text/plain" onchange="flImportFile(this)"'+(imp.busy?' disabled':'')+' style="margin-top:10px;font-size:14px;color:var(--text)">'+s);}
 function _flRenderImportCard(){var el=document.getElementById('fl-import-card');if(el)el.innerHTML=_flImportCardHtml();}
 function _flImportSummary(j){
   var t='Added '+j.added+' entr'+(j.added===1?'y':'ies')+'.';

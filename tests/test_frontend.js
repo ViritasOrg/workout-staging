@@ -8250,6 +8250,17 @@ console.log('\n── Food log ────────────────�
     await T.buildTokenCostCard();
     check('token cost: a failed load says so', /HTTP 500/.test(T._tkCostCardHtml()));
   })();
+  // Opening the app straight onto Settings (the last page) runs buildFlKeyCard before the
+  // import card's state is declared; that threw and left both food-log cards blank (2026-11-03).
+  {
+    const _imSrc = fs.readFileSync(htmlPath, 'utf8');
+    const _imFn = _imSrc.slice(_imSrc.indexOf('function _flImportCardHtml(){'), _imSrc.indexOf('function _flRenderImportCard()'));
+    const I = vm.createContext({_flEsc: (x) => String(x), _flSecCard: (id, t, b) => '<h>' + t + '</h>' + b});
+    vm.runInContext(_imFn, I);
+    let html = '';
+    try { html = I._flImportCardHtml(); } catch (e) { html = 'THREW ' + e.message; }
+    check('food-log import card: draws before its state is declared (app opened on Settings)', /Import old log/.test(html));
+  }
   // Today's intake against the Macros tab's targets (2026-10-21).
   const _flSaveT = G._macrosTargets;
   G._flKey = {set: true, last4: 'WXYZ'}; G._flErr = ''; G._flPending = null; G._flBusy = false;
