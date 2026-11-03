@@ -1561,7 +1561,7 @@ function _aiEx(e){
 }
 // Pure: the operations applied to a copy of prog. Returns {prog, oneOff, lines, errors}; prog is
 // null when nothing in the program changes. Any error blocks the whole change.
-function _applyAiOps(prog,ops,today,catalogue){
+function _applyAiOps(prog,ops,today,catalogue,extraDay){
   var cp=JSON.parse(JSON.stringify(prog)),changed=false,oneOff=null,lines=[],errors=[];
   var known={};(catalogue||[]).forEach(function(n){known[n.toLowerCase()]=n;});
   cp.days.forEach(function(d){(d.exercises||[]).forEach(function(x){known[String(x.name).toLowerCase()]=x.name;});});
@@ -1589,6 +1589,13 @@ function _applyAiOps(prog,ops,today,catalogue){
       oneOff={id:'oo'+Date.now(),date:new Date().toISOString().split('T')[0],day:today,name:'Today — '+(o.title||'One-off session'),exercises:exs};
       lines.push('Today only'+(td?', instead of '+td.name:'')+': '+(o.title||'one-off session'));
       exs.forEach(function(x){lines.push('  • '+x.name+' '+x.scheme);});}
+    // A second session the same day (Henrik, 2026-11-03: "i did pull b earlier today but want a
+    // new pull session now"). It is filed under the day trained last, so the program does not
+    // move on: the next planned day stays the next planned day.
+    if(o.op==='extra'&&exs.length){var ed=extraDay||today;
+      oneOff={id:'oo'+Date.now(),date:new Date().toISOString().split('T')[0],day:ed,extra:true,name:'Extra — '+(o.title||'extra session'),exercises:exs};
+      lines.push('Extra session today, the program stays where it is: '+(o.title||'extra session'));
+      exs.forEach(function(x){lines.push('  • '+x.name+' '+x.scheme);});}
   });
   return{prog:changed?cp:null,oneOff:oneOff,lines:lines,errors:errors};
 }
@@ -1605,19 +1612,23 @@ function _progAiHtml(){
   return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Ask AI to change your program</div>'+b+'</div>';
 }
 function _renderProgAi(){var el=document.getElementById('prog-ai-card');if(el)el.innerHTML=_progAiHtml();}
+// The day an extra session is filed under: the one trained last (or the last day before any
+// session), so _nextTrainingDay gives the same answer after it is saved as before.
+function _extraDay(){var p=getActiveProgram();var n=p&&p.days?p.days.length:1;var l=logs&&logs[0]&&parseInt(logs[0].day);return(l>=1&&l<=n)?l:n;}
 function _progAiToday(){var ls=document.getElementById('log-day');return parseInt(ls&&ls.value)||_nextTrainingDay();}
 async function progAiAsk(){
   var prog=getActiveProgram();var t=(_pai.text||'').trim();
   if(!prog){_pai.err='There is no active program yet.';_renderProgAi();return;}
   if(!t){_pai.err='Type what you want changed.';_renderProgAi();return;}
   _pai.busy=true;_pai.err='';_pai.plan=null;_renderProgAi();
-  var today=_progAiToday(),cat=_exCatalogue();
+  var today=_progAiToday(),cat=_exCatalogue(),td=new Date().toISOString().split('T')[0];
+  var doneToday=(logs||[]).filter(function(l){return l&&l.date===td;}).slice(0,5).map(function(l){var d=getActiveProgramDay(l.day);return{name:(d&&d.name)||('Day '+l.day),exercises:(l.exercises||[]).map(function(x){return x.name;}).slice(0,20)};});
   try{
-    var r=await fetch(AGENT_URL+'/program-ai',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({request:t,today:today,catalogue:cat,
+    var r=await fetch(AGENT_URL+'/program-ai',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({request:t,today:today,catalogue:cat,done_today:doneToday,
       program:{name:prog.name||'',days:prog.days.map(function(d){return{name:d.name||'',exercises:(d.exercises||[]).map(function(x){return x.name;})};})}})});
     var j=await r.json().catch(function(){return{};});
     if(!r.ok){_pai.err=(j&&typeof j.detail==='string')?j.detail:'The AI request failed (HTTP '+r.status+').';}
-    else{var plan=_applyAiOps(prog,j.ops,today,cat);
+    else{var plan=_applyAiOps(prog,j.ops,today,cat,_extraDay());
       if(plan.errors.length)_pai.err=plan.errors.join(' ')+' Nothing was changed.';
       else if(!plan.prog&&!plan.oneOff)_pai.err='The AI found nothing to change.';
       else _pai.plan=plan;}
@@ -4310,7 +4321,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
-  {v:'1.335',title:'Ask AI to change your program',text:'On Plan, tell the AI what to change: remove or swap an exercise on some or all days, add one, or get a different session for today only. It shows the change first; tap Apply to keep it. Uses your own API key from Settings.'},
+  {v:'1.335',title:'Ask AI to change your program',text:'On Plan, tell the AI what to change: remove or swap an exercise on some or all days, add one, get a different session for today only, or an extra session when you have already trained today. It shows the change first; tap Apply to keep it. Uses your own API key from Settings.'},
   {v:'1.322',title:'Water',text:'Macros now logs water: tap + 250 ml or + 500 ml. The daily target is worked out from your body weight, sex and age, or set your own.'},
   {v:'1.309',title:'Macro targets per day',text:'Food Edit shows the targets in force on any day and lets you set them from that day onward, so the history card measures each day against the right goals. Use it to fill in the periods of an imported log.'},
   {v:'1.307',title:'Animated tour',text:'The Setup Wizard ends with a short animated tour: building a program, logging a workout, the ? sketches and tracking macros. Watch it again from the button at the top of Settings.'},

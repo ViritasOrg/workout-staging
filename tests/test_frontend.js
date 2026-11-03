@@ -9316,4 +9316,19 @@ setTimeout(() => { check('every async check finished within 30 s', false); _summ
   check('saveLog: …does not overwrite the remembered weights of the day it replaced', /if\(!_oo\)setData\('template_weights_day'/.test(save));
   check('saveLog: …and is cleared once the log is saved', /_pushSavedLog\(newLog\);if\(_oo\)_setOneOff\(null\)/.test(save));
 }
+{
+  const prog = {name: 'T', days: [{name: 'Day 1 — Push', exercises: []}, {name: 'Day 2 — Pull B', exercises: []}, {name: 'Day 3 — Legs', exercises: []}]};
+  G._programs = [prog]; G._activeProgramIndex = 0;
+  G.logs = [{id: 1, date: new Date().toISOString().split('T')[0], day: 2, exercises: []}];
+  const next = G._nextTrainingDay();
+  const p = G._applyAiOps(prog, [{op: 'extra', days: [], exercise: '', with: '', title: 'Pull C',
+    exercises: [{name: 'Lat Pulldown', sets: 3, reps: '10'}]}], 3, G._exCatalogue(), G._extraDay());
+  check('AI extra: filed under the day trained last, so the program does not move on',
+    p.prog === null && p.oneOff.extra && p.oneOff.day === 2 && next === 3, JSON.stringify(p.oneOff));
+  G.logs = [Object.assign({}, G.logs[0], {id: 2, day: p.oneOff.day})].concat(G.logs);
+  check('AI extra: after it is saved the next planned day is still the same', G._nextTrainingDay() === next);
+  G.logs = [];
+  check('AI extra: with no sessions yet it takes the last day, so day 1 stays next', G._extraDay() === 3);
+  G.logs = [];
+}
 function SCRIPT_SRC_FOR_AI() { return require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8'); }

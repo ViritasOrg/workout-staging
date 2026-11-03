@@ -1279,6 +1279,9 @@ Henrik: *"use [the Claude key] to allow AI guided changes to training programs .
 - **A one-off session never changes the program.** It is `wkt-oneoff` (phone + `/user-settings`), holds for its own date,
   and after that only while an unsaved draft started on it is open (`d.oneOff`). `_planDay` serves it to Today, the Log
   prefill and `saveLog`; its save does not overwrite `template_weights_day<N>` of the day it replaced, and clears it.
+- **An extra session the same day** (Henrik, 2026-11-03: *"i did pull b earlier today but want a new pull session now
+  (same day) gimme a suggestion of exercises"*) is op `extra`: a one-off with `extra:true` filed under `_extraDay()`, the
+  day trained last, so saving it leaves `_nextTrainingDay` where it was. The request carries `done_today` (today's logs).
 
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
