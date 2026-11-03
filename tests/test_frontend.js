@@ -8195,6 +8195,56 @@ console.log('\n── Food log ────────────────�
   check('food log: deletes go through confirmGlobalDelete',
     /function flEditDelete[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && /function flRemoveKey[\s\S]*?confirmGlobalDelete\(/.test(_flBlock) && !/[^.]confirm\('/.test(_flBlock));
 
+  // Token cost (Henrik, 2026-11-03: "Both apps needs a token cost view, calculated weekly and monthly
+  // token spend in users choice of currency (default EUR)").
+  {
+    const wk = (label, calls, cost) => ({label, start: '2026-11-02', calls, input_tokens: 1200, output_tokens: 800, cost, unpriced_calls: 0});
+    G._tkErr = '';
+    G._tkCost = {currency: 'SEK', rate: 9.2, currencies: ['EUR', 'SEK', 'USD'],
+                 weeks: [wk('Week 45', 3, 1.5), wk('Week 44 <b>', 0, 0)], months: [wk('November 2026', 3, 12.25)]};
+    const h = G._tkCostCardHtml();
+    check('token cost: weekly and monthly tables with calls, tokens and cost in the chosen currency',
+      /Weekly/.test(h) && /Monthly/.test(h) && /Week 45/.test(h) && /November 2026/.test(h) && /2\.0 k/.test(h) && /SEK/.test(h) && /12[.,]25/.test(h));
+    check('token cost: the currency picker lists the currencies with the chosen one selected and saves on change',
+      /<option selected>SEK<\/option>/.test(h) && /<option>EUR<\/option>/.test(h) && /tkSetCurrency\(this\.value\)/.test(h));
+    check('token cost: labels are escaped', h.indexOf('Week 44 <b>') < 0 && h.indexOf('Week 44 &lt;b&gt;') >= 0);
+    G._tkCost = Object.assign({}, G._tkCost, {rate: null, weeks: [wk('Week 45', 1, null)]});
+    const n = G._tkCostCardHtml();
+    check('token cost: no exchange rate shows no figure and says why, never a guessed amount',
+      /No exchange rate for SEK/.test(n) && /–/.test(n));
+    G._tkCost = null; G._tkErr = '';
+  }
+  // The load and the currency save, in their own sandbox holding only this block, so the
+  // recorded fetch cannot collide with the suite's other async tests.
+  (async () => {
+    const _tkSrc = fs.readFileSync(htmlPath, 'utf8');
+    const _tkBlock = _tkSrc.slice(_tkSrc.indexOf('// Token cost (Henrik'), _tkSrc.indexOf('function flOpenKeySettings('));
+    const seen = [];
+    let mode = 'ok';
+    const T = vm.createContext({
+      AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), JSON, Intl, encodeURIComponent,
+      _flEsc: (x) => String(x), _flSecCard: (id, label, body) => body,
+      document: {getElementById: () => null},
+      fetch: async (url, opt) => {
+        seen.push({url, m: (opt && opt.method) || 'GET', body: opt && opt.body});
+        if (mode === 'fail') return {ok: false, status: 500, json: async () => ({})};
+        if (/\/token-cost\/currency$/.test(url)) return {ok: true, status: 200, json: async () => ({ok: true})};
+        return {ok: true, status: 200, json: async () => ({currency: seen.some(x => x.m === 'PUT') ? 'USD' : 'EUR', rate: 1, currencies: ['EUR', 'USD'], weeks: [], months: []})};
+      },
+    });
+    vm.runInContext(_tkBlock, T);
+    await T.buildTokenCostCard();
+    const first = T._tkCost && T._tkCost.currency;
+    await T.tkSetCurrency('USD');
+    check('token cost: loads the cost (EUR by default) with the device\'s time zone',
+      first === 'EUR' && /\/token-cost\?tz=/.test(seen[0].url));
+    check('token cost: a picked currency is saved on the backend and the view reloads in it',
+      seen.some(x => x.m === 'PUT' && /\/token-cost\/currency$/.test(x.url) && JSON.parse(x.body).currency === 'USD') && T._tkCost.currency === 'USD');
+    check('token cost: nothing is kept in localStorage (the backend keeps the choice)', !/localStorage|setData\(/.test(_tkBlock));
+    mode = 'fail';
+    await T.buildTokenCostCard();
+    check('token cost: a failed load says so', /HTTP 500/.test(T._tkCostCardHtml()));
+  })();
   // Today's intake against the Macros tab's targets (2026-10-21).
   const _flSaveT = G._macrosTargets;
   G._flKey = {set: true, last4: 'WXYZ'}; G._flErr = ''; G._flPending = null; G._flBusy = false;
