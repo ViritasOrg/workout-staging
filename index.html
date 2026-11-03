@@ -454,7 +454,6 @@
       </div>
     </div>
     <div id="fl-key-card"></div>
-    <div id="fl-cost-card"></div>
     <div id="fl-import-card"></div>
     <div id="s-deploy-card"></div>
     <div id="s-tabs-card" style="margin-top:0"></div>
@@ -4322,7 +4321,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
-  {v:'1.336',title:'Token cost',text:'Settings → AI · Token cost shows what the AI calls on your own key cost each week and each month, in the currency you pick (EUR to start with).'},
+  {v:'1.336',title:'Token cost',text:'Settings → Food log · API key shows what the AI calls on your own key cost each week and each month, in the currency you pick (EUR to start with).'},
   {v:'1.335',title:'Ask AI to change your program',text:'On Plan, tell the AI what to change: remove or swap an exercise on some or all days, add one, get a different session for today only, or an extra session when you have already trained today. It shows the change first; tap Apply to keep it. Uses your own API key from Settings.'},
   {v:'1.322',title:'Water',text:'Macros now logs water: tap + 250 ml or + 500 ml. The daily target is worked out from your body weight, sex and age, or set your own.'},
   {v:'1.309',title:'Macro targets per day',text:'Food Edit shows the targets in force on any day and lets you set them from that day onward, so the history card measures each day against the right goals. Use it to fill in the periods of an imported log.'},
@@ -4569,6 +4568,7 @@ function _flKeyCardHtml(){
     '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Change','flStartChange()',true)+_flBtn('Remove','flRemoveKey()',false)+'</div>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:8px">One key serves every app and device signed in to your account.</div>';
   if(_flErr&&_flKey&&(!_flKey.set||_flKeyChanging))b+='<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flErr)+'</div>';
+  if(_flKey&&_flKey.set&&!_flKeyChanging)b+=_tkCostCardHtml();   // token cost lives with the key it is billed to (Henrik, 2026-11-03)
   return _flSecCard('flkey','Food log · API key',b);}
 // Settings cards follow the Settings design: a header bar that opens and closes, collapsed
 // by default (Henrik, 2026-10-22: "they should be default collapsed like all others").
@@ -4602,8 +4602,8 @@ function _tkCostCardHtml(){
       (c.rate===null?'<div style="font-size:12px;color:var(--danger,#ff3b30);margin-top:8px">No exchange rate for '+_flEsc(cur)+' yet, so costs cannot be shown.</div>':'')+
       _tkTable('Weekly',c.weeks||[],cur)+_tkTable('Monthly',c.months||[],cur)+
       '<div style="font-size:11px;color:var(--muted);margin-top:8px">AI calls on your own key, at the provider\'s list prices. A free-tier key is not charged.</div>';}
-  return _flSecCard('tkcost','AI · Token cost',b);}
-function _tkRenderCostCard(){var el=document.getElementById('fl-cost-card');if(el)el.innerHTML=_tkCostCardHtml();}
+  return '<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:10px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Token cost</div>'+b+'</div>';}
+function _tkRenderCostCard(){_flRenderKeyCard();}
 async function buildTokenCostCard(){_tkErr='';var tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}
   try{var r=await fetch(AGENT_URL+'/token-cost?tz='+encodeURIComponent(tz),{headers:authHeaders()});if(r.ok)_tkCost=await r.json();else _tkErr='Could not load the token cost (HTTP '+r.status+').';}catch(e){_tkErr='Could not load the token cost. Check your connection.';}
   _tkRenderCostCard();}

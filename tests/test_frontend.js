@@ -8212,6 +8212,11 @@ console.log('\n── Food log ────────────────�
     const n = G._tkCostCardHtml();
     check('token cost: no exchange rate shows no figure and says why, never a guessed amount',
       /No exchange rate for SEK/.test(n) && /–/.test(n));
+    G._flKey = {set: true, last4: 'WXYZ'}; G._flKeyChanging = false;
+    G._tkCost = {currency: 'EUR', rate: 1, currencies: ['EUR'], weeks: [wk('Week 45', 1, 0.5)], months: []};
+    check('token cost: shown in the same Settings card as the API key',
+      /Food log · API key/.test(G._flKeyCardHtml()) && /Token cost/.test(G._flKeyCardHtml()) && /Week 45/.test(G._flKeyCardHtml()));
+    check('token cost: not a card of its own', !/fl-cost-card/.test(fs.readFileSync(htmlPath, 'utf8')));
     G._tkCost = null; G._tkErr = '';
   }
   // The load and the currency save, in their own sandbox holding only this block, so the
@@ -8223,7 +8228,7 @@ console.log('\n── Food log ────────────────�
     let mode = 'ok';
     const T = vm.createContext({
       AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), JSON, Intl, encodeURIComponent,
-      _flEsc: (x) => String(x), _flSecCard: (id, label, body) => body,
+      _flEsc: (x) => String(x), _flRenderKeyCard: () => {},
       document: {getElementById: () => null},
       fetch: async (url, opt) => {
         seen.push({url, m: (opt && opt.method) || 'GET', body: opt && opt.body});
