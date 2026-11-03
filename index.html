@@ -454,6 +454,7 @@
       </div>
     </div>
     <div id="fl-key-card"></div>
+    <div id="fl-cost-card"></div>
     <div id="fl-import-card"></div>
     <div id="s-deploy-card"></div>
     <div id="s-tabs-card" style="margin-top:0"></div>
@@ -4321,6 +4322,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.336',title:'Token cost',text:'Settings → AI · Token cost shows what the AI calls on your own key cost each week and each month, in the currency you pick (EUR to start with).'},
   {v:'1.335',title:'Ask AI to change your program',text:'On Plan, tell the AI what to change: remove or swap an exercise on some or all days, add one, get a different session for today only, or an extra session when you have already trained today. It shows the change first; tap Apply to keep it. Uses your own API key from Settings.'},
   {v:'1.322',title:'Water',text:'Macros now logs water: tap + 250 ml or + 500 ml. The daily target is worked out from your body weight, sex and age, or set your own.'},
   {v:'1.309',title:'Macro targets per day',text:'Food Edit shows the targets in force on any day and lets you set them from that day onward, so the history card measures each day against the right goals. Use it to fill in the periods of an imported log.'},
@@ -4572,7 +4574,7 @@ function _flKeyCardHtml(){
 // by default (Henrik, 2026-10-22: "they should be default collapsed like all others").
 function _flSecCard(id,label,body){return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'+sSecHdr(id,label)+sSecBody(id)+'<div style="padding:14px 16px">'+body+'</div></div></div>';}
 function _flRenderKeyCard(){var el=document.getElementById('fl-key-card');if(el)el.innerHTML=_flKeyCardHtml();}
-async function buildFlKeyCard(){_flRenderImportCard();try{var r=await fetch(AGENT_URL+'/food-log/key',{headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flRenderKeyCard();}
+async function buildFlKeyCard(){_flRenderImportCard();try{var r=await fetch(AGENT_URL+'/food-log/key',{headers:authHeaders()});if(r.ok)_flKey=await r.json();}catch(e){}_flRenderKeyCard();buildTokenCostCard();}
 function flStartChange(){_flKeyChanging=true;_flErr='';_flProv=_flProvOf(_flKey&&_flKey.provider||'gemini').id;_flRenderKeyCard();}
 function flCancelChange(){_flKeyChanging=false;_flErr='';_flRenderKeyCard();}
 function _flOpenSettingsAt(id,sec){
@@ -4580,6 +4582,33 @@ function _flOpenSettingsAt(id,sec){
   else if(typeof switchTab==='function')switchTab('settings',document.getElementById('tab-btn-settings'));
   if(!_sOpen[sec])toggleSSec(sec);                    // the button opens the section it points at
   var c=document.getElementById(id);if(c&&c.scrollIntoView)c.scrollIntoView({block:'start'});}
+// Token cost (Henrik, 2026-11-03: "Both apps needs a token cost view, calculated weekly and monthly
+// token spend in users choice of currency (default EUR)"). The backend records each AI call made on
+// the user's own key (food estimates, medicine packages) and sums it per week and per month in the
+// currency chosen here; the choice is kept on the backend for every app and device.
+var _tkCost=null,_tkErr='';
+function _tkMoney(v,cur){if(v===null||v===undefined)return '–';var d=v>0&&v<1?4:2;try{return new Intl.NumberFormat('en-GB',{style:'currency',currency:cur,minimumFractionDigits:2,maximumFractionDigits:d}).format(v);}catch(e){return v.toFixed(d)+' '+cur;}}
+function _tkTok(n){n=n||0;return n>=1e6?(n/1e6).toFixed(1)+' M':n>=1e3?(n/1e3).toFixed(n>=1e4?0:1)+' k':String(n);}
+function _tkTable(title,rows,cur){var th='padding:4px 6px;font-size:11px;color:var(--muted);font-weight:600',td='padding:4px 6px;font-size:13px;color:var(--text)';
+  return '<div style="font-size:12px;font-weight:700;color:var(--text);margin:12px 0 4px">'+title+'</div><table style="width:100%;border-collapse:collapse"><tr><th style="'+th+';text-align:left"></th><th style="'+th+';text-align:right">Calls</th><th style="'+th+';text-align:right">Tokens</th><th style="'+th+';text-align:right">Cost</th></tr>'+
+  rows.map(function(r){return '<tr><td style="'+td+'">'+_flEsc(r.label)+'</td><td style="'+td+';text-align:right">'+r.calls+'</td><td style="'+td+';text-align:right">'+_tkTok((r.input_tokens||0)+(r.output_tokens||0))+'</td><td style="'+td+';text-align:right">'+_tkMoney(r.cost,cur)+'</td></tr>';}).join('')+'</table>';}
+function _tkCostCardHtml(){
+  var b;
+  if(_tkErr)b='<div style="font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_tkErr)+'</div>';
+  else if(!_tkCost)b='<div style="font-size:13px;color:var(--muted)">Loading…</div>';
+  else{var c=_tkCost,cur=c.currency;
+    b='<label style="font-size:13px;color:var(--text)">Currency <select id="tk-cur" onchange="tkSetCurrency(this.value)" style="margin-left:6px;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px">'+
+      (c.currencies||[cur]).map(function(x){return '<option'+(x===cur?' selected':'')+'>'+_flEsc(x)+'</option>';}).join('')+'</select></label>'+
+      (c.rate===null?'<div style="font-size:12px;color:var(--danger,#ff3b30);margin-top:8px">No exchange rate for '+_flEsc(cur)+' yet, so costs cannot be shown.</div>':'')+
+      _tkTable('Weekly',c.weeks||[],cur)+_tkTable('Monthly',c.months||[],cur)+
+      '<div style="font-size:11px;color:var(--muted);margin-top:8px">AI calls on your own key, at the provider\'s list prices. A free-tier key is not charged.</div>';}
+  return _flSecCard('tkcost','AI · Token cost',b);}
+function _tkRenderCostCard(){var el=document.getElementById('fl-cost-card');if(el)el.innerHTML=_tkCostCardHtml();}
+async function buildTokenCostCard(){_tkErr='';var tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}
+  try{var r=await fetch(AGENT_URL+'/token-cost?tz='+encodeURIComponent(tz),{headers:authHeaders()});if(r.ok)_tkCost=await r.json();else _tkErr='Could not load the token cost (HTTP '+r.status+').';}catch(e){_tkErr='Could not load the token cost. Check your connection.';}
+  _tkRenderCostCard();}
+async function tkSetCurrency(cur){try{var r=await fetch(AGENT_URL+'/token-cost/currency',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({currency:cur})});if(!r.ok){_tkErr='Could not save the currency (HTTP '+r.status+').';_tkRenderCostCard();return;}}catch(e){_tkErr='Could not save the currency. Check your connection.';_tkRenderCostCard();return;}
+  await buildTokenCostCard();}
 function flOpenKeySettings(){_flOpenSettingsAt('fl-key-card','flkey');}
 function flOpenImportSettings(){_flOpenSettingsAt('fl-import-card','flimport');}
 // Import an old log from a CSV or Excel file (Henrik, 2026-10-22: "an "import" feature
