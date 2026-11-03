@@ -3690,8 +3690,8 @@ console.log('\n── Bottom navbar / PLASMA GUI port ────────�
   check('content bottom padding clears fixed navbar', src.includes('padding:16px 20px 116px'));
   check('rest timer bar sits above the bottom navbar',
     src.includes('bottom:calc(64px + env(safe-area-inset-bottom,0px))'));
-  check('boot restores last page via showPage without legacy nav button',
-    !src.includes("getElementById('nav-btn-'") && src.includes("localStorage.getItem('wkt-last-page')"));
+  check('boot opens on Log via showPage without legacy nav button',
+    !src.includes("getElementById('nav-btn-'") && src.includes("showPage('log');})();"));
   check('header restyled to pep hdr (34px display title, non-sticky)',
     src.includes('.header-title{font-family:var(--font-display);font-size:34px') && !src.includes('.header{position:sticky'));
   check('weight badge label cannot wrap (KG TODAY on one line)',
