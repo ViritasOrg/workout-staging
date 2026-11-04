@@ -8492,7 +8492,7 @@ console.log('\n── Macro targets (suggested + override) ───────
   const _src = fs.readFileSync(htmlPath, 'utf8');
   const _blk = _src.slice(_src.indexOf('// ── Food log (Macros)'), _src.indexOf('// ── end food log ──'));
   check('food key: Settings carries the key card', /<div id="fl-key-card"[^>]*><\/div>/.test(_src));
-  check('  …and opening Settings loads it', /'settings'\)\{loadSettings\(\);buildFlKeyCard\(\);\}/.test(_src));
+  check('  …and opening Settings loads it', /'settings'\)\{loadSettings\(\);buildFlKeyCard\(\);/.test(_src));
   const calls = [], els = {};
   const K = vm.createContext({console, Promise, JSON, Math, String, Number, parseFloat, encodeURIComponent,
     AGENT_URL: 'https://agent', authHeaders: (x) => Object.assign({}, x || {}), confirmGlobalDelete: () => true, alert: () => {},
@@ -9450,3 +9450,121 @@ Promise.resolve(globalThis.__aiReply).then(async function(){
   check("AI cannot: the card shows the AI's sentence alone", G._pai.err === 'Day 1 has nothing hard on the shoulders, so there is nothing to change.', G._pai.err);
   G._programs = []; G._pai = G._paiFresh();
 }).catch(e => check('AI cannot checks ran', false, String(e && e.stack || e)));
+
+// ── Polestar climate (Henrik, 2026-11-04) ───────────────────────────────────
+console.log('\n── Polestar climate ───────────────────────────────────────');
+{
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const _blk = _src.slice(_src.indexOf('// ── Polestar climate (Henrik, 2026-11-04) ──'), _src.indexOf('// ── end polestar ──'));
+  check('polestar: block present', _blk.length > 1000);
+  check('polestar: nothing kept in localStorage (backend is the record)', !/localStorage\.|setData\(/.test(_blk));
+  check('polestar: staging only until Henrik says go', /var POLESTAR_ON=IS_STAGING;/.test(_blk));
+  check('polestar: Settings carries the card', /<div id="ps-card"><\/div>/.test(_src));
+  check('polestar: opening Settings loads it', /'settings'\)\{loadSettings\(\);buildFlKeyCard\(\);buildPolestarCard\(\);\}/.test(_src));
+  check('polestar: every set input reaches the check', /function _onLogInput\(e\)\{[^}]*_psCheck\(e\.target\)/.test(_src));
+
+  // A tiny DOM: cards of reps inputs, and the log's date/day selects.
+  const mkInp = v => ({ dataset: { type: 'reps' }, value: v });
+  const mkCard = inps => ({ querySelectorAll: () => inps });
+  function ctx(opts) {
+    const calls = [], asked = [], alerts = [], els = {};
+    const cards = opts.cards;
+    els['structured-log'] = { querySelectorAll: () => cards };
+    els['log-date'] = { value: '2026-11-04' }; els['log-day'] = { value: opts.day || '3' };
+    const C = vm.createContext({ console, Promise, JSON, Math, String, Number, parseInt, isFinite,
+      IS_STAGING: opts.staging !== false, AGENT_URL: 'https://agent',
+      authHeaders: x => Object.assign({}, x || {}), confirmGlobalDelete: () => opts.del !== false,
+      sSecHdr: (id, l) => '<h>' + l + '</h>', sSecBody: id => '<div>',
+      _escP: x => String(x),
+      confirm: m => { asked.push(m); return opts.yes !== false; }, alert: m => alerts.push(m),
+      navigator: { geolocation: { getCurrentPosition: (ok) => ok({ coords: { latitude: 60.1699, longitude: 24.9384 } }) } },
+      document: { getElementById: id => els[id] || null },
+      fetch: async (url, o) => { calls.push({ url, method: (o && o.method) || 'GET', body: o && o.body });
+        if (url.startsWith('https://api.open-meteo.com/')) return { ok: true, json: async () => ({ current: { temperature_2m: opts.temp } }) };
+        if (url === 'https://agent/polestar' && (!o || !o.method)) return { ok: true, json: async () => opts.creds || { set: true, email: 'me@x.com' } };
+        if (url === 'https://agent/polestar/climate') return { ok: true, json: async () => opts.answer || { ok: true, status: 'SUCCESS', message: '' } };
+        if (url === 'https://agent/polestar' && o.method === 'PUT') return opts.putFail ? { ok: false, status: 400, json: async () => ({ detail: 'Polestar did not accept that email and password' }) } : { ok: true, json: async () => ({ set: true, email: 'me@x.com' }) };
+        if (url === 'https://agent/polestar' && o.method === 'DELETE') return { ok: true, json: async () => ({ set: false, email: '' }) };
+        return { ok: false, status: 404, json: async () => ({}) }; } });
+    vm.runInContext(_blk, C);
+    return { C, calls, asked, alerts, els };
+  }
+  const threeSets = () => { const r = [mkInp('8'), mkInp(''), mkInp('')]; return { r, cards: [mkCard([mkInp('5')]), mkCard(r)] }; };
+
+  (async () => {
+    {
+      const { C } = ctx({ cards: [] });
+      check('polestar: under 10 °C and over 22 °C ask, 10–22 does not',
+        C._psNeedsClimate(9.9) && C._psNeedsClimate(22.1) && !C._psNeedsClimate(10) && !C._psNeedsClimate(22) && !C._psNeedsClimate(null));
+    }
+    {
+      const { r, cards } = threeSets(); const { C } = ctx({ cards });
+      r[1].value = '8';
+      check('polestar: the trigger is the second-to-last set of the last exercise', C._psIsTrigger(r[1]));
+      check('  …not the last set', (r[2].value = '8', !C._psIsTrigger(r[2])));
+      check('  …not another exercise', !C._psIsTrigger(cards[0].querySelectorAll()[0]));
+      r[1].value = ''; check('  …and only once it holds a number', !C._psIsTrigger(r[1]));
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 4.2 });
+      r[1].value = '8'; await t.C._psCheck(r[1]);
+      check('polestar: cold outside asks, with the temperature', t.asked.length === 1 && /4 °C outside/.test(t.asked[0]) && /Polestar climate/.test(t.asked[0]));
+      check('  …yes starts climate on the backend', t.calls.some(c => c.url === 'https://agent/polestar/climate' && c.method === 'POST'));
+      check('  …and says it is on', t.alerts[0] === 'Polestar climate is on.');
+      check('  …the weather is read at the phone\'s location', t.calls.some(c => /latitude=60\.170&longitude=24\.938&current=temperature_2m/.test(c.url)));
+      await t.C._psCheck(r[1]);
+      check('  …asked once per workout, not on every keystroke', t.asked.length === 1);
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 15 });
+      r[1].value = '8'; await t.C._psCheck(r[1]);
+      check('polestar: 15 °C does not ask and starts nothing', t.asked.length === 0 && !t.calls.some(c => /climate/.test(c.url)));
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 30, yes: false });
+      r[1].value = '8'; await t.C._psCheck(r[1]);
+      check('polestar: hot asks too, and no starts nothing', t.asked.length === 1 && !t.calls.some(c => /climate/.test(c.url)));
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, creds: { set: false, email: '' } });
+      r[1].value = '8'; await t.C._psCheck(r[1]);
+      check('polestar: without a Polestar ID it never asks or reads the location', t.asked.length === 0 && !t.calls.some(c => /open-meteo/.test(c.url)));
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, staging: false });
+      r[1].value = '8'; await t.C._psCheck(r[1]);
+      check('polestar: off outside staging (no calls at all)', t.calls.length === 0 && t.asked.length === 0);
+      t.els['ps-card'] = { innerHTML: 'x' }; t.C._psRender(); check('  …and no Settings card', t.els['ps-card'].innerHTML === '');
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, answer: { ok: false, status: 'CAR_OFFLINE', message: '' } });
+      r[1].value = '8'; await t.C._psCheck(r[1]);
+      check('polestar: the car\'s refusal is shown', /did not start: the car answered CAR_OFFLINE/.test(t.alerts[0] || ''));
+    }
+    {
+      const t = ctx({ cards: [], creds: { set: false, email: '' } });
+      t.els['ps-card'] = { innerHTML: '' };
+      await t.C.buildPolestarCard();
+      check('polestar card: asks for email and password', /id="ps-email"/.test(t.els['ps-card'].innerHTML) && /type="password"/.test(t.els['ps-card'].innerHTML) && /psSave\(\)/.test(t.els['ps-card'].innerHTML));
+      t.els['ps-email'] = { value: ' me@x.com ' }; t.els['ps-pw'] = { value: 'pw' };
+      await t.C.psSave();
+      const put = t.calls.find(c => c.method === 'PUT');
+      check('polestar card: Save sends both to the backend', put && JSON.stringify(JSON.parse(put.body)) === JSON.stringify({ email: 'me@x.com', password: 'pw' }));
+      check('  …then shows who is signed in, never the password', /Signed in as me@x\.com/.test(t.els['ps-card'].innerHTML) && !/pw"/.test(t.els['ps-card'].innerHTML) && /psRemove\(\)/.test(t.els['ps-card'].innerHTML));
+      await t.C.psRemove();
+      check('polestar card: Remove deletes it on the backend', t.calls.some(c => c.method === 'DELETE') && /id="ps-email"/.test(t.els['ps-card'].innerHTML));
+    }
+    {
+      const t = ctx({ cards: [], creds: { set: false, email: '' }, putFail: true });
+      t.els['ps-card'] = { innerHTML: '' }; await t.C.buildPolestarCard();
+      t.els['ps-email'] = { value: 'me@x.com' }; t.els['ps-pw'] = { value: 'bad' };
+      await t.C.psSave();
+      check('polestar card: Polestar refusing the login is shown', /did not accept that email and password/.test(t.els['ps-card'].innerHTML));
+    }
+    {
+      const t = ctx({ cards: [], del: false });
+      t.els['ps-card'] = { innerHTML: '' }; await t.C.buildPolestarCard(); await t.C.psRemove();
+      check('polestar card: Remove goes through the global-delete confirmation', !t.calls.some(c => c.method === 'DELETE'));
+    }
+  })().catch(e => { check('polestar: tests ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}

@@ -882,6 +882,23 @@ its questions: *"Remove rest timers. 1 yes 2 no remove the timers totally 3 yes 
   showing under the clock (the app asks for a see-through `black-translucent` status bar).
 - Set inputs are 16px so iOS does not zoom when one is tapped.
 
+### Polestar climate from the Log (rule 2026-11-04)
+Henrik: *"if the current outside temperature at my location is under 10deg C or over 22deg C, I want the Workout app
+to ask me if i want to turn on Polestar ventilation when I enter a value in the second to last set of the days last
+exercise … in settigns we need to add a Polestar card where a user can add their credentials."*
+
+- The block between `// ── Polestar climate (Henrik, 2026-11-04) ──` and `// ── end polestar ──` in `index.html`.
+  `_onLogInput` hands every set input to `_psCheck`; it fires on the reps box of the **second-to-last set of the last
+  exercise card**, once it holds a number, at most once per workout (log date + day).
+- The temperature is Open-Meteo's `current.temperature_2m` at the phone's location (`navigator.geolocation`); below
+  `PS_COLD_C` (10) or above `PS_HOT_C` (22) it asks "Turn on Polestar climate?", and yes calls `POST /polestar/climate`
+  (claude-agent-backend `routers/polestar.py`, which starts climate at 21 °C).
+- Settings → **Polestar** card (`#ps-card`): the Polestar ID email and password go to `PUT /polestar`, which checks
+  them with Polestar before saving; Remove goes through `confirmGlobalDelete`. Nothing is kept in localStorage.
+- **Staging only** (`POLESTAR_ON=IS_STAGING`) until Henrik has tried it end to end and says go. Switching it on for
+  production is its own change, and that change adds the `WHATS_NEW` row (none until then, or production would
+  announce a feature it does not show).
+
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
 day containing a pressing movement (bench/incline/OHP/dips/chest-or-landmine press) — **even in
