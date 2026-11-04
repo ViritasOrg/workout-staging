@@ -9458,7 +9458,8 @@ console.log('\n── Polestar climate ─────────────�
   const _blk = _src.slice(_src.indexOf('// ── Polestar climate (Henrik, 2026-11-04) ──'), _src.indexOf('// ── end polestar ──'));
   check('polestar: block present', _blk.length > 1000);
   check('polestar: nothing kept in localStorage (backend is the record)', !/localStorage\.|setData\(/.test(_blk));
-  check('polestar: staging only until Henrik says go', /var POLESTAR_ON=IS_STAGING;/.test(_blk));
+  // Henrik, 2026-11-04: "I push stage to prod, then all features must be available in prod!"
+  check('polestar: no staging gate (Push to Prod ships it)', !/IS_STAGING/.test(_blk) && !/POLESTAR_ON/.test(_blk));
   check('polestar: Settings carries the card', /<div id="ps-card"><\/div>/.test(_src));
   check('polestar: opening Settings loads it', /'settings'\)\{loadSettings\(\);buildFlKeyCard\(\);buildPolestarCard\(\);\}/.test(_src));
   check('polestar: the header car is checked at start and after sign-in', /syncWorkoutDraftFromAgent\(\);syncPolestarCar\(\);\}else/.test(_src) && /\}\)\(\);syncPolestarCar\(\);checkAgentStatus\(\)/.test(_src));
@@ -9573,8 +9574,8 @@ console.log('\n── Polestar climate ─────────────�
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, staging: false });
       r[1].value = '8'; await t.C._psCheck(r[1]);
-      check('polestar: off outside staging (no calls at all)', t.calls.length === 0 && !t.open.has('psModal'));
-      t.els['ps-card'] = { innerHTML: 'x' }; t.C._psRender(); check('  …and no Settings card', t.els['ps-card'].innerHTML === '');
+      check('polestar: in prod it asks on a cold day, as on staging', t.open.has('psModal') && t.calls.some(c => /open-meteo/.test(c.url)));
+      t.els['ps-card'] = { innerHTML: '' }; await t.C.buildPolestarCard(); check('  …and prod has the Settings card', /Polestar/.test(t.els['ps-card'].innerHTML));
     }
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, answer: { ok: false, status: 'CAR_OFFLINE', message: '' } });
@@ -9609,7 +9610,7 @@ console.log('\n── Polestar climate ─────────────�
     {
       const t = ctx({ cards: [], staging: false });
       await t.C.syncPolestarCar();
-      check('polestar: no car outside staging', t.els['hdr-car'].hidden === true && t.calls.length === 0);
+      check('polestar: prod shows the grey car for a saved Polestar ID', t.els['hdr-car'].hidden === false && /ps-car-off/.test(t.els['hdr-car'].innerHTML));
     }
     {
       const t = ctx({ cards: [], creds: { set: false, email: '' } });
@@ -9639,4 +9640,40 @@ console.log('\n── Polestar climate ─────────────�
       check('polestar card: Remove goes through the global-delete confirmation', !t.calls.some(c => c.method === 'DELETE'));
     }
   })().catch(e => { check('polestar: tests ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+}
+
+// ── Push to Prod ships every feature: no feature is gated to staging (Henrik, 2026-11-04) ──
+// "I push stage to prod, then all features must be available in prod!" Polestar shipped behind
+// `POLESTAR_ON=IS_STAGING`, Henrik pushed to prod and the card was not there. IS_STAGING may only
+// switch ENVIRONMENT plumbing (data namespace, URLs, the Deploy and stage-copy cards) or a test
+// tool Henrik asked for as staging-only. Every use is listed here; a new one fails until it is
+// one of those and is added with its reason.
+console.log('\n── No feature is gated to staging ─────────────────────────');
+{
+  const _fs = require('fs'), _path = require('path');
+  const _dir = _path.dirname(_path.resolve(htmlPath));
+  const _files = [_path.resolve(htmlPath)].concat(_fs.readdirSync(_dir).filter(f => /\.js$/.test(f)).map(f => _path.join(_dir, f)));
+  const ALLOWED = [
+    /const IS_STAGING=\(window\.location\.pathname/,                 // the switch itself
+    /const APP_ID=IS_STAGING\?'stage':''/,                            // staging's own data namespace
+    /if\(IS_STAGING\)\{var _S='staging:'/,                           // staging's own localStorage keys
+    /IS_STAGING\?\{storage:/,                                         // Storage inspector (test tool)
+    /if\(IS_STAGING\)\{card\.innerHTML='';return;\}/,                // prod→stage copy card, prod only
+    /env='\+\(\(typeof IS_STAGING/,                                   // environment name in a debug report
+    /if\(IS_STAGING\)buildDeployCard\(\)|s-deploy-card/,              // the Push to Prod card itself
+    /fetch\(\(IS_STAGING\?'https:\/\/viritasorg\.github\.io\//,       // each app's own version.json
+    /if\(!IS_STAGING\|\|localStorage\.getItem\('wk-bf-isol-v1'\)\)/, // staging data isolation migration
+    /s-injbody-row|_injBodyOverrideFor\(typeof IS_STAGING/,           // body-figure override, "On stage only" (Henrik, 2026-10-14)
+    /Staging only, via IS_STAGING|DEBUG DUMP · STAGING ONLY/,         // T-Calc debug dump (test tool)
+  ];
+  const bad = [];
+  _files.forEach(f => {
+    const src = _fs.readFileSync(f, 'utf8'); let i = -1;
+    while ((i = src.indexOf('IS_STAGING', i + 1)) >= 0) {
+      const win = src.slice(Math.max(0, i - 80), i + 400);
+      if (!ALLOWED.some(re => re.test(win))) bad.push(_path.basename(f) + ': …' + src.slice(Math.max(0, i - 40), i + 60).replace(/\s+/g, ' ') + '…');
+    }
+  });
+  check('every IS_STAGING use is environment plumbing or a listed test tool, never a feature gate',
+    bad.length === 0, 'Push to Prod must ship every feature. Remove the gate:\n      ' + bad.join('\n      '));
 }

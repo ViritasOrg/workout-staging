@@ -908,9 +908,9 @@ exercise … in settigns we need to add a Polestar card where a user can add the
   after 30 s.
 - Settings → **Polestar** card (`#ps-card`): the Polestar ID email and password go to `PUT /polestar`, which checks
   them with Polestar before saving; Remove goes through `confirmGlobalDelete`. Nothing is kept in localStorage.
-- **Staging only** (`POLESTAR_ON=IS_STAGING`) until Henrik has tried it end to end and says go. Switching it on for
-  production is its own change, and that change adds the `WHATS_NEW` row (none until then, or production would
-  announce a feature it does not show).
+- **In staging and prod alike** (Henrik, 2026-11-04: "I push stage to prod, then all features must be available in
+  prod!"). It shipped staging-only behind `POLESTAR_ON=IS_STAGING` and was missing after his Push to Prod; the flag is
+  gone and its `WHATS_NEW` row (1.349) went in with the fix.
 - **No BMW, no Tesla** (Henrik, 2026-11-04, after Polestar worked end to end: "it all works great", then "skip Tesla").
   BMW: no outside app can start climate any more; CarData is read-only and BMW closed the MyBMW backend to third parties
   on 2025-09-29 (community sources; BMW's own docs page did not render). Tesla: possible through the Fleet API (signed
@@ -1408,6 +1408,21 @@ touched only `CLAUDE.md` or other non-app files, what Pages serves is unchanged 
 `version.json` still matches the live build: leave it, do not force a bump for a docs
 change. If it touched `index.html` or a `tab-*.js`, the deploy did not happen — say so
 plainly rather than reporting the change as live.
+
+## ⚠️ PUSH TO PROD SHIPS EVERYTHING — NO FEATURE IS GATED TO STAGING ⚠️
+Henrik, 2026-11-04: *"I push stage to prod, then all features must be available in prod!"* and *"update claude md to
+make sure you dont fail like this again"*. Polestar climate shipped behind `POLESTAR_ON=IS_STAGING`; he tested it on
+staging, pressed Push to Prod, and prod had no Polestar card.
+
+- **Staging is the test bed and Push to Prod is Henrik's go.** For these apps that IS the org rule "Nothing half-built is
+  ever visible": a feature is built and tested on staging, and pressing Push to Prod ships it. Never add a second gate.
+- **`IS_STAGING` switches environment plumbing only**: the data namespace (`APP_ID`, the localStorage prefix), each app's
+  own URLs, the Deploy card and the prod→stage copy card, and test tools Henrik asked for as staging-only (Storage
+  inspector, T-Calc debug dump, the body-figure override). Never a user feature, never "until Henrik says go".
+- A feature that must not reach prod yet is not merged to staging `main`, or is merged switched off for both.
+- `tests/test_frontend.js` lists every allowed `IS_STAGING` use and fails on any other ("No feature is gated to
+  staging"). A red there means remove the gate, not extend the list; a new test tool is added only when Henrik asked
+  for it as staging-only, with his words beside it.
 
 ## Promotion to prod — Claude must NOT trigger this
 **Prod has its own version number** (Henrik, 2026-11-04: "production is on 251 dont mix the stage and prod versions").
