@@ -1565,14 +1565,14 @@ function _aiEx(e){
 // Pure: the operations applied to a copy of prog. Returns {prog, oneOff, lines, errors}; prog is
 // null when nothing in the program changes. Any error blocks the whole change.
 function _applyAiOps(prog,ops,today,catalogue,extraDay){
-  var cp=JSON.parse(JSON.stringify(prog)),changed=false,oneOff=null,lines=[],errors=[];
+  var cp=JSON.parse(JSON.stringify(prog)),changed=false,oneOff=null,lines=[],errors=[],said=[];
   var known={};(catalogue||[]).forEach(function(n){known[n.toLowerCase()]=n;});
   cp.days.forEach(function(d){(d.exercises||[]).forEach(function(x){known[String(x.name).toLowerCase()]=x.name;});});
   function real(n){return known[String(n||'').trim().toLowerCase()]||null;}
   function dayNames(ds){return ds.map(function(i){return cp.days[i-1].name;}).join(', ');}
   function inDays(name,ds){var lc=String(name).trim().toLowerCase();return ds.filter(function(i){var d=cp.days[i-1];return d&&(d.exercises||[]).some(function(x){return String(x.name).toLowerCase()===lc;});});}
   (ops||[]).forEach(function(o){
-    if(o.op==='cannot'){errors.push(o.title||'The AI could not make that change.');return;}
+    if(o.op==='cannot'){said.push(o.title||'The AI could not make that change.');return;}   // an answer, not an error
     if(o.op==='remove'||o.op==='replace'){
       var hit=inDays(o.exercise,o.days||[]);
       if(!hit.length){errors.push(o.exercise+' is not in '+((o.days||[]).length?dayNames((o.days||[]).filter(function(i){return cp.days[i-1];})):'the program')+'.');return;}
@@ -1600,7 +1600,7 @@ function _applyAiOps(prog,ops,today,catalogue,extraDay){
       lines.push('Extra session today, the program stays where it is: '+(o.title||'extra session'));
       exs.forEach(function(x){lines.push('  • '+x.name+' '+x.scheme);});}
   });
-  return{prog:changed?cp:null,oneOff:oneOff,lines:lines,errors:errors};
+  return{prog:changed?cp:null,oneOff:oneOff,lines:lines,errors:errors,said:said};
 }
 function _progAiHtml(){
   var b='<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:8px">Tell the AI what to change in your active program, or ask for a different session today only. It runs on your own API key (Settings, Food log · API key). Nothing changes until you tap Apply.</div>'+
@@ -1651,7 +1651,7 @@ async function progAiAsk(turn){
     if(!r.ok){_pai.err=(j&&typeof j.detail==='string')?j.detail:'The AI request failed (HTTP '+r.status+').';if(r.status!==422)back();}
     else{var plan=_applyAiOps(prog,j.ops,today,cat,_extraDay());
       if(plan.errors.length)_pai.err=plan.errors.join(' ')+' Nothing was changed.';
-      else if(!plan.prog&&!plan.oneOff)_pai.err='The AI found nothing to change.';
+      else if(!plan.prog&&!plan.oneOff)_pai.err=plan.said.join(' ')||'The AI found nothing to change.';
       else _pai.plan=plan;}
   }catch(e){_pai.err='Could not reach the server. Check your connection.';back();}
   _pai.busy=false;_renderProgAi();
