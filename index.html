@@ -455,6 +455,7 @@
     </div>
     <div id="fl-key-card"></div>
     <div id="fl-import-card"></div>
+    <div id="ps-card"></div>
     <div id="s-deploy-card"></div>
     <div id="s-tabs-card" style="margin-top:0"></div>
     <div id="s-appearance-card"></div>
@@ -1398,7 +1399,7 @@ function _diagRenderInto(host){
 function buildStoragePage(){var _el=document.getElementById('page-storage');if(!_el)return;var _esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};_lsDbgKeys=[];for(var _di=0;_di<localStorage.length;_di++){var _dk=localStorage.key(_di);if(_dk!=null)_lsDbgKeys.push(_dk);}_lsDbgKeys.sort();var _rows=_lsDbgKeys.map(function(k,i){var _raw=localStorage.getItem(k)||'';var _extra='';try{var _pv=JSON.parse(_raw);if(Array.isArray(_pv))_extra='array · '+_pv.length+' items';else if(_pv!==null&&typeof _pv==='object')_extra='object · '+Object.keys(_pv).length+' keys';else _extra=typeof _pv;}catch(e){_extra='string';}var _trunc=_raw.length>300;var _disp=_trunc?_raw.slice(0,300)+'…':_raw;return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">'+'<div><span style="font-family:monospace;font-size:12px;color:var(--accent);font-weight:600">'+_esc(k)+'</span><span style="font-size:10px;color:var(--muted);margin-left:8px">'+_esc(_extra)+'</span></div>'+'<button onclick="lsDbgCopy('+i+')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 10px;font-size:10px;cursor:pointer;font-family:inherit;flex-shrink:0">Copy</button>'+'</div>'+'<pre style="font-family:monospace;font-size:10px;color:var(--muted);white-space:pre-wrap;word-break:break-all;margin:0;line-height:1.4;max-height:100px;overflow:hidden">'+_esc(_disp)+'</pre>'+'</div>';}).join('');_el.innerHTML='<div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:13px;color:var(--muted)">'+_lsDbgKeys.length+' keys in localStorage</div><div style="display:flex;gap:8px"><button onclick="buildStoragePage()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Refresh</button><button onclick="lsDbgCopyAll()" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Copy All</button></div></div>'+_rows+'</div>';_diagRenderInto(_el);}
 function lsDbgCopy(i){var k=_lsDbgKeys[i];if(k==null)return;var v=localStorage.getItem(k)||'';var out={};try{out[k]=JSON.parse(v);}catch(e){out[k]=v;}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
 function lsDbgCopyAll(){var out={};for(var _ci=0;_ci<localStorage.length;_ci++){var _ck=localStorage.key(_ci);if(!_ck)continue;var _cv=localStorage.getItem(_ck)||'';try{out[_ck]=JSON.parse(_cv);}catch(e){out[_ck]=_cv;}}navigator.clipboard.writeText(JSON.stringify(out,null,2)).catch(function(){});}
-function showPage(name,btn){localStorage.setItem('wkt-last-page',name);_currentPage=name;var _pr=primaryOf(name);if(_pr){_currentPrimary=_pr;_lastSub[_pr]=name;try{localStorage.setItem('wkt-last-sub-'+_pr,name);}catch(e){}_setPrimaryActive(_pr);_applySubtabVis(_pr);}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs .tab').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');var _tb=document.getElementById('tab-btn-'+name);if(_tb)_tb.classList.add('active');if(name==='macros'){buildWkMacroTargets();buildWaterLog();buildFoodLog();}if(name==='foodedit')buildFoodEdit();if(name==='today'||name==='plan')buildProgramSettingsCard();if(name==='today')buildWhatsNewCard();if(name==='history')renderHistory();if(name==='progress')renderProgress();if(name==='settings'){loadSettings();buildFlKeyCard();}if(name==='storage')buildStoragePage();if(name==='log'){var _lc=document.getElementById('structured-log');var _hasReps=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});var _curDay=parseInt(document.getElementById('log-day').value)||0;
+function showPage(name,btn){localStorage.setItem('wkt-last-page',name);_currentPage=name;var _pr=primaryOf(name);if(_pr){_currentPrimary=_pr;_lastSub[_pr]=name;try{localStorage.setItem('wkt-last-sub-'+_pr,name);}catch(e){}_setPrimaryActive(_pr);_applySubtabVis(_pr);}document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs .tab').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');var _tb=document.getElementById('tab-btn-'+name);if(_tb)_tb.classList.add('active');if(name==='macros'){buildWkMacroTargets();buildWaterLog();buildFoodLog();}if(name==='foodedit')buildFoodEdit();if(name==='today'||name==='plan')buildProgramSettingsCard();if(name==='today')buildWhatsNewCard();if(name==='history')renderHistory();if(name==='progress')renderProgress();if(name==='settings'){loadSettings();buildFlKeyCard();buildPolestarCard();}if(name==='storage')buildStoragePage();if(name==='log'){var _lc=document.getElementById('structured-log');var _hasReps=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});var _curDay=parseInt(document.getElementById('log-day').value)||0;
     // Re-prefill when the on-screen log was built under a now-stale deload or unit
     // state (both toggles live outside the Log page, so their inline re-prefill only
     // fires when Log is already open). Never blow away a log with reps entered.
@@ -3892,7 +3893,7 @@ function _renderGearChip(card){var el=card&&card.querySelector&&card.querySelect
 function _updateLogProgress(){var c=document.getElementById('structured-log');if(!c)return;var cards=Array.prototype.slice.call(c.querySelectorAll('.ex-card'));var n=0;
   cards.forEach(function(card){var r=Array.prototype.slice.call(card.querySelectorAll('input[data-type="reps"]'));var d=r.length>0&&r.every(function(i){return parseInt(i.value)>0;});if(d){n++;card.classList.add('ex-done');}else card.classList.remove('ex-done');});
   var el=document.getElementById('log-progress');if(el)el.textContent=cards.length?(n+' of '+cards.length+' exercises done'):'';return n;}
-function _onLogInput(){scheduleDraft();_updateLogProgress();}
+function _onLogInput(e){scheduleDraft();_updateLogProgress();if(e&&e.target)_psCheck(e.target);}
 // ⋯ menu: Swap, the equipment toggles, Remove. The toggles are the card's own (hidden) gear buttons, clicked for you.
 var _exMenuBtn=null;
 var _GEAR_LBL=[['data-gear','Machine gearing (½)','gear',0.5],['data-gear2','Two cable stacks','gear2',2],['data-db','Two dumbbells','db',2]];
@@ -4786,6 +4787,73 @@ async function flEditDelete(id){if(!confirmGlobalDelete('this food entry'))retur
   try{var r=await fetch(AGENT_URL+'/food-log/'+encodeURIComponent(id),{method:'DELETE',headers:authHeaders()});if(!r.ok){alert('Not deleted: the server answered '+r.status+'.');return;}}catch(e){alert('Not deleted: could not reach the server.');return;}
   buildFoodEdit(_flEditDate);}
 // ── end food log ──
+// ── Polestar climate (Henrik, 2026-11-04) ──
+// "if the current outside temperature at my location is under 10deg C or over 22deg C, I want the Workout app to ask
+// me if i want to turn on Polestar ventilation when I enter a value in the second to last set of the days last
+// exercise … in settings we need to add a Polestar card where a user can add their credentials."
+// The backend (/polestar, claude-agent-backend routers/polestar.py) keeps the Polestar ID and talks to Polestar;
+// nothing is stored on the phone. The outside temperature comes from Open-Meteo at the phone's location.
+// Staging only until Henrik has tried it and says go (org rule: nothing half-built is ever visible).
+var POLESTAR_ON=IS_STAGING;
+var PS_COLD_C=10,PS_HOT_C=22;
+var _ps=null,_psErr='',_psChanging=false,_psAsked='';
+function _psNeedsClimate(t){return typeof t==='number'&&isFinite(t)&&(t<PS_COLD_C||t>PS_HOT_C);}
+// The reps input of the second-to-last set of the day's last exercise card, once it holds a number.
+function _psIsTrigger(inp){
+  if(!inp||!inp.dataset||inp.dataset.type!=='reps'||!(parseInt(inp.value)>0))return false;
+  var c=document.getElementById('structured-log');if(!c)return false;
+  var cards=c.querySelectorAll('.ex-card');if(!cards.length)return false;
+  var reps=cards[cards.length-1].querySelectorAll('input[data-type="reps"]');
+  return reps.length>=2&&reps[reps.length-2]===inp;}
+function _psWorkoutKey(){var d=document.getElementById('log-date'),y=document.getElementById('log-day');return (d?d.value:'')+'|'+(y?y.value:'');}
+function _psPosition(){return new Promise(function(res){
+  if(typeof navigator==='undefined'||!navigator.geolocation)return res(null);
+  navigator.geolocation.getCurrentPosition(function(p){res(p&&p.coords?{lat:p.coords.latitude,lon:p.coords.longitude}:null);},
+    function(){res(null);},{timeout:10000,maximumAge:1800000});});}
+// Open-Meteo forecast API, current=temperature_2m → current.temperature_2m in °C (https://open-meteo.com/en/docs).
+async function _psOutsideTemp(){var pos=await _psPosition();if(!pos)return null;
+  try{var r=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+pos.lat.toFixed(3)+'&longitude='+pos.lon.toFixed(3)+'&current=temperature_2m');
+    if(!r.ok)return null;var j=await r.json();var t=j&&j.current?j.current.temperature_2m:null;return typeof t==='number'?t:null;}catch(e){return null;}}
+async function _psLoad(){try{var r=await fetch(AGENT_URL+'/polestar',{headers:authHeaders()});_ps=r.ok?await r.json():null;}catch(e){_ps=null;}return _ps;}
+// Asked at most once per workout (date + day); a second keystroke in the same box does not ask again.
+async function _psCheck(inp){
+  if(!POLESTAR_ON||!_psIsTrigger(inp))return;
+  var key=_psWorkoutKey();if(_psAsked===key)return;_psAsked=key;
+  var st=_ps&&_ps.set?_ps:await _psLoad();if(!st||!st.set)return;
+  var t=await _psOutsideTemp();if(!_psNeedsClimate(t))return;
+  if(!confirm('It is '+Math.round(t)+' °C outside.\n\nTurn on Polestar climate?'))return;
+  alert(await _psStart());}
+async function _psStart(){
+  try{var r=await fetch(AGENT_URL+'/polestar/climate',{method:'POST',headers:authHeaders()});var j=await r.json().catch(function(){return{};});
+    if(r.ok&&j.ok)return 'Polestar climate is on.';
+    return 'Polestar climate did not start: '+(j.detail||(j.status?'the car answered '+j.status:'unknown error'))+'.';}
+  catch(e){return 'Polestar climate did not start: could not reach the server.';}}
+// Settings card, collapsed by default like the others.
+function _psInputs(){var st='width:100%;box-sizing:border-box;margin:6px 0;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px';
+  return '<input id="ps-email" type="email" autocomplete="username" placeholder="Polestar ID email" value="'+_escP(_ps&&_ps.email||'')+'" style="'+st+'">'
+    +'<input id="ps-pw" type="password" autocomplete="current-password" placeholder="Polestar ID password" style="'+st+'">';}
+function _psBtn(label,onclick,primary){return '<button onclick="'+onclick+'" style="flex:1;margin-top:6px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-ui);'+(primary?'background:var(--accent);color:#000;border:none':'background:var(--surface2);color:var(--text);border:1px solid var(--border)')+'">'+label+'</button>';}
+function _psCardHtml(){var b;
+  if(!_ps)b='<div style="font-size:13px;color:var(--muted)">Could not load your Polestar status. Check your connection.</div>';
+  else if(!_ps.set||_psChanging)b='<div style="font-size:13px;color:var(--text);line-height:1.5">Sign in with your Polestar ID, the one you use in the Polestar app. When it is under '+PS_COLD_C+' °C or over '+PS_HOT_C+' °C outside, the Log asks to turn on the car\'s climate as you enter the second-to-last set of the day\'s last exercise.</div>'
+    +_psInputs()+'<div style="display:flex;gap:8px">'+_psBtn('Save','psSave()',true)+(_psChanging?_psBtn('Cancel','psCancel()',false):'')+'</div>';
+  else b='<div style="font-size:13px;color:var(--text)">Signed in as '+_escP(_ps.email)+'</div><div style="display:flex;gap:8px;margin-top:6px">'+_psBtn('Change','psChange()',true)+_psBtn('Remove','psRemove()',false)+'</div>';
+  if(_psErr)b+='<div style="margin-top:10px;font-size:13px;color:var(--danger,#ff3b30)">'+_escP(_psErr)+'</div>';
+  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'+sSecHdr('polestar','Polestar')+sSecBody('polestar')+'<div style="padding:14px 16px">'+b+'</div></div></div>';}
+function _psRender(){var el=document.getElementById('ps-card');if(el)el.innerHTML=POLESTAR_ON?_psCardHtml():'';}
+async function buildPolestarCard(){if(!POLESTAR_ON)return _psRender();await _psLoad();_psRender();}
+function psChange(){_psChanging=true;_psErr='';_psRender();}
+function psCancel(){_psChanging=false;_psErr='';_psRender();}
+async function psSave(){var e=document.getElementById('ps-email'),p=document.getElementById('ps-pw');
+  var email=e?String(e.value||'').trim():'',pw=p?String(p.value||''):'';if(!email||!pw){_psErr='Enter both the email and the password.';return _psRender();}
+  _psErr='Checking with Polestar…';_psRender();
+  try{var r=await fetch(AGENT_URL+'/polestar',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({email:email,password:pw})});var j=await r.json().catch(function(){return{};});
+    if(!r.ok){_psErr=j.detail||('Could not save (error '+r.status+').');return _psRender();}_ps=j;_psChanging=false;_psErr='';}
+  catch(err){_psErr='Could not reach the server. Check your connection and try again.';}
+  _psRender();}
+async function psRemove(){if(!confirmGlobalDelete('your Polestar ID (the Log stops asking about climate until you add it again)'))return;
+  try{var r=await fetch(AGENT_URL+'/polestar',{method:'DELETE',headers:authHeaders()});if(r.ok)_ps=await r.json();}catch(e){}_psChanging=false;_psRender();}
+// ── end polestar ──
 // ── Water (Macros) ────────────────────────────────────────────────────────────
 // Henrik, 2026-11-01: "add water intake to macros tracking". The same block is in Peptide
 // Tracker and Workout, which share one log on the backend (/water-log). The daily target is
