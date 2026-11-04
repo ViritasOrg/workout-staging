@@ -898,8 +898,8 @@ exercise … in settigns we need to add a Polestar card where a user can add the
   climate…** (cannot be closed while the car answers) → **Climate is on** or **Climate did not start** with the reason.
 - While climate runs, a **red car with a heat (orange waves) or AC (blue snowflake) symbol** sits in the header
   (`#hdr-car`, `_psCarSvg`; Henrik: "In the main app view a red car with a heating/ac symbol should be shown"). The app
-  asks `GET /polestar/climate` every 3 minutes and removes it when the car is neither active nor starting, or after an
-  hour; tapping it reopens the card.
+  asks `GET /polestar/climate` every 3 minutes and removes it when the car is neither active nor starting, or after
+  30 minutes, since Polestar runs climate for 30 minutes (Henrik, 2026-11-04); tapping it reopens the card.
 - Settings → **Polestar** card (`#ps-card`): the Polestar ID email and password go to `PUT /polestar`, which checks
   them with Polestar before saving; Remove goes through `confirmGlobalDelete`. Nothing is kept in localStorage.
 - **Staging only** (`POLESTAR_ON=IS_STAGING`) until Henrik has tried it end to end and says go. Switching it on for
