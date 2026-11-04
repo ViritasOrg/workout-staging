@@ -1410,6 +1410,11 @@ change. If it touched `index.html` or a `tab-*.js`, the deploy did not happen â€
 plainly rather than reporting the change as live.
 
 ## Promotion to prod â€” Claude must NOT trigger this
+**Prod has its own version number** (Henrik, 2026-11-04: "production is on 251 dont mix the stage and prod versions").
+The promotion resets `const VERSION` in the promoted `index.html` to prod's own `version.json`, so prod is v1.251 while
+staging is v1.346. Never call a staging version prod's version: name the staging build that was promoted ("staging v1.346"),
+and give prod's number only when read from prod itself.
+
 Promotion happens via **Henrik clicking "Push to Prod"** in the staging app's
 Settings UI, which fires a `repository_dispatch` event that runs
 `.github/workflows/promote-to-prod.yml`. That workflow diffs staging against
