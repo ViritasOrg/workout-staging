@@ -893,6 +893,13 @@ exercise … in settigns we need to add a Polestar card where a user can add the
 - The temperature is Open-Meteo's `current.temperature_2m` at the phone's location (`navigator.geolocation`); below
   `PS_COLD_C` (10) or above `PS_HOT_C` (22) it asks "Turn on Polestar climate?", and yes calls `POST /polestar/climate`
   (claude-agent-backend `routers/polestar.py`, which starts climate at 21 °C).
+- The question is the **Polestar card** (`#psModal`, `_psModalHtml`), never a native confirm/alert (Henrik, 2026-11-04:
+  "needs a status that shows climate is started and a message while waiting for the update"): ask → **Starting
+  climate…** (cannot be closed while the car answers) → **Climate is on** or **Climate did not start** with the reason.
+- While climate runs, a **red car with a heat (orange waves) or AC (blue snowflake) symbol** sits in the header
+  (`#hdr-car`, `_psCarSvg`; Henrik: "In the main app view a red car with a heating/ac symbol should be shown"). The app
+  asks `GET /polestar/climate` every 3 minutes and removes it when the car is neither active nor starting, or after an
+  hour; tapping it reopens the card.
 - Settings → **Polestar** card (`#ps-card`): the Polestar ID email and password go to `PUT /polestar`, which checks
   them with Polestar before saving; Remove goes through `confirmGlobalDelete`. Nothing is kept in localStorage.
 - **Staging only** (`POLESTAR_ON=IS_STAGING`) until Henrik has tried it end to end and says go. Switching it on for

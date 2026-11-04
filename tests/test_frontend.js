@@ -9463,33 +9463,41 @@ console.log('\n── Polestar climate ─────────────�
   check('polestar: opening Settings loads it', /'settings'\)\{loadSettings\(\);buildFlKeyCard\(\);buildPolestarCard\(\);\}/.test(_src));
   check('polestar: every set input reaches the check', /function _onLogInput\(e\)\{[^}]*_psCheck\(e\.target\)/.test(_src));
 
-  // A tiny DOM: cards of reps inputs, and the log's date/day selects.
+  // A tiny DOM: cards of reps inputs, the log's date/day selects, the header icon and the Polestar card.
   const mkInp = v => ({ dataset: { type: 'reps' }, value: v });
   const mkCard = inps => ({ querySelectorAll: () => inps });
   function ctx(opts) {
-    const calls = [], asked = [], alerts = [], els = {};
+    const calls = [], els = {}, open = new Set(), timers = [];
     const cards = opts.cards;
     els['structured-log'] = { querySelectorAll: () => cards };
     els['log-date'] = { value: '2026-11-04' }; els['log-day'] = { value: opts.day || '3' };
+    els['hdr-car'] = { hidden: true, innerHTML: '' }; els['ps-modal-body'] = { innerHTML: '' };
+    let release = null;
     const C = vm.createContext({ console, Promise, JSON, Math, String, Number, parseInt, isFinite,
       IS_STAGING: opts.staging !== false, AGENT_URL: 'https://agent',
       authHeaders: x => Object.assign({}, x || {}), confirmGlobalDelete: () => opts.del !== false,
       sSecHdr: (id, l) => '<h>' + l + '</h>', sSecBody: id => '<div>',
       _escP: x => String(x),
-      confirm: m => { asked.push(m); return opts.yes !== false; }, alert: m => alerts.push(m),
+      openModal: id => open.add(id), closeModal: id => open.delete(id),
+      setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimeout: () => {},
+      confirm: () => { throw new Error('no native confirm'); }, alert: () => { throw new Error('no native alert'); },
       navigator: { geolocation: { getCurrentPosition: (ok) => ok({ coords: { latitude: 60.1699, longitude: 24.9384 } }) } },
       document: { getElementById: id => els[id] || null },
       fetch: async (url, o) => { calls.push({ url, method: (o && o.method) || 'GET', body: o && o.body });
         if (url.startsWith('https://api.open-meteo.com/')) return { ok: true, json: async () => ({ current: { temperature_2m: opts.temp } }) };
         if (url === 'https://agent/polestar' && (!o || !o.method)) return { ok: true, json: async () => opts.creds || { set: true, email: 'me@x.com' } };
-        if (url === 'https://agent/polestar/climate') return { ok: true, json: async () => opts.answer || { ok: true, status: 'SUCCESS', message: '' } };
+        if (url === 'https://agent/polestar/climate' && o && o.method === 'POST') {
+          if (opts.hold) await new Promise(r => { release = r; });
+          return { ok: true, json: async () => opts.answer || { ok: true, status: 'SUCCESS', message: '' } }; }
+        if (url === 'https://agent/polestar/climate') return { ok: true, json: async () => opts.status || { active: true, starting: false, status: 'ACTIVE', action: 'HEATING' } };
         if (url === 'https://agent/polestar' && o.method === 'PUT') return opts.putFail ? { ok: false, status: 400, json: async () => ({ detail: 'Polestar did not accept that email and password' }) } : { ok: true, json: async () => ({ set: true, email: 'me@x.com' }) };
         if (url === 'https://agent/polestar' && o.method === 'DELETE') return { ok: true, json: async () => ({ set: false, email: '' }) };
         return { ok: false, status: 404, json: async () => ({}) }; } });
     vm.runInContext(_blk, C);
-    return { C, calls, asked, alerts, els };
+    return { C, calls, els, open, timers, release: () => release && release() };
   }
   const threeSets = () => { const r = [mkInp('8'), mkInp(''), mkInp('')]; return { r, cards: [mkCard([mkInp('5')]), mkCard(r)] }; };
+  const tick = () => new Promise(r => setImmediate(r));
 
   (async () => {
     {
@@ -9506,40 +9514,68 @@ console.log('\n── Polestar climate ─────────────�
       r[1].value = ''; check('  …and only once it holds a number', !C._psIsTrigger(r[1]));
     }
     {
-      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 4.2 });
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 4.2, hold: true });
       r[1].value = '8'; await t.C._psCheck(r[1]);
-      check('polestar: cold outside asks, with the temperature', t.asked.length === 1 && /4 °C outside/.test(t.asked[0]) && /Polestar climate/.test(t.asked[0]));
-      check('  …yes starts climate on the backend', t.calls.some(c => c.url === 'https://agent/polestar/climate' && c.method === 'POST'));
-      check('  …and says it is on', t.alerts[0] === 'Polestar climate is on.');
+      const ask = t.els['ps-modal-body'].innerHTML;
+      check('polestar: cold outside opens the Polestar card with the temperature', t.open.has('psModal') && /It is 4 °C outside/.test(ask) && /warm the car/.test(ask) && /psYes\(\)/.test(ask));
       check('  …the weather is read at the phone\'s location', t.calls.some(c => /latitude=60\.170&longitude=24\.938&current=temperature_2m/.test(c.url)));
+      const p = t.C.psYes(); await tick();
+      check('  …Turn on shows a waiting message while the car answers', /Starting climate…/.test(t.els['ps-modal-body'].innerHTML) && /Waiting for the car/.test(t.els['ps-modal-body'].innerHTML));
+      t.C.psClose(); check('  …and the card cannot be closed while waiting', t.open.has('psModal'));
+      t.release(); await p;
+      check('  …then says climate is on', /Climate is on/.test(t.els['ps-modal-body'].innerHTML) && /warming up/.test(t.els['ps-modal-body'].innerHTML));
+      check('  …the start went to the backend', t.calls.some(c => c.url === 'https://agent/polestar/climate' && c.method === 'POST'));
+      check('  …the red car with the heat symbol shows in the header', t.els['hdr-car'].hidden === false && /#e53935/.test(t.els['hdr-car'].innerHTML) && /ps-car-heat/.test(t.els['hdr-car'].innerHTML));
+      check('  …and the car is re-checked in 3 minutes', t.timers.length === 1 && t.timers[0].ms === 180000);
+      t.C.psClose(); check('  …OK closes the card', !t.open.has('psModal'));
       await t.C._psCheck(r[1]);
-      check('  …asked once per workout, not on every keystroke', t.asked.length === 1);
+      check('  …asked once per workout, not on every keystroke', t.calls.filter(c => /open-meteo/.test(c.url)).length === 1);
+      t.C.psOpenStatus(); check('  …tapping the header car shows that climate is on', t.open.has('psModal') && /Climate is on/.test(t.els['ps-modal-body'].innerHTML));
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 30 });
+      r[1].value = '8'; await t.C._psCheck(r[1]); const askHot = t.els['ps-modal-body'].innerHTML; await t.C.psYes();
+      check('polestar: hot outside cools, with the AC symbol', /It is 30 °C outside/.test(askHot) && /cool the car/.test(askHot) && /ps-car-cool/.test(t.els['hdr-car'].innerHTML) && /cooling/.test(t.els['ps-modal-body'].innerHTML));
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, status: { active: false, starting: false, status: 'IDLE', action: 'UNDEFINED' } });
+      r[1].value = '8'; await t.C._psCheck(r[1]); await t.C.psYes();
+      await t.timers[0].f();
+      check('polestar: the header car goes when the car says climate stopped', t.els['hdr-car'].hidden === true && t.els['hdr-car'].innerHTML === '');
+    }
+    {
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, status: { active: false, starting: true, status: 'START_ATTEMPT', action: 'COOLING' } });
+      r[1].value = '8'; await t.C._psCheck(r[1]); await t.C.psYes();
+      await t.timers[0].f();
+      check('polestar: still starting keeps the car and follows the car\'s heat/cool action', t.els['hdr-car'].hidden === false && /ps-car-cool/.test(t.els['hdr-car'].innerHTML) && t.timers.length === 2);
+      for (let i = 1; i < 20; i++) await t.timers[t.timers.length - 1].f();
+      check('  …and goes after an hour of checks at most', t.els['hdr-car'].hidden === true);
     }
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 15 });
       r[1].value = '8'; await t.C._psCheck(r[1]);
-      check('polestar: 15 °C does not ask and starts nothing', t.asked.length === 0 && !t.calls.some(c => /climate/.test(c.url)));
+      check('polestar: 15 °C does not ask and starts nothing', !t.open.has('psModal') && !t.calls.some(c => /climate/.test(c.url)));
     }
     {
-      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 30, yes: false });
-      r[1].value = '8'; await t.C._psCheck(r[1]);
-      check('polestar: hot asks too, and no starts nothing', t.asked.length === 1 && !t.calls.some(c => /climate/.test(c.url)));
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 30 });
+      r[1].value = '8'; await t.C._psCheck(r[1]); t.C.psClose();
+      check('polestar: Not now starts nothing and shows no car', !t.open.has('psModal') && !t.calls.some(c => /climate/.test(c.url)) && t.els['hdr-car'].hidden === true);
     }
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, creds: { set: false, email: '' } });
       r[1].value = '8'; await t.C._psCheck(r[1]);
-      check('polestar: without a Polestar ID it never asks or reads the location', t.asked.length === 0 && !t.calls.some(c => /open-meteo/.test(c.url)));
+      check('polestar: without a Polestar ID it never asks or reads the location', !t.open.has('psModal') && !t.calls.some(c => /open-meteo/.test(c.url)));
     }
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, staging: false });
       r[1].value = '8'; await t.C._psCheck(r[1]);
-      check('polestar: off outside staging (no calls at all)', t.calls.length === 0 && t.asked.length === 0);
+      check('polestar: off outside staging (no calls at all)', t.calls.length === 0 && !t.open.has('psModal'));
       t.els['ps-card'] = { innerHTML: 'x' }; t.C._psRender(); check('  …and no Settings card', t.els['ps-card'].innerHTML === '');
     }
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, answer: { ok: false, status: 'CAR_OFFLINE', message: '' } });
-      r[1].value = '8'; await t.C._psCheck(r[1]);
-      check('polestar: the car\'s refusal is shown', /did not start: the car answered CAR_OFFLINE/.test(t.alerts[0] || ''));
+      r[1].value = '8'; await t.C._psCheck(r[1]); await t.C.psYes();
+      check('polestar: the car\'s refusal is shown on the card, and no header car', /Climate did not start/.test(t.els['ps-modal-body'].innerHTML) && /The car answered CAR_OFFLINE/.test(t.els['ps-modal-body'].innerHTML) && t.els['hdr-car'].hidden === true);
     }
     {
       const t = ctx({ cards: [], creds: { set: false, email: '' } });
