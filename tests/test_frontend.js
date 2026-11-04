@@ -9347,7 +9347,9 @@ setTimeout(() => { check('every async check finished within 30 s', false); _summ
   p = G._applyAiOps(prog, [op({op: 'remove', days: [2], exercise: 'Squat'})], 1, cat);
   check('AI: removing something that is not there is an error, not a silent no-op', p.prog === null && p.errors.length === 1);
   p = G._applyAiOps(prog, [op({op: 'cannot', title: 'That is not a training change.'})], 1, cat);
-  check('AI cannot: its reason is shown', p.errors[0] === 'That is not a training change.');
+  // Henrik, 2026-11-04, on "...so there is nothing to Nothing was changed.": the AI's answer is shown as it is, with
+  // no "Nothing was changed." tacked on; that is for a change that failed.
+  check('AI cannot: its reason is an answer, shown as it is', p.said[0] === 'That is not a training change.' && p.errors.length === 0);
 
   p = G._applyAiOps(prog, [op({op: 'add', days: [2], exercises: [{name: 'Face Pulls', sets: 3, reps: '15'}]})], 1, cat);
   const fp = p.prog.days[1].exercises[2];
@@ -9400,7 +9402,7 @@ setTimeout(() => { check('every async check finished within 30 s', false); _summ
 function SCRIPT_SRC_FOR_AI() { return require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8'); }
 // Henrik, 2026-11-03: "I need to be able to reply to the AI suggestions, today it suggests a machine not available in my
 // current gym, and now I am forced to start over", then "And keep the whole conversation in the replies".
-(async function(){
+globalThis.__aiReply = (async function(){
   const prog = {name: 'T', days: [{name: 'Day 1 — Push', exercises: [{name: 'Bench Press', sets: '3', kg: 60}]},
     {name: 'Day 2 — Pull', exercises: [{name: 'Barbell Row', sets: '3', kg: 50}]}]};
   G._programs = [prog]; G._activeProgramIndex = 0;
@@ -9438,3 +9440,13 @@ function SCRIPT_SRC_FOR_AI() { return require('fs').readFileSync(require('path')
   check('AI reply: Cancel starts a fresh conversation', G._pai.hist.length === 0 && G._pai.last === '' && !G._pai.plan);
   G._programs = []; G._activeProgramIndex = 0;
 })().catch(e => check('AI reply checks ran', false, String(e && e.stack || e)));
+
+Promise.resolve(globalThis.__aiReply).then(async function(){
+  const prog = {name: 'T', days: [{name: 'Day 1', exercises: [{name: 'Squat', sets: '3', kg: 0}]}]};
+  G._programs = [prog]; G._activeProgramIndex = 0; G._pai = G._paiFresh(); G._pai.text = 'Make it easier on my shoulders';
+  const cur = G.fetch; G.fetch = async () => ({ok: true, status: 200, json: async () => ({ops: [{op: 'cannot', days: [], exercise: '',
+    with: '', exercises: [], title: 'Day 1 has nothing hard on the shoulders, so there is nothing to change.'}]})});
+  const p = G.progAiAsk(); G.fetch = cur; await p;
+  check("AI cannot: the card shows the AI's sentence alone", G._pai.err === 'Day 1 has nothing hard on the shoulders, so there is nothing to change.', G._pai.err);
+  G._programs = []; G._pai = G._paiFresh();
+}).catch(e => check('AI cannot checks ran', false, String(e && e.stack || e)));
