@@ -846,8 +846,8 @@ const THEMES=[
 ];
 function applyTheme(id){var t=THEMES.find(function(x){return x.id===id;})||THEMES[0];var r=document.documentElement.style;Object.entries(t.vars).forEach(function(e){r.setProperty('--'+e[0],e[1]);});setData('wkt-theme',id);pushSettingsToAgent({'wkt-theme':id});}
 (function(){var _st=getData('wkt-theme',1);if(_st!==1)applyTheme(_st);})();
-const PAGE_LABELS=Object.assign({today:'Today',plan:'Plan',log:'Log Workout',macros:'Macros',foodedit:'Food Edit',history:'History',progress:'Progress'},IS_STAGING?{storage:'Storage'}:{});
-const PAGE_DEFAULTS=Object.assign({today:true,plan:true,log:true,macros:true,foodedit:true,history:true,progress:true},IS_STAGING?{storage:true}:{});
+const PAGE_LABELS=Object.assign({today:'Today',plan:'Plan',log:'Log Workout',macros:'Macros',foodedit:'Food Edit',history:'History',progress:'Progress'},{storage:'Storage'});
+const PAGE_DEFAULTS=Object.assign({today:true,plan:true,log:true,macros:true,foodedit:true,history:true,progress:true},{storage:true});
 // Two-tier navigation (ported from the peptide app): 5 fixed bottom "primary" tabs,
 // each grouping one or more page destinations; a secondary sub-tab strip appears only
 // when the active group has more than one visible destination (More → Settings/Storage).
