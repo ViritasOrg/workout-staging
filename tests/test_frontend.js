@@ -9523,7 +9523,7 @@ console.log('\n── Polestar climate ─────────────�
       check('  …Turn on shows a waiting message while the car answers', /Starting climate…/.test(t.els['ps-modal-body'].innerHTML) && /Waiting for the car/.test(t.els['ps-modal-body'].innerHTML));
       t.C.psClose(); check('  …and the card cannot be closed while waiting', t.open.has('psModal'));
       t.release(); await p;
-      check('  …then says climate is on', /Climate is on/.test(t.els['ps-modal-body'].innerHTML) && /warming up/.test(t.els['ps-modal-body'].innerHTML));
+      check('  …then says climate is on, for 30 minutes', /Climate is on/.test(t.els['ps-modal-body'].innerHTML) && /warming up for 30 minutes/.test(t.els['ps-modal-body'].innerHTML));
       check('  …the start went to the backend', t.calls.some(c => c.url === 'https://agent/polestar/climate' && c.method === 'POST'));
       check('  …the red car with the heat symbol shows in the header', t.els['hdr-car'].hidden === false && /#e53935/.test(t.els['hdr-car'].innerHTML) && /ps-car-heat/.test(t.els['hdr-car'].innerHTML));
       check('  …and the car is re-checked in 3 minutes', t.timers.length === 1 && t.timers[0].ms === 180000);
@@ -9548,8 +9548,10 @@ console.log('\n── Polestar climate ─────────────�
       r[1].value = '8'; await t.C._psCheck(r[1]); await t.C.psYes();
       await t.timers[0].f();
       check('polestar: still starting keeps the car and follows the car\'s heat/cool action', t.els['hdr-car'].hidden === false && /ps-car-cool/.test(t.els['hdr-car'].innerHTML) && t.timers.length === 2);
-      for (let i = 1; i < 20; i++) await t.timers[t.timers.length - 1].f();
-      check('  …and goes after an hour of checks at most', t.els['hdr-car'].hidden === true);
+      for (let i = 1; i < 9; i++) await t.timers[t.timers.length - 1].f();
+      check('  …still there after 27 minutes of checks', t.els['hdr-car'].hidden === false);
+      await t.timers[t.timers.length - 1].f();
+      check('  …and gone at 30 minutes, when Polestar stops climate', t.els['hdr-car'].hidden === true);
     }
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 15 });
