@@ -911,9 +911,11 @@ exercise … in settigns we need to add a Polestar card where a user can add the
 - **Staging only** (`POLESTAR_ON=IS_STAGING`) until Henrik has tried it end to end and says go. Switching it on for
   production is its own change, and that change adds the `WHATS_NEW` row (none until then, or production would
   announce a feature it does not show).
-- **Next: BMW and Tesla** (Henrik, 2026-11-04: "add BMW and Tesla support if possible as well later once this is
-  tested and works"). Start only after Henrik confirms Polestar works end to end on staging; first read what each maker
-  currently offers for starting climate remotely (official API or maintained library), never from memory.
+- **No BMW, no Tesla** (Henrik, 2026-11-04, after Polestar worked end to end: "it all works great", then "skip Tesla").
+  BMW: no outside app can start climate any more; CarData is read-only and BMW closed the MyBMW backend to third parties
+  on 2025-09-29 (community sources; BMW's own docs page did not render). Tesla: possible through the Fleet API (signed
+  commands, a registered developer app, a key on every car, paid per command), and Henrik chose not to. Do not start either
+  unless he asks again.
 
 ### Face Pulls — NEVER on a push/press day (rule 2026-07-24)
 A Face Pull is a pulling movement and must **never** be scheduled on a push/press day — any
