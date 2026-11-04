@@ -1416,13 +1416,14 @@ staging, pressed Push to Prod, and prod had no Polestar card.
 
 - **Staging is the test bed and Push to Prod is Henrik's go.** For these apps that IS the org rule "Nothing half-built is
   ever visible": a feature is built and tested on staging, and pressing Push to Prod ships it. Never add a second gate.
-- **`IS_STAGING` switches environment plumbing only**: the data namespace (`APP_ID`, the localStorage prefix), each app's
-  own URLs, the Deploy card and the prod→stage copy card, and test tools Henrik asked for as staging-only (Storage
-  inspector, T-Calc debug dump, the body-figure override). Never a user feature, never "until Henrik says go".
+- **The Push to Prod card is the ONLY staging-only feature** (Henrik, 2026-11-05: *"The only feature we don't need in
+  production is the push to prod card"*). Every other `IS_STAGING` use is environment plumbing: the data namespace
+  (`APP_ID`, the localStorage prefix), each app's own URLs, and the prod→stage copy card. Test tools (the Storage
+  inspector, the T-Calc debug dump, the body-figure override) ship to prod like everything else. Never a gate "until
+  Henrik says go".
 - A feature that must not reach prod yet is not merged to staging `main`, or is merged switched off for both.
 - `tests/test_frontend.js` lists every allowed `IS_STAGING` use and fails on any other ("No feature is gated to
-  staging"). A red there means remove the gate, not extend the list; a new test tool is added only when Henrik asked
-  for it as staging-only, with his words beside it.
+  staging"). A red there means remove the gate, never extend the list.
 
 ## Promotion to prod — Claude must NOT trigger this
 **Prod has its own version number** (Henrik, 2026-11-04: "production is on 251 dont mix the stage and prod versions").

@@ -2716,8 +2716,9 @@ console.log('\n── Storage inspector ─────────────�
     src.includes('function lsDbgCopy('));
   check('lsDbgCopyAll function defined',
     src.includes('function lsDbgCopyAll()'));
-  check('storage tab included in PAGE_LABELS and PAGE_DEFAULTS via IS_STAGING (toggleable in Settings)',
-    src.includes("IS_STAGING?{storage:'Storage'}:{}") && src.includes('IS_STAGING?{storage:true}:{}'));
+  // In prod as on staging (Henrik, 2026-11-05: "The only feature we don't need in production is the push to prod card").
+  check('storage tab included in PAGE_LABELS and PAGE_DEFAULTS in prod as on staging (toggleable in Settings)',
+    src.includes(",{storage:'Storage'})") && src.includes(',{storage:true})') && !src.includes('IS_STAGING?{storage:'));
   check('buildStoragePage uses clipboard API to copy',
     src.includes('navigator.clipboard.writeText'));
 }
@@ -9644,10 +9645,10 @@ console.log('\n── Polestar climate ─────────────�
 
 // ── Push to Prod ships every feature: no feature is gated to staging (Henrik, 2026-11-04) ──
 // "I push stage to prod, then all features must be available in prod!" Polestar shipped behind
-// `POLESTAR_ON=IS_STAGING`, Henrik pushed to prod and the card was not there. IS_STAGING may only
-// switch ENVIRONMENT plumbing (data namespace, URLs, the Deploy and stage-copy cards) or a test
-// tool Henrik asked for as staging-only. Every use is listed here; a new one fails until it is
-// one of those and is added with its reason.
+// `POLESTAR_ON=IS_STAGING`, Henrik pushed to prod and the card was not there. Then (2026-11-05):
+// "The only feature we don't need in production is the push to prod card". IS_STAGING may only
+// switch ENVIRONMENT plumbing (data namespace, URLs, the stage-copy card) and the Push to Prod
+// card. Every use is listed here; anything else fails.
 console.log('\n── No feature is gated to staging ─────────────────────────');
 {
   const _fs = require('fs'), _path = require('path');
@@ -9657,14 +9658,11 @@ console.log('\n── No feature is gated to staging ─────────
     /const IS_STAGING=\(window\.location\.pathname/,                 // the switch itself
     /const APP_ID=IS_STAGING\?'stage':''/,                            // staging's own data namespace
     /if\(IS_STAGING\)\{var _S='staging:'/,                           // staging's own localStorage keys
-    /IS_STAGING\?\{storage:/,                                         // Storage inspector (test tool)
     /if\(IS_STAGING\)\{card\.innerHTML='';return;\}/,                // prod→stage copy card, prod only
     /env='\+\(\(typeof IS_STAGING/,                                   // environment name in a debug report
     /if\(IS_STAGING\)buildDeployCard\(\)|s-deploy-card/,              // the Push to Prod card itself
     /fetch\(\(IS_STAGING\?'https:\/\/viritasorg\.github\.io\//,       // each app's own version.json
     /if\(!IS_STAGING\|\|localStorage\.getItem\('wk-bf-isol-v1'\)\)/, // staging data isolation migration
-    /s-injbody-row|_injBodyOverrideFor\(typeof IS_STAGING/,           // body-figure override, "On stage only" (Henrik, 2026-10-14)
-    /Staging only, via IS_STAGING|DEBUG DUMP · STAGING ONLY/,         // T-Calc debug dump (test tool)
   ];
   const bad = [];
   _files.forEach(f => {
@@ -9674,6 +9672,6 @@ console.log('\n── No feature is gated to staging ─────────
       if (!ALLOWED.some(re => re.test(win))) bad.push(_path.basename(f) + ': …' + src.slice(Math.max(0, i - 40), i + 60).replace(/\s+/g, ' ') + '…');
     }
   });
-  check('every IS_STAGING use is environment plumbing or a listed test tool, never a feature gate',
+  check('every IS_STAGING use is environment plumbing or the Push to Prod card, never a feature',
     bad.length === 0, 'Push to Prod must ship every feature. Remove the gate:\n      ' + bad.join('\n      '));
 }
