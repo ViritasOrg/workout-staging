@@ -900,6 +900,12 @@ exercise … in settigns we need to add a Polestar card where a user can add the
   (`#hdr-car`, `_psCarSvg`; Henrik: "In the main app view a red car with a heating/ac symbol should be shown"). The app
   asks `GET /polestar/climate` every 3 minutes and removes it when the car is neither active nor starting, or after
   30 minutes, since Polestar runs climate for 30 minutes (Henrik, 2026-11-04); tapping it reopens the card.
+- **A grey car sits in the header whenever a Polestar ID is saved** (Henrik, 2026-11-04: "keep a grey car in title if
+  credentials are available in the app"; `syncPolestarCar` at start, `_psRenderCar`), and **tapping the car turns climate on
+  or off** ("Clicking the car needs a turn on and off button"): grey → the card says Climate is off with **Turn on**; red →
+  Climate is on with **Turn off** (`POST /polestar/climate/stop`), each with a waiting message while the car answers.
+  Started from the header, heat or cool is not known until the car says, so the car is red without a symbol and asked
+  after 30 s.
 - Settings → **Polestar** card (`#ps-card`): the Polestar ID email and password go to `PUT /polestar`, which checks
   them with Polestar before saving; Remove goes through `confirmGlobalDelete`. Nothing is kept in localStorage.
 - **Staging only** (`POLESTAR_ON=IS_STAGING`) until Henrik has tried it end to end and says go. Switching it on for
