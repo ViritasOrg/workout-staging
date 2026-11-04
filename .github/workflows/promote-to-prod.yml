@@ -8,9 +8,15 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     steps:
+      # ⚠️ ALWAYS STAGING'S CURRENT MAIN, NEVER THE COMMIT THE RUN STARTED ON (2026-11-04).
+      # A run checks out the commit it was dispatched at, and a RE-RUN keeps that commit. The
+      # app's Retry button re-runs a failed run, so retrying the 17:56 EET failure at 23:17
+      # promoted staging v1.345 over the v1.347 already promoted at 22:57: prod went back two
+      # builds. Checking out main makes a retry promote what staging has now.
       - name: Checkout staging
         uses: actions/checkout@v4
         with:
+          ref: main
           path: staging
 
       - name: Checkout prod
@@ -25,7 +31,12 @@ jobs:
           cd prod
           git config user.name "staging-promote-bot"
           git config user.email "actions@github.com"
-          BRANCH="promote/staging-$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          # The commit actually promoted (staging's main now), not GITHUB_SHA, which on a
+          # re-run is the commit the first attempt saw.
+          STAGING_SHA=$(git -C ../staging rev-parse HEAD)
+          echo "STAGING_SHA=$STAGING_SHA" >> "$GITHUB_ENV"
+          echo "Promoting staging@main $STAGING_SHA"
+          BRANCH="promote/staging-$(date +%Y%m%d%H%M%S)-${STAGING_SHA::7}"
           git checkout -b "$BRANCH"
 
           # Copy app files from staging — prod owns version.json, .github/workflows/, CLAUDE.md, assets, etc.
@@ -45,7 +56,7 @@ jobs:
           fi
 
           git add -A
-          git commit -m "Promote staging changes (${GITHUB_SHA::7})"
+          git commit -m "Promote staging changes (${STAGING_SHA::7})"
           git push origin "$BRANCH"
           echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
@@ -58,7 +69,7 @@ jobs:
             -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/ViritasOrg/workout/pulls \
-            -d "{\"title\":\"Promote staging changes (${GITHUB_SHA::7})\",\"head\":\"$BRANCH\",\"base\":\"main\",\"body\":\"Auto-generated PR from workout-staging@main (${GITHUB_SHA}), triggered via Push to Prod.\"}")
+            -d "{\"title\":\"Promote staging changes (${STAGING_SHA::7})\",\"head\":\"$BRANCH\",\"base\":\"main\",\"body\":\"Auto-generated PR from workout-staging@main (${STAGING_SHA}), triggered via Push to Prod.\"}")
           PR_URL=$(echo "$RESPONSE" | jq -r '.html_url')
           PR_NODE_ID=$(echo "$RESPONSE" | jq -r '.node_id')
           PR_NUMBER=$(echo "$RESPONSE" | jq -r '.number')
@@ -70,6 +81,21 @@ jobs:
           echo "PR_NODE_ID=$PR_NODE_ID" >> "$GITHUB_ENV"
           echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
 
+          # >>> close superseded
+          # A failed run leaves its promote PR open (PR #302 on 2026-11-04). This one carries
+          # everything newer, so the older ones are closed and their branches deleted; an open
+          # stale PR is one a later click could merge. Best effort: a failure here never stops
+          # the promotion.
+          for OLD in $(gh pr list --repo "ViritasOrg/workout" --state open --limit 50 \
+                         --json number,headRefName \
+                         --jq '.[] | select(.headRefName | startswith("promote/staging-")) | .number' 2>/dev/null); do
+            [ "$OLD" = "$PR_NUMBER" ] && continue
+            echo "Closing superseded promote PR #$OLD"
+            gh pr close "$OLD" --repo "ViritasOrg/workout" --delete-branch \
+              --comment "Superseded by #$PR_NUMBER." || true
+          done
+          # <<< close superseded
+
       - name: Wait for CI and merge prod PR
         if: env.PR_NUMBER != ''
         env:
@@ -77,8 +103,47 @@ jobs:
         run: |
           REPO="ViritasOrg/workout"
           echo "Waiting for CI on PR #$PR_NUMBER then merging..."
-          for i in $(seq 1 60); do
-            PR_DATA=$(gh api repos/$REPO/pulls/$PR_NUMBER --jq '{merged: .merged, state: .state, sha: .head.sha}')
+          # ⚠️ A TRANSIENT API ERROR IS NOT A FAILED PROMOTION.
+          # This step runs under `bash -e`, and every poll shells out to `gh api`. A
+          # single hiccup from GitHub therefore aborted the whole promotion: run 160
+          # (2026-09-23) died with "gh: Server Error (HTTP 502)" on attempt 33 of 60,
+          # while prod CI was still running and had not failed anything. The promotion
+          # reported failure for a reason that had nothing to do with the code.
+          #
+          # gh_retry runs a read up to 3 times with a short backoff and prints nothing
+          # but the payload. If all three fail it returns non-zero WITHOUT killing the
+          # step, and the caller treats that as "no answer yet" and polls again — the
+          # loop's own 180 attempts remain the only thing that can time it out.
+          #
+          # Reads only. A failed read means wait; it never means merge. The merge itself
+          # is deliberately NOT retried: it is the one side effect here, and an ambiguous
+          # second attempt at merging is worse than a promotion that has to be re-run.
+          # ⚠️ `rc=$?` AFTER AN `if` WITH NO ELSE IS 0, NOT THE COMMAND'S STATUS.
+          # The first version of this helper did that and so returned SUCCESS with an
+          # empty payload once all three attempts had failed — the caller would then jq
+          # an empty string and poll a blank SHA. Caught by simulating a 502 against it
+          # rather than by reading it. The status is now explicit, and a response that
+          # is empty counts as a failure even when gh exits 0.
+          gh_retry() {
+            local out=""
+            for _a in 1 2 3; do
+              if out=$(gh api "$@" 2>/dev/null) && [ -n "$out" ]; then
+                printf '%s' "$out"
+                return 0
+              fi
+              sleep 3
+            done
+            return 1
+          }
+          # 180 polls of 10 s = 30 minutes (2026-11-04). It was 60 (10 minutes): prod's CI runs
+          # two `test` checks, peptide's take about 8 minutes on their own, and on 2026-11-04 a
+          # workout promotion timed out at 17:56 EET with both still queued on GitHub.
+          for i in $(seq 1 180); do
+            if ! PR_DATA=$(gh_retry repos/$REPO/pulls/$PR_NUMBER --jq '{merged: .merged, state: .state, sha: .head.sha}'); then
+              echo "Attempt $i: could not read the PR (transient API error), waiting 10s..."
+              sleep 10
+              continue
+            fi
             MERGED=$(echo "$PR_DATA" | jq -r '.merged')
             STATE=$(echo "$PR_DATA" | jq -r '.state')
             SHA=$(echo "$PR_DATA" | jq -r '.sha')
@@ -89,7 +154,11 @@ jobs:
               echo "PR #$PR_NUMBER closed without merging — CI failed on prod"
               exit 1
             fi
-            RUNS=$(gh api repos/$REPO/commits/$SHA/check-runs)
+            if ! RUNS=$(gh_retry repos/$REPO/commits/$SHA/check-runs); then
+              echo "Attempt $i: could not read check runs (transient API error), waiting 10s..."
+              sleep 10
+              continue
+            fi
             # Gate on THIS repo's own CI job only. The gate used to fail if ANY check
             # on the commit was failed/cancelled, which meant a scanner the repo does
             # not control could block a deploy: moving to the ViritasOrg org turned on
@@ -122,5 +191,5 @@ jobs:
             echo "Attempt $i: $PENDING CI check(s) still running, waiting 10s..."
             sleep 10
           done
-          echo "Timeout: PR #$PR_NUMBER did not merge within 10 minutes"
+          echo "Timeout: PR #$PR_NUMBER did not merge within 30 minutes"
           exit 1

@@ -1433,6 +1433,14 @@ firing a fresh `repository_dispatch`/Push to Prod yourself is not.
 must never be auto-merged. The workflow has always auto-merged; the note was
 out of date.)*
 
+**A Retry promotes staging as it is now, and the wait is 30 minutes (2026-11-04).** Henrik: *"been
+impossible to promote to prod today"*. A run that timed out waiting for prod CI (10 minutes, both `test`
+checks still queued) left its prod PR open, and the app's Retry re-ran it hours later; a re-run checks out
+the commit it was first dispatched at, so it promoted an older staging build over a newer one already on
+prod. `promote-to-prod.yml` now checks out staging `main` (`ref: main`, named by `STAGING_SHA`), waits up
+to 30 minutes, retries a failed API read, and closes the older `promote/staging-*` PRs a new one
+supersedes. `tests/test_promote_workflow.js` runs the steps against a fake `gh`.
+
 **PEPTIDE_WORKOUT_PROD_TOKEN secret (renamed 2026-11-01, was `PROMOTE_TOKEN`):** the promotion
 workflow checks out, pushes to, opens and merges the PR on the prod repo with this repository
 secret: a classic GitHub token with the
