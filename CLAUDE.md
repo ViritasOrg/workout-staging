@@ -1283,6 +1283,12 @@ Henrik: *"use [the Claude key] to allow AI guided changes to training programs .
 - **An extra session the same day** (Henrik, 2026-11-03: *"i did pull b earlier today but want a new pull session now
   (same day) gimme a suggestion of exercises"*) is op `extra`: a one-off with `extra:true` filed under `_extraDay()`, the
   day trained last, so saving it leaves `_nextTrainingDay` where it was. The request carries `done_today` (today's logs).
+- **You can reply to a suggestion, and every reply carries the whole conversation** (Henrik, 2026-11-03: *"I need to be
+  able to reply to the AI suggestions, today it suggests a machine not available in my current gym, and now I am forced
+  to start over"*, then *"And keep the whole conversation in the replies"*). After an answer the box becomes **Reply**
+  (`progAiReply`); `_pai.hist` holds every earlier request and what was proposed for it, sent as `history`, and the card
+  shows the conversation (`_paiConvoHtml`). Nothing is applied until Apply, so each answer is a whole revised set against
+  the program as it is. A request that never reached the AI (offline, no key) is not a turn; Cancel and Apply start afresh.
 
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
