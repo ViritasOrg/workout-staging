@@ -905,7 +905,8 @@ exercise … in settigns we need to add a Polestar card where a user can add the
   or off** ("Clicking the car needs a turn on and off button"): grey → the card says Climate is off with **Turn on**; red →
   Climate is on with **Turn off** (`POST /polestar/climate/stop`), each with a waiting message while the car answers.
   Started from the header, heat or cool is not known until the car says, so the car is red without a symbol and asked
-  after 30 s.
+  every 30 s until it says heating or cooling, then every 3 minutes (Henrik, 2026-11-05: "Stage car symbol has lost the
+  heating symbol?": it was asked once at 30 s, then not for 3 minutes).
 - Settings → **Polestar** card (`#ps-card`): the Polestar ID email and password go to `PUT /polestar`, which checks
   them with Polestar before saving; Remove goes through `confirmGlobalDelete`. Nothing is kept in localStorage.
 - **In staging and prod alike** (Henrik, 2026-11-04: "I push stage to prod, then all features must be available in
