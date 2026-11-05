@@ -74,7 +74,7 @@ jobs:
           PR_NODE_ID=$(echo "$RESPONSE" | jq -r '.node_id')
           PR_NUMBER=$(echo "$RESPONSE" | jq -r '.number')
           if [ "$PR_URL" = "null" ] || [ -z "$PR_URL" ]; then
-            echo "PR creation failed: $RESPONSE"
+            echo "::error::PR creation failed: $RESPONSE"
             exit 1
           fi
           echo "PR_URL=$PR_URL" >> "$GITHUB_ENV"
@@ -151,7 +151,7 @@ jobs:
               echo "PR #$PR_NUMBER merged (attempt $i)"
               exit 0
             elif [ "$STATE" = "closed" ]; then
-              echo "PR #$PR_NUMBER closed without merging — CI failed on prod"
+              echo "::error::PR #$PR_NUMBER closed without merging — CI failed on prod"
               exit 1
             fi
             if ! RUNS=$(gh_retry repos/$REPO/commits/$SHA/check-runs); then
@@ -180,7 +180,7 @@ jobs:
             FAILED=$(echo "$CI" | jq '[.[] | select(.conclusion == "failure" or .conclusion == "cancelled")] | length')
             PENDING=$(echo "$CI" | jq '[.[] | select(.status != "completed")] | length')
             if [ "$FAILED" -gt "0" ]; then
-              echo "CI failed on prod PR #$PR_NUMBER ($FAILED failed checks)"
+              echo "::error::CI failed on prod PR #$PR_NUMBER ($FAILED failed checks)"
               exit 1
             fi
             if [ "$PENDING" = "0" ]; then
@@ -191,5 +191,5 @@ jobs:
             echo "Attempt $i: $PENDING CI check(s) still running, waiting 10s..."
             sleep 10
           done
-          echo "Timeout: PR #$PR_NUMBER did not merge within 30 minutes"
+          echo "::error::Timeout: PR #$PR_NUMBER did not merge within 30 minutes"
           exit 1
