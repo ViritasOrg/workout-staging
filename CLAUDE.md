@@ -1292,6 +1292,11 @@ PR maintains them.
   top to re run the intro for users who want to see it again"*). `openTour()` opens the overlay on the
   tour with the saved profile's gender and `_obTourOnly` set: no Back, no dots, Done or Skip just
   close it. Nothing is saved: the profile and the weight log are only written by a real wizard finish.
+- **The App card (version, Check, Setup Wizard) is the first thing in Settings, always open, with the intro
+  button right under it** (Henrik, 2026-11-05: *"app version should be on top and the layout better now there is a
+  weird gap between two cards"*). Settings is a flex column with a 14px gap: a card slot that renders nothing
+  (`#s-deploy-card` in prod) is hidden by `#page-settings>div:empty{display:none}`, and no card adds a top margin
+  of its own, or the spacing doubles.
 - **A feature worth a `WHATS_NEW` row usually gets a tour scene too**, or a line in the scene it
   belongs to. Keep scenes to roughly 8 seconds and one idea each.
 - **`TOUR_TABS` lists every visible tab in the tab bar** and renders as the closing scene plus the list

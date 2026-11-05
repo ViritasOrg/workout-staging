@@ -8996,8 +8996,18 @@ console.log('\n── Onboarding tour ──────────────
   check('WHATS_NEW announces the tour and where to replay it', G.WHATS_NEW.some(e => /tour/i.test(e.title) && /top of Settings/.test(e.text)));
 
   // Henrik: "in settings/More add a button on top to re run the intro for users who want to see it again."
-  check('Settings opens with a "Watch the intro again" button, before the first section',
-    /id="page-settings"[^>]*>\s*<button id="tour-replay-btn" onclick="openTour\(\)"[^>]*>[^<]*<span[^>]*>▶<\/span>Watch the intro again<\/button>/.test(html));
+  // Then 2026-11-05: "app version should be on top": the App card (version) comes first, the intro button right under it.
+  const _setTop = html.slice(html.indexOf('id="page-settings"'));
+  const _firstSec = _setTop.search(/<div class="s-sec-hdr"|<div id="(?:fl-|ps-|s-)/);
+  check('Settings opens with the App card (version), then the "Watch the intro again" button, before the other sections',
+    /id="page-settings"[^>]*>\s*<div[^>]*>\s*<div class="s-sec-hdr open"[^>]*>App<\/div>\s*<div class="s-sec-body" id="s-sec-app">[\s\S]*?id="s-version"/.test(html) &&
+    /^[^]*?<\/div>\s*<\/div>\s*<\/div>\s*<button id="tour-replay-btn" onclick="openTour\(\)"[^>]*>[^<]*<span[^>]*>▶<\/span>Watch the intro again<\/button>/.test(_setTop) &&
+    _setTop.indexOf('tour-replay-btn') < _firstSec);
+  // Henrik, 2026-11-05: "a weird gap between two cards". An empty card slot (Push to Prod in prod) took a flex gap,
+  // and some cards added a 14px margin on top of the gap.
+  check('Settings: an empty card slot takes no gap, and no card adds its own top margin',
+    /#page-settings>div:empty\{display:none;\}/.test(html) &&
+    !/overflow:hidden;margin-top:14px[^']*'\s*\+\s*sSecHdr\('(?:tabs|cache|stagecopy)'/.test(html));
   const ov = trk('onboarding-overlay'); ov.classList.add('hidden');
   const dots = trk('ob-dots'), backB = trk('ob-back'), nextB = trk('ob-next');
   sandbox.localStorage._s['wkt-profile'] = JSON.stringify({ onboarded: true, gender: 'female', weight: 60 });
