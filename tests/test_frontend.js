@@ -9498,7 +9498,7 @@ console.log('\n── Polestar climate ─────────────�
         if (url === 'https://agent/polestar' && o.method === 'DELETE') return { ok: true, json: async () => ({ set: false, email: '' }) };
         return { ok: false, status: 404, json: async () => ({}) }; } });
     vm.runInContext(_blk, C);
-    return { C, calls, els, open, timers, release: () => release && release() };
+    return { C, calls, els, open, timers, opts, release: () => release && release() };
   }
   const threeSets = () => { const r = [mkInp('8'), mkInp(''), mkInp('')]; return { r, cards: [mkCard([mkInp('5')]), mkCard(r)] }; };
   const tick = () => new Promise(r => setImmediate(r));
@@ -9594,8 +9594,15 @@ console.log('\n── Polestar climate ─────────────�
       check('  …Turn on starts climate and turns the car red, heat or cool not known yet', t.calls.some(c => c.url === 'https://agent/polestar/climate' && c.method === 'POST') && /ps-car-on/.test(t.els['hdr-car'].innerHTML) && /#e53935/.test(t.els['hdr-car'].innerHTML) && !t.calls.some(c => /open-meteo/.test(c.url)));
       check('  …and asks the car again after 30 s to learn heat or cool', t.timers[t.timers.length - 1].ms === 30000);
       check('  …the card now offers Turn off', /Climate is on/.test(t.els['ps-modal-body'].innerHTML) && /psTurnOff\(\)/.test(t.els['ps-modal-body'].innerHTML));
+      // Henrik, 2026-11-05: "Stage car symbol has lost the heating symbol?" The car had not decided at 30 s and was
+      // not asked again for 3 minutes. It is asked every 30 s until it says heating or cooling.
+      t.opts.status = { active: true, starting: true, status: 'START_ATTEMPT', action: 'NOT_REQUIRED' };
+      await t.timers[t.timers.length - 1].f();
+      check('  …a car that has not decided yet is asked again 30 s later, not 3 minutes', /ps-car-on/.test(t.els['hdr-car'].innerHTML) && t.timers[t.timers.length - 1].ms === 30000);
+      t.opts.status = null;
       await t.timers[t.timers.length - 1].f();
       check('  …the car\'s heating shows as the heat symbol', /ps-car-heat/.test(t.els['hdr-car'].innerHTML));
+      check('  …and from then on it is asked every 3 minutes', t.timers[t.timers.length - 1].ms === 180000);
       const p = t.C.psTurnOff(); 
       check('  …Turn off shows a waiting message', /Stopping climate…/.test(t.els['ps-modal-body'].innerHTML));
       t.C.psClose(); check('  …which cannot be closed while waiting', t.open.has('psModal'));
