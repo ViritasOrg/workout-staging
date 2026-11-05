@@ -1,7 +1,7 @@
 # Workout Staging — Claude Instructions
 
-<!-- BEGIN ORG-WIDE RULES v14. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there; the Sync org rules workflow opens the PRs that copy this block into every other ViritasOrg repo, and the daily drift check reports any copy that differs. -->
-## Org-wide rules: every ViritasOrg repo (canonical v14, 2026-11-05)
+<!-- BEGIN ORG-WIDE RULES v15. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there; the Sync org rules workflow opens the PRs that copy this block into every other ViritasOrg repo, and the daily drift check reports any copy that differs. -->
+## Org-wide rules: every ViritasOrg repo (canonical v15, 2026-11-05)
 
 Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file adds repo-specific rules. If one seems to contradict this block, say so to Henrik instead of picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent). The quote and incident behind each rule: https://github.com/ViritasOrg/claude-agent-backend/blob/main/docs/org-rules-history.md.
 
@@ -18,7 +18,7 @@ Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file 
 - **Don't stop for minor things**: a small reversible call (an estimate, a name, an obvious adjacent fix) is made and reported, not asked. Ask only what is his: a change to what he asked for, prod, a delete, a real trade-off.
 - **Once Henrik has answered, carry on** (https://github.com/ViritasOrg/Flyt/issues/582): never end a turn on "shall I go ahead?".
 - **Never slack off when you know what to do next**: a turn never ends on a plan, a promise or a summary while work that needs nothing from Henrik is undone. End only when finished, when it truly waits on Henrik (then end with that one step) or when it waits on something that will wake the session (CI, a scheduled check), named with when it lands.
-- **Background events get no reply unless they change something for Henrik**: a CI result, PR event or agent's progress that needs nothing from him gets no message; never repeat a status or an open question because an event woke the session. Speak when his work is finished, fails or needs his one step, once.
+- **A wake-up that changes nothing for Henrik gets no message at all**: a CI result, a PR or merge notice, a watcher finishing, a check-in or an agent's progress that needs nothing from him and changes nothing he asked about ends the turn with nothing written, not a status, not "nothing new", and not the open step either. The open step is restated only in a message sent because something changed (his work finished, failed, or needs that step), once. Never acknowledge this rule or promise to keep it; keeping it is silence.
 - **A message sent while you work never means stop** (https://github.com/ViritasOrg/Flyt/issues/895): a mid-turn message (Send Now) is a question or extra instruction; answer it in a line and carry on, re-running the interrupted step. Stop only on "stop", "wait", "hold", "don't".
 - **Every reference is a clickable link, its full URL visible** (https://github.com/ViritasOrg/Flyt/issues/425): issue, PR, Claude session, Actions run, commit, file or page, written as its full `https://` URL inside the sentence. Never link text that hides the URL, a bare `#299`, `owner/repo#n`, a URL in bold, in code formatting or alone on a line.
 
@@ -79,7 +79,7 @@ Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file 
 
 ### CLAUDE.md holds rules, not records
 - A repo's root `CLAUDE.md` is loaded into every session, so it stays under 200 lines: imperative rules, one line each, an issue URL as provenance, at most one line of why. Quotes, incident stories, feature logs, "current state" and design notes go to `docs/` (pointed to from `CLAUDE.md` in one line), or to `.claude/rules/<area>.md` with `paths:` frontmatter when a rule only matters for part of the repo. A rule Henrik gives goes in as a rule; the quote goes to `docs/rule-history.md`.
-<!-- END ORG-WIDE RULES v14 -->
+<!-- END ORG-WIDE RULES v15 -->
 
 ## This repo
 Single-file PWA: `index.html` (JS, CSS, HTML inline), `css/main.css`; `const VERSION` matches `version.json`, both bumped by the version-bump workflow on merge. GitHub Pages deploys on push to `main` (the live `version.json` cannot be fetched from a session). All development happens here; `workout` (prod) is read-only for Claude. Shared infrastructure with `peptidetracker-staging` (Push to Prod, settings sync, update checker, auth, backend calls, `IS_STAGING`): **a fix in one app is made in the other in the same session**. Tests: `node tests/test_frontend.js`, 0 failures before any PR. **Program generation, the Log screen, drafts, 1RM, sketches, home equipment, Ask AI and Polestar have their own rule file, `docs/program-rules.md`: read it before touching any of them and update it in the same PR.** The old `CLAUDE.md` is `docs/claude-md-archive-2026-11-05.md`; a new rule goes below as one line, its story into `docs/rule-history.md`. **Scan the conversation for rules each session** and extract what Henrik gave into this file; point out a contradiction rather than silently picking one.
