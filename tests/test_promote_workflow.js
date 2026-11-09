@@ -79,7 +79,17 @@ case "$1 $2" in
           echo '{"check_runs":[{"name":"test","status":"completed","conclusion":"success"},{"name":"test","status":"completed","conclusion":"success"}]}'
         fi ;;
     esac ;;
-  "pr merge") touch "${dir}/merged" ;;
+  "pr merge")
+    m=$(cat "${dir}/merges" 2>/dev/null || echo 0); m=$((m+1)); echo $m > "${dir}/merges"
+    if [ "$m" -le "\${GH_MERGE_BEHIND:-0}" ]; then
+      echo "X Pull request ViritasOrg/x#7 is not mergeable: the head branch is not up to date with the base branch." >&2; exit 1
+    fi
+    if [ -n "\${GH_MERGE_REFUSE:-}" ]; then echo "\${GH_MERGE_REFUSE}" >&2; exit 1; fi
+    touch "${dir}/merged" ;;
+  "api -X")
+    echo "$4" >> "${dir}/updates"
+    [ -n "\${GH_UPDATE_FAIL:-}" ] && { echo "gh: merge conflict between base and head (HTTP 422)" >&2; exit 1; }
+    echo '{"message":"Updating pull request branch."}' ;;
   "pr list") for n in \${GH_PR_LIST}; do echo $n; done ;;
   "pr close") [ "$3" = "\${GH_CLOSE_FAIL:-none}" ] && exit 1; echo "$3" >> "${dir}/closed" ;;
 esac
@@ -96,6 +106,7 @@ function run(script, env) {
   });
   const read = f => { try { return fs.readFileSync(path.join(sb.dir, f), 'utf8'); } catch (e) { return ''; } };
   return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), merged: fs.existsSync(path.join(sb.dir, 'merged')),
+           updates: read('updates').trim().split('\n').filter(Boolean),
            closed: read('closed').trim().split('\n').filter(Boolean), polls: +read('polls') || 0 };
 }
 
@@ -132,6 +143,26 @@ console.log('\n── Push to Prod: the wait for prod CI ───────�
   check('CI that never finishes times out after 30 minutes, without merging',
     r.code !== 0 && !r.merged && /did not merge within 30 minutes/.test(r.out) && r.polls === 180, 'polls ' + r.polls);
   check('  …the merge itself is never retried', !/gh_retry[^\n]*pr merge/.test(wait));
+}
+
+console.log('\n── Push to Prod: prod main moves while CI runs (2026-11-09) ─────');
+{
+  const wait = stepRun('Wait for CI and merge prod PR');
+  let r = run(wait, { GH_MERGE_BEHIND: '1' });
+  check('a PR left behind by a merge on prod main is updated from main, then merged',
+    r.code === 0 && r.merged && JSON.stringify(r.updates) === '["repos/ViritasOrg/' + (/peptidetracker"/.test(wait) ? 'peptidetracker' : 'workout') + '/pulls/7/update-branch"]',
+    'exit ' + r.code + ' updates ' + JSON.stringify(r.updates) + '\n' + r.out.slice(-400));
+  check('  …and CI is waited for again before that merge', r.polls >= 2, 'polls ' + r.polls);
+  r = run(wait, { GH_MERGE_BEHIND: '100' });
+  check('  …at most 3 updates, then it fails with GitHub\'s reason',
+    r.code !== 0 && !r.merged && r.updates.length === 3 && /::error::GitHub refused to merge PR #7: X Pull request .* not up to date/.test(r.out),
+    'updates ' + r.updates.length + '\n' + r.out.slice(-400));
+  r = run(wait, { GH_MERGE_BEHIND: '1', GH_UPDATE_FAIL: '1' });
+  check('  …an update that fails (a conflict) stops the promotion with that reason',
+    r.code !== 0 && !r.merged && /::error::Prod main moved while CI ran and PR #7 could not be updated from it: gh: merge conflict/.test(r.out), r.out.slice(-400));
+  r = run(wait, { GH_MERGE_REFUSE: 'X Pull request is not mergeable: review required' });
+  check('any other refusal is not retried, and its reason is the error line',
+    r.code !== 0 && !r.merged && r.updates.length === 0 && /::error::GitHub refused to merge PR #7: X Pull request is not mergeable: review required/.test(r.out), r.out.slice(-400));
 }
 
 console.log('\n── Push to Prod: promote PRs a failed run left open ─────────────');

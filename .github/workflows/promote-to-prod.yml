@@ -185,8 +185,30 @@ jobs:
             fi
             if [ "$PENDING" = "0" ]; then
               echo "All CI checks passed (attempt $i). Merging PR #$PR_NUMBER..."
-              gh pr merge "$PR_NUMBER" --repo "$REPO" --squash --delete-branch
-              exit 0
+              if MERGE_OUT=$(gh pr merge "$PR_NUMBER" --repo "$REPO" --squash --delete-branch 2>&1); then
+                echo "$MERGE_OUT"
+                exit 0
+              fi
+              echo "$MERGE_OUT"
+              # ⚠️ PROD MAIN MOVED WHILE CI RAN (2026-11-09). Prod requires a PR to be up to
+              # date with main, so anything merged there during the wait (the org-rules sync
+              # PR merged at 20:56 EET, two minutes before CI went green) makes GitHub refuse
+              # the merge. That refusal is unambiguous, so it is answered here: bring the PR
+              # up to date, wait for CI on the new head and merge, up to 3 times. Any other
+              # refusal still fails, with GitHub's own words as the error.
+              if echo "$MERGE_OUT" | grep -qi "not up to date" && [ "${UPDATES:-0}" -lt 3 ]; then
+                UPDATES=$(( ${UPDATES:-0} + 1 ))
+                echo "Prod main moved while CI ran: updating PR #$PR_NUMBER from main (update $UPDATES of 3), then waiting for CI again..."
+                if ! UPD_OUT=$(gh api -X PUT "repos/$REPO/pulls/$PR_NUMBER/update-branch" 2>&1); then
+                  echo "$UPD_OUT"
+                  echo "::error::Prod main moved while CI ran and PR #$PR_NUMBER could not be updated from it: $(echo "$UPD_OUT" | head -1)"
+                  exit 1
+                fi
+                sleep 10
+                continue
+              fi
+              echo "::error::GitHub refused to merge PR #$PR_NUMBER: $(echo "$MERGE_OUT" | grep -v '^$' | head -1)"
+              exit 1
             fi
             echo "Attempt $i: $PENDING CI check(s) still running, waiting 10s..."
             sleep 10
