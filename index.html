@@ -4962,7 +4962,7 @@ async function psRemove(){if(!confirmGlobalDelete('your Polestar ID (the Log sto
 // age; research in claude-agent-backend docs/enhanced-bodybuilding/22-water-intake.md) unless
 // the user has typed their own (user setting "water-goal-ml"). Nothing here lives only on the device.
 var _wlRows=[],_wlTarget=null,_wlOwn=0,_wlBusy=false,_wlErr='',_wlTargetFail=false;
-var WL_STEPS=[250,500];
+var WL_STEPS=[100,250,500];// 100 ml added (Henrik, 2026-11-10); 250 stays the highlighted step
 function _wlProfile(){
   if(typeof _userProfile==='function'){var p=_userProfile();return{weight:p.weight_kg||0,sex:p.sex||'male',age:p.age||0};}
   var w=(typeof getData==='function'?getData('wkt-profile',{}):{})||{};
@@ -4987,7 +4987,7 @@ function _wlHtml(){
   h+='<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+(food?'Includes '+food+' ml from drinks in the food log. ':'')+(goal?'Target '+_wlL(goal)+', ':'')+basis+' · <span onclick="wlSetOwn()" style="text-decoration:underline;cursor:pointer">'+(_wlOwn>0?'Change':'Set my own')+'</span></div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+
     (_wlBusy?'<div style="font-size:14px;color:var(--muted);padding:10px 0">Saving…</div>':
-      WL_STEPS.map(function(ml){return _flBtn('+ '+ml+' ml','wlAdd('+ml+')',ml===WL_STEPS[0]);}).join('')+
+      WL_STEPS.map(function(ml){return _flBtn('+ '+ml+' ml','wlAdd('+ml+')',ml===250);}).join('')+
       (_wlRows.length?_flBtn('Undo last','wlUndo()',false):''))+'</div>';
   if(_wlErr)h+='<div style="margin-top:8px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_wlErr)+'</div>';
   return _flCard(h);

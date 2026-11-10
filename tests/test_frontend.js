@@ -9126,6 +9126,7 @@ console.log('\n── Water ─────────────────�
   check('water: shows the day\'s total against the target', /0\.8 L<\/b> \/ 3\.1 L/.test(_h) && /width:24%/.test(_h));
   check('  …says where the target comes from', /Yamada 2022/.test(_h) && /Set my own/.test(_h));
   check('  …with one-tap amounts and an undo', /wlAdd\(250\)/.test(_h) && /wlAdd\(500\)/.test(_h) && /wlUndo\(\)/.test(_h));
+  check('  …including a 100 ml step, before 250 and 500', /wlAdd\(100\)[\s\S]*wlAdd\(250\)[\s\S]*wlAdd\(500\)/.test(_h));
   G._wlOwn = 3500;
   _h = G._wlHtml();
   check('  …and an own target replaces the research one', /\/ 3\.5 L/.test(_h) && /your own target/.test(_h) && !/Yamada/.test(_h));
