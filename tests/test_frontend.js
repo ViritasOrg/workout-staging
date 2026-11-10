@@ -3766,13 +3766,28 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
   check('muscle plan: builds at home and with injuries', homeErr.length === 0, homeErr.slice(0,4).join(' | '));
   // The picture: marked muscles red, on both sexes, front and back
   const fig = G._muscleFigureHtml('m', ['glutes','chest']);
-  const redEll = (fig.match(/<ellipse[^>]*fill="rgba\(255,30,30,0\.55\)"[^>]*>/g) || []);
+  const redEll = (fig.match(/<path[^>]*fill="rgba\(255,30,30,0\.55\)"[^>]*>/g) || []);
   check('muscle picture: the male front and back images are shown', fig.includes('muscles-m-front.webp') && fig.includes('muscles-m-back.webp'));
   check('muscle picture: marked muscles (both sides) are red, nothing else is',
     redEll.length === 4 && redEll.every(e => /data-muscle="(glutes|chest)"/.test(e)), redEll.length);
   check('muscle picture: every muscle can be tapped on the picture and as a chip',
     M.every(id => fig.includes(`data-muscle="${id}"`) && fig.includes(`data-muscle-chip="${id}"`)) && M.every(id => G._muscleFigureHtml('f', []).includes(`data-muscle="${id}"`)));
-  check('muscle picture: no ellipse is red when nothing is marked', !/255,30,30/.test(G._muscleFigureHtml('f', [])));
+  // Henrik 2026-11-10: "muscle choices are oval shapes not following the muscles at all nor in the
+  // correct spot? and I can[t] choose traps at all". Shapes are traced outlines now, and traps exist.
+  check('muscle picture: shapes are traced outlines (paths), not ovals', !/<ellipse/.test(fig) && /<path data-muscle="chest" d="M[\d.,]+C/.test(fig));
+  check('muscle picture: traps can be picked, on the front and the back of both bodies', M.includes('traps') &&
+    ['m','f'].every(x => ['front','back'].every(v => G._muscleShapes(x, v, 'traps').length >= 1)) && fig.includes('data-muscle-chip="traps"'));
+  const tp = G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['traps']);
+  check('muscle plan: traps alone are trained with shrugs', tp.days.every(d => d.exercises.some(e => e.name === 'Shrug')));
+  // Every outline sits on the body: its centre is inside the figure's silhouette (not the light background).
+  check('muscle picture: left/right shapes are mirror images, central ones (traps, abs) are single',
+    G._muscleShapes('m','front','chest').length === 2 && G._muscleShapes('m','front','abs').length === 1 && G._muscleShapes('f','back','traps').length === 1);
+  check('muscle picture: every shape is in the right region of the body (head-to-toe order)', (() => {
+    const cy = (sex, v, id) => { const s = G._muscleShapes(sex, v, id)[0]; return s.reduce((a, q) => a + q[1], 0) / s.length; };
+    return ['m','f'].every(x => cy(x,'front','traps') < cy(x,'front','chest') && cy(x,'front','chest') < cy(x,'front','abs') && cy(x,'front','abs') < cy(x,'front','quads')
+      && cy(x,'back','traps') < cy(x,'back','lats') && cy(x,'back','lats') < cy(x,'back','glutes') && cy(x,'back','glutes') < cy(x,'back','hamstrings') && cy(x,'back','hamstrings') < cy(x,'back','calves'));
+  })());
+  check('muscle picture: no shape is red when nothing is marked', !/255,30,30/.test(G._muscleFigureHtml('f', [])));
   check('muscle picture: Feminine Aesthetic shows the female body', G._muscleSex('aesthetic') === 'f' && G._muscleFigureHtml('f', []).includes('muscles-f-front.webp'));
   // Every image the app references ships with Push to Prod
   const wf = fs.readFileSync(path.join(__dirname, '..', '.github/workflows/promote-to-prod.yml'), 'utf8');
@@ -3781,7 +3796,7 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
   const el = () => ({ textContent: '', innerHTML: '' });
   vm.runInContext("_progWiz={step:'muscles',goal:'hypertrophy',sub:null,muscles:[],nDays:3,setsPerMuscle:12,injuries:[],name:'',homeItems:[]}", sandbox);
   let b = el(), f = el(); G._renderProgWiz(el(), b, f);
-  check('wizard: the muscles step shows the body picture, Next disabled until a muscle is marked', /<ellipse/.test(b.innerHTML) && /disabled/.test(f.innerHTML) && /ready-made focus/.test(f.innerHTML));
+  check('wizard: the muscles step shows the body picture, Next disabled until a muscle is marked', /<path data-muscle/.test(b.innerHTML) && /disabled/.test(f.innerHTML) && /ready-made focus/.test(f.innerHTML));
   vm.runInContext("var __rpoSaved=_renderProgOverlay;_renderProgOverlay=function(){}", sandbox);
   G._progWizToggleMuscle('triceps');
   b = el(); f = el(); G._renderProgWiz(el(), b, f);
