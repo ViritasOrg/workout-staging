@@ -791,3 +791,22 @@ Henrik: *"use [the Claude key] to allow AI guided changes to training programs .
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 
+
+### Muscle planner (Henrik, 2026-11-10)
+*"enable user to click and choose muscles to train after choosing goal (hypertrophy/strenght/female).
+marked muscles should be shown in red."* Answers: **1 A** — only the marked muscles are trained,
+unmarked ones are left out; **2 B** — individual muscles are clickable.
+- After the goal (Strength, Hypertrophy, Feminine Aesthetic; not Rehab) the wizard shows the
+  Peptide Tracker's body pictures (`muscles-{m,f}-{front,back}.webp`, the 20% body-fat images,
+  without injection sites). Feminine Aesthetic shows the female body, otherwise the profile's sex.
+  Tapping a muscle on the picture or its chip marks it red. "Use a ready-made focus instead" goes
+  to the old focus step; Next is disabled until one muscle is marked.
+- Muscles: chest, front/side/rear delts, triceps, biceps, lats, upper back, quads, hamstrings,
+  glutes, calves, abs (`MUSCLES`, regions in `MUSCLE_REGIONS`, exercises in `MUSCLE_LIB`).
+- `_musclePlanPool`: Lower / Push / Pull days for the marked muscles when there are at least as
+  many days as categories, otherwise full-body days; abs ride along every day. Each marked
+  muscle's lead exercise per day is `keep:true`. Weekly sets-per-muscle counts once per marked
+  muscle in a group; unmarked groups get 0.
+- The leg-day rule (Squat first, Deadlift last) applies to a muscle plan only when quads,
+  hamstrings and glutes are all marked, since those lifts would otherwise train unmarked muscles.
+- Push to Prod copies `muscles-*.webp`.
