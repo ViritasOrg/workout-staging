@@ -774,7 +774,10 @@ After every session in which Henrik gives a rule, constraint, or order, extract 
 *"enable user to click and choose muscles to train after choosing goal (hypertrophy/strenght/female).
 marked muscles should be shown in red."* Answers: **1 A** — only the marked muscles are trained,
 unmarked ones are left out; **2 B** — individual muscles are clickable.
-- After the goal (Strength, Hypertrophy, Feminine Aesthetic; not Rehab) the wizard shows the
+- The picker is optional (Henrik, 2026-11-10: *"the picker should not be a mandatory step, the
+  wizard should give user a choice, automatic or pick muscles"*): after the goal the wizard asks
+  **Automatic** (the ready-made focus step) or **Pick muscles** (step `mode`); Rehab skips it.
+- Pick muscles (Strength, Hypertrophy, Feminine Aesthetic; not Rehab) shows the
   Peptide Tracker's body pictures (`muscles-{m,f}-{front,back}.webp`, the 20% body-fat images,
   without injection sites). Feminine Aesthetic shows the female body, otherwise the profile's sex.
   Tapping a muscle on the picture or its chip marks it red. "Use a ready-made focus instead" goes
