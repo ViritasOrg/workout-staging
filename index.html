@@ -2289,24 +2289,36 @@ function _progBuildManual(){
 // (hypertrophy/strenght/female). marked muscles should be shown in red." — on the Peptide
 // Tracker's body pictures (male/female, front/back, 20% body fat), without the injection sites.
 // Answers: 1 A — ONLY the marked muscles are trained, unmarked ones are left out; 2 B — the
-// individual muscles below are clickable. Regions are ellipses [cx,cy,rx,ry] on the 360×920 image.
-var MUSCLES=[{id:'chest',label:'Chest',group:'chest',cat:'push'},{id:'frontdelts',label:'Front delts',group:'shoulders',cat:'push'},
+// individual muscles below are clickable. Regions: see MUSCLE_REGIONS.
+var MUSCLES=[{id:'chest',label:'Chest',group:'chest',cat:'push'},{id:'traps',label:'Traps',group:'back',cat:'pull'},{id:'frontdelts',label:'Front delts',group:'shoulders',cat:'push'},
   {id:'sidedelts',label:'Side delts',group:'shoulders',cat:'push'},{id:'triceps',label:'Triceps',group:'arms',cat:'push'},
   {id:'lats',label:'Lats',group:'back',cat:'pull'},{id:'upperback',label:'Upper back',group:'back',cat:'pull'},
   {id:'reardelts',label:'Rear delts',group:'shoulders',cat:'pull'},{id:'biceps',label:'Biceps',group:'arms',cat:'pull'},
   {id:'quads',label:'Quads',group:'legs',cat:'lower'},{id:'hamstrings',label:'Hamstrings',group:'legs',cat:'lower'},
   {id:'glutes',label:'Glutes',group:'legs',cat:'lower'},{id:'calves',label:'Calves',group:'legs',cat:'lower'},
   {id:'abs',label:'Abs',group:null,cat:'core'}];
-var MUSCLE_REGIONS={"m":{"front":{"chest":[[140,258,34,26],[220,258,34,26]],"frontdelts":[[100,232,15,20],[260,232,15,20]],"sidedelts":[[80,245,11,24],[280,245,11,24]],"biceps":[[72,310,14,34],[288,310,14,34]],"abs":[[180,345,32,58]],"quads":[[130,585,27,70],[230,585,27,70]]},"back":{"upperback":[[180,230,48,32]],"reardelts":[[95,240,15,18],[265,240,15,18]],"lats":[[132,310,26,48],[228,310,26,48]],"triceps":[[72,305,13,34],[288,305,13,34]],"glutes":[[145,470,32,34],[215,470,32,34]],"hamstrings":[[135,600,25,58],[225,600,25,58]],"calves":[[125,760,18,45],[235,760,18,45]]}},"f":{"front":{"chest":[[145,262,28,22],[215,262,28,22]],"frontdelts":[[107,235,13,18],[253,235,13,18]],"sidedelts":[[90,248,10,22],[270,248,10,22]],"biceps":[[82,315,12,32],[278,315,12,32]],"abs":[[180,355,28,55]],"quads":[[135,590,25,68],[225,590,25,68]]},"back":{"upperback":[[180,230,42,30]],"reardelts":[[100,240,13,17],[260,240,13,17]],"lats":[[138,310,22,42],[222,310,22,42]],"triceps":[[80,305,12,32],[280,305,12,32]],"glutes":[[145,465,32,36],[215,465,32,36]],"hamstrings":[[138,595,24,58],[222,595,24,58]],"calves":[[130,760,17,45],[230,760,17,45]]}}};
+// Henrik 2026-11-10: "muscle choices are oval shapes not following the muscles at all nor in the
+// correct spot? and I can[t] choose traps at all" — each muscle is now its traced outline: polygons
+// on the 360×920 image for the figure's left side, mirrored to the right (traps and abs are one
+// central shape), drawn as smooth closed curves.
+var MUSCLE_REGIONS={"m":{"front":{"traps":[[[148,168],[152,192],[112,202],[96,204],[118,190]]],"frontdelts":[[[96,204],[102,216],[101,262],[97,288],[88,290],[83,258],[81,225],[87,209]]],"sidedelts":[[[87,209],[81,225],[83,258],[88,290],[73,282],[62,262],[60,235],[67,216],[78,207]]],"chest":[[[102,216],[140,206],[178,212],[178,282],[160,292],[128,292],[108,281],[101,262]]],"biceps":[[[88,292],[98,302],[95,332],[88,355],[70,360],[58,345],[56,315],[64,292]]],"abs":[[[150,292],[210,292],[215,330],[210,380],[195,412],[165,412],[150,380],[145,330]]],"quads":[[[92,496],[130,492],[172,500],[170,540],[160,590],[140,606],[115,606],[100,590],[88,550]]]},"back":{"traps":[[[165,165],[195,165],[255,200],[225,214],[196,250],[180,292],[164,250],[135,214],[105,200]]],"upperback":[[[110,214],[136,216],[160,248],[160,288],[134,284],[112,264],[104,236]]],"reardelts":[[[96,204],[102,240],[99,276],[80,282],[64,264],[62,232],[73,210]]],"lats":[[[102,262],[126,268],[160,300],[172,350],[166,396],[140,386],[116,346],[102,302]]],"triceps":[[[97,282],[99,302],[93,340],[80,358],[62,350],[54,320],[58,292],[78,282]]],"glutes":[[[100,420],[140,412],[176,420],[177,488],[140,496],[100,488],[92,455]]],"hamstrings":[[[92,502],[172,502],[166,560],[150,610],[125,622],[102,610],[92,560]]],"calves":[[[88,660],[125,650],[146,680],[142,740],[126,772],[102,772],[88,736],[84,690]]]}},"f":{"front":{"traps":[[[138,178],[142,192],[110,203],[98,205],[118,190]]],"frontdelts":[[[98,205],[104,220],[103,255],[98,272],[90,268],[88,235],[90,212]]],"sidedelts":[[[90,212],[88,235],[90,268],[80,262],[73,240],[76,218],[86,206]]],"chest":[[[108,225],[145,222],[178,228],[178,295],[150,300],[118,295],[105,270]]],"biceps":[[[98,278],[102,295],[98,325],[88,345],[72,345],[64,325],[66,295],[76,278]]],"abs":[[[150,305],[210,305],[215,340],[208,385],[195,405],[165,405],[152,385],[145,340]]],"quads":[[[92,495],[130,490],[172,495],[168,540],[158,590],[140,628],[115,628],[100,600],[88,550]]]},"back":{"traps":[[[162,170],[198,170],[250,198],[222,212],[196,245],[180,285],[164,245],[138,212],[110,198]]],"upperback":[[[108,212],[138,214],[160,245],[158,285],[132,285],[110,265],[102,238]]],"reardelts":[[[98,203],[104,225],[102,262],[88,270],[74,258],[72,228],[82,206]]],"lats":[[[104,262],[130,282],[160,305],[170,350],[162,385],[140,380],[118,345],[106,300]]],"triceps":[[[100,272],[102,290],[96,325],[86,345],[68,345],[60,320],[64,290],[78,272]]],"glutes":[[[100,445],[140,438],[177,445],[178,505],[150,512],[110,505],[92,480]]],"hamstrings":[[[92,515],[174,515],[165,570],[150,640],[122,650],[102,630],[92,570]]],"calves":[[[100,690],[150,685],[158,720],[150,770],[128,790],[105,780],[96,740]]]}}};
 // Exercises per muscle, first = the one a session leads with. Hip Thrust only for Feminine
 // Aesthetic (rule 2026-07-23), Bulgarian Split Squat never (banned in hypertrophy).
 var MUSCLE_LIB={quads:[['Squat',60],['Leg Press',100],['Leg Extension',35]],hamstrings:[['Romanian Deadlift',60],['Leg Curl',35]],
   glutes:[['Lunges',20],['Hip Abductor (outside hips)',40]],glutesF:[['Hip Thrust',60],['Hip Abductor (outside hips)',40],['Lunges',20]],
   calves:[['Calf Raises',50],['Seated Calf Raise',40]],chest:[['Bench Press',60],['Incline DB Press',22],['Cable Fly',15]],
   frontdelts:[['Overhead Press',35],['Arnold Press',14],['Front Raise',8]],sidedelts:[['Lateral Raise',8],['Cable Lateral Raise',6]],
-  reardelts:[['Rear Delt Fly',7],['Face Pulls',15]],lats:[['Pull-ups',0],['Lat Pulldown',45]],upperback:[['Barbell Row',50],['Cable Row',45]],
+  reardelts:[['Rear Delt Fly',7],['Face Pulls',15]],lats:[['Pull-ups',0],['Lat Pulldown',45]],traps:[['Shrug',60],['Upright Row',25]],upperback:[['Barbell Row',50],['Cable Row',45]],
   biceps:[['Barbell Curl',25],['Hammer Curl',12]],triceps:[['Tricep Pushdown',20],['Overhead Tricep Cable',18],['Skull Crushers',20]],
   abs:[['Dead Bug',0],['Plank',0],['Pallof Press',8]]};
+var MUSCLE_CENTER={traps:1,abs:1};
+// Every outline of one muscle on one picture: the traced polygon and its mirror (x → 360-x).
+function _muscleShapes(sex,view,id){var out=[];((MUSCLE_REGIONS[sex]||{})[view]||{})[id]&&MUSCLE_REGIONS[sex][view][id].forEach(function(p){out.push(p);
+  var cx=p.reduce(function(a,q){return a+q[0];},0)/p.length;if(!(MUSCLE_CENTER[id]&&Math.abs(cx-180)<15))out.push(p.map(function(q){return[360-q[0],q[1]];}).reverse());});return out;}
+// A closed Catmull-Rom curve through the points, as an SVG path (soft muscle outlines, not corners).
+function _smoothPath(p){var n=p.length,d='M'+p[0][0]+','+p[0][1];for(var i=0;i<n;i++){var p0=p[(i-1+n)%n],p1=p[i],p2=p[(i+1)%n],p3=p[(i+2)%n];
+  var c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+  d+='C'+c1x.toFixed(1)+','+c1y.toFixed(1)+' '+c2x.toFixed(1)+','+c2y.toFixed(1)+' '+p2[0]+','+p2[1];}return d+'Z';}
 function _muscleLib(id,goal){return (id==='glutes'&&goal==='aesthetic')?MUSCLE_LIB.glutesF:MUSCLE_LIB[id];}
 // Which figure: Feminine Aesthetic shows the female body, otherwise the profile's sex.
 function _muscleSex(goal){if(goal==='aesthetic')return'f';var pr=getData('wkt-profile',{})||{};return pr.gender==='female'?'f':'m';}
@@ -2317,9 +2329,8 @@ function _muscleFigureHtml(sex,marked,toggleFn){marked=marked||[];toggleFn=toggl
   ['front','back'].forEach(function(v){
     h+='<div style="flex:1;max-width:180px;position:relative;"><div style="text-align:center;font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">'+(v==='front'?'Front':'Back')+'</div><div style="position:relative;"><img src="muscles-'+sex+'-'+v+'.webp" alt="'+(sex==='f'?'Female':'Male')+' body, '+v+'" style="width:100%;display:block;border-radius:8px;">'
       +'<svg viewBox="0 0 360 920" style="position:absolute;inset:0;width:100%;height:100%;">';
-    var rg=MUSCLE_REGIONS[sex][v];
-    Object.keys(rg).forEach(function(id){var on=marked.indexOf(id)>=0;
-      rg[id].forEach(function(e){h+='<ellipse data-muscle="'+id+'" cx="'+e[0]+'" cy="'+e[1]+'" rx="'+e[2]+'" ry="'+e[3]+'" onclick="'+toggleFn+'(\''+id+'\')" style="cursor:pointer;" fill="'+(on?'rgba(255,30,30,0.55)':'rgba(255,255,255,0.01)')+'" stroke="'+(on?'#ff1e1e':'rgba(80,80,80,0.55)')+'" stroke-width="'+(on?3:2)+'"'+(on?'':' stroke-dasharray="6 5"')+'><title>'+lab[id]+'</title></ellipse>';});});
+    Object.keys(MUSCLE_REGIONS[sex][v]).forEach(function(id){var on=marked.indexOf(id)>=0;
+      _muscleShapes(sex,v,id).forEach(function(pt){h+='<path data-muscle="'+id+'" d="'+_smoothPath(pt)+'" onclick="'+toggleFn+'(\''+id+'\')" style="cursor:pointer;" fill="'+(on?'rgba(255,30,30,0.55)':'rgba(255,255,255,0.01)')+'" stroke="'+(on?'#ff1e1e':'rgba(80,80,80,0.55)')+'" stroke-width="'+(on?3:2)+'"'+(on?'':' stroke-dasharray="6 5"')+'><title>'+lab[id]+'</title></path>';});});
     h+='</svg></div></div>';});
   h+='</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">';
   MUSCLES.forEach(function(m){var on=marked.indexOf(m.id)>=0;
