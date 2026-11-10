@@ -14,8 +14,8 @@ feels backwards to set it manually."*
 - **A generated program may only prescribe a rep count some range defines** —
   `REPS_LEGAL = [2,3,4,5,6,8,9,10,11,12,15]`. Anything else snaps to the nearest legal count
   (Calf Raises 20 → 15, a 3-rep strength triple → 4) and the tag is then read off it.
-- The derivation runs **at the very end of `_generateWorkoutProgram`**, after the leg-day rules,
-  injury swaps and prehab injection — those re-author schemes and would otherwise slip past it.
+- The derivation runs **at the very end of `_generateWorkoutProgram`**, after injury swaps
+  and prehab injection — those re-author schemes and would otherwise slip past it.
 - **The scheme string is clamped too:** its low end is the prescription and its high end is
   capped at the tag's ceiling (`3×12-15` volume → `3×12`), so the app never displays rep
   guidance that crosses out of the tag it shows. Trailing text is preserved.
@@ -94,14 +94,9 @@ programs; only `rehab-*` still uses the old linear `scaleSets` path.
   exercise.** `BALANCE_RATIO=2`, applied **last** — both the ceiling trim and the allocation can
   otherwise open a gap. The compound bias is ~1.76×, so the guardrail preserves it in full and
   only clips rounding/floor pile-ups.
-- **The heavy Deadlift finisher is a fixed prescription** (`ex.fixed`) — always present, always
-  last on its leg day, keeping exactly the sets it was authored with (1×5-8) at every
-  sets-per-muscle. It is exempt from allocation, the ceiling trim, the balance guardrail and the
-  linear strength scaling, but its volume still counts, so everything else is sized around it.
-  *(Supersedes, for this entry only, the 2026-07-10 "Squat and Deadlift are allocator-sized like
-  any other exercise" rule. Every other lift, including a strength program's Squat, is
-  target-sized — strength splits no longer keep fixed 5×5 / 5×3 set counts, though reps and tags
-  are untouched.)*
+- **No exercise is a fixed prescription** since the leg-day rule was removed (2026-11-10): the
+  Deadlift is allocator-sized like every other lift. (`ex.fixed` is still honoured by the
+  allocator if an entry ever carries it.)
 - **Where the target cannot be met:** a muscle overshoots only when every lift for it already
   sits on the 2-set floor (e.g. 9 weekly leg sets across three leg days is impossible — 3
   exercises × 2 sets × 3 days = 18). Undershoot at high targets is capped by the 5-set maximum
@@ -122,11 +117,6 @@ and no dumbbells.
   own answers are gym machines; without them a knee-safe Leg Press turns back into a squat.
 - **Gym output is byte-identical to before** — verified across 1400 programs. Keep it that way:
   every home rule lives behind `equip`.
-- The leg-day rule asks `_legdaySafeName`, which reads the `equip:<id>` marker. A slot is
-  "blocked" when its safe substitute is not the real lift (`_isMainSquat`/`_isMainDeadlift`), so
-  kettlebell leg days open with **Kettlebell Front Squat** (≥3 strength sets) and close with
-  **Kettlebell Deadlift**; bodyweight has no deadlift and that half stands down, as for a
-  lower-back injury.
 - **Bodyweight at home is AMRAP** (`max`, scheme `N×max — stop 1–2 reps short of failure`, tag
   `volume`). That is how "higher reps allowed" is honoured without touching the 12-rep ceiling:
   `tagForReps`/`snapReps` leave `max` alone. Rehab-tagged work keeps its 15s.
@@ -188,7 +178,7 @@ variant is the most demanding movement a pull session carries, so it is done fre
 - Enforced in `_generateWorkoutProgram`: on any pull day holding a pull-up variant
   (`isPullUpEx` — Pull-ups / Weighted Pull-ups / Chin-ups; **not** Lat Pulldown or Face
   Pulls), that entry is hoisted to the first slot. Runs **after** every structural edit —
-  leg-day rules, injury swaps, prehab injection, Face Pull relocation, drop-to-fit — since
+  injury swaps, prehab injection, Face Pull relocation, drop-to-fit — since
   those reorder and remove entries.
 - The seeded `6-Day Hypertrophy — Upper` Day 2 — Pull A was the trigger: it opened with
   Barbell Row. The seed now opens with Pull-ups; Day 5 — Pull B already opened with
@@ -208,8 +198,7 @@ variant is the most demanding movement a pull session carries, so it is done fre
   `/push/`, and not `/legs|lower/`:
   - a mixed `Vertical Push/Pull` day is not a pull program, and hoisting there would
     reorder someone's pressing work uninvited;
-  - `Lower Pull` is a leg day whose first and last slots belong to the leg-day rule
-    (Squat first / Deadlift last);
+  - `Lower Pull` is a leg day, not a pull program;
   - full-body days are untouched — `Full Body B` carries Pull-ups next to a heavy
     Deadlift, and the main lower lift keeps the opening slot.
 - **Newly generated programs only.** Stored programs are not migrated (rule 2026-07-15) —
@@ -474,23 +463,14 @@ breath-holding keep HR up without matching oxygen uptake). Henrik's watch implie
 that session — above the 6.0 Compendium ceiling for "power lifting or body building, vigorous
 effort" that this estimator will ever use. Do not chase it by widening the band.
 
-### Leg day rules — ALWAYS follow (rule replaced 2026-07-10)
-Every `Legs*` day is **EITHER** a Squat day **OR** a Deadlift day — never both in one
-session (systemic/CNS load management). Supersedes the earlier "Squat always first AND
-Deadlift always last in every leg day" rule.
-- **Squat day**: Squat is the first exercise; contains NO conventional Deadlift
-- **Deadlift day**: Deadlift is the last exercise (6 reps, `1×6`, tag `strength` — was
-  documented as "5–8 reps"; superseded 2026-07-31, see Tags are DERIVED above); contains NO squat variants
-  (matcher: `/squat/i` excluding `split`)
-- Leg days alternate between the two types, starting with a Squat day
-- Set counts come from the volume allocator — never hardcoded (2026-07-10). **Exception
-  (2026-07-31): the heavy Deadlift finisher on a Deadlift day is a fixed prescription — see
-  Volume allocation above.**
-- Enforced **only on newly generated programs** (`_generateWorkoutProgram`) on days named
-  `Legs*`. **`_ensurePrograms` must NOT re-enforce leg-day rules on stored programs** (rule
-  2026-07-24): re-injecting/reordering Squat & Deadlift on every load silently reverted the
-  user's own exercise edits (e.g. swapping Squat → Leg Press). Stored programs are the user's
-  own and are left exactly as saved — consistent with "never mutate stored programs" (2026-07-15).
+### Leg days: no Squat/Deadlift rule (removed 2026-11-10)
+Henrik, 2026-11-10: *"find and remove the squat and deadlift rule i made for myself"*. The
+2026-08-21 rule (every leg day opens with ≥3 strength sets of Squat and ends with 1-3 strength
+sets of Deadlift, re-asserted after allocation, `_applyLegDayRule` / `_enforceLegDayFloor`) and
+the 2026-07-10 alternation it replaced are both gone. A leg day carries exactly what its
+template authors, sized by the allocator. **`_ensurePrograms` never reorders or injects
+exercises in stored programs** (rule 2026-07-24). `_isLegDay` stays: the template library uses
+it for "push and leg days".
 
 ### The program library and the template library (rule 2026-09-21)
 Henrik: *"Add support for a library of programs. Not just the 4 as today."* Two separate
@@ -616,9 +596,7 @@ push+legs on a 6-day split is 4. Henrik chose the day filter over a hard cap (he
 "max 3 times per week" and then replaced it with "only push and leg days" in the same turn).
 If a cap is ever added it belongs alongside `extendOn`, not in the template's notes.
 
-**Leg days:** extending puts the template block before the squat, so an extended leg day no
-longer opens with one. The leg-day rule is enforced only at generation time and explicitly
-never re-applied to stored programs, so nothing fights over it at runtime.
+**Leg days:** extending puts the template block first on the day.
 
 ### The in-progress workout is never deleted until its log is on the backend (rule 2026-09-30)
 Henrik, at the gym after an app update wiped a session: *"I want in progress logs to be saved
@@ -807,6 +785,4 @@ unmarked ones are left out; **2 B** — individual muscles are clickable.
   many days as categories, otherwise full-body days; abs ride along every day. Each marked
   muscle's lead exercise per day is `keep:true`. Weekly sets-per-muscle counts once per marked
   muscle in a group; unmarked groups get 0.
-- The leg-day rule (Squat first, Deadlift last) applies to a muscle plan only when quads,
-  hamstrings and glutes are all marked, since those lifts would otherwise train unmarked muscles.
 - Push to Prod copies `muscles-*.webp`.
