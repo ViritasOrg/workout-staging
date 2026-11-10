@@ -3844,6 +3844,37 @@ if (typeof G._generateWorkoutProgram === 'function') {
     _hasHT(G._generateWorkoutProgram('rehab','knee',6,'T',16,[])));
 }
 
+// ── Bootylicious (Feminine Aesthetic focus, Henrik 2026-11-10) ─────────────────
+// "includes legs all glutes muscles core and back. arms focus triceps shoulders no chest presses"
+if (typeof G._generateWorkoutProgram === 'function') {
+  console.log('\n── Bootylicious ───────');
+  const CORE = ['Dead Bug','Plank','Pallof Press','Bird Dog'];
+  const BICEP = /curl/i;
+  const chestLed = (n) => (G.getExSplits(n).chest || 0) >= 0.5 || /bench|chest press|chest machine|push-?up|\bdips?\b|close grip|floor press/i.test(n) && !/leg press|pike push/i.test(n);
+  const equips = ['gym', G._homeEquipId([]), G._homeEquipId(['kettlebell','bands'])];
+  const bad = [], miss = [];
+  [3,4,5,6].forEach(n => [9,16,21].forEach(spm => equips.forEach(eq => [[],['shoulders'],['knees']].forEach(inj => {
+    const p = G._generateWorkoutProgram('aesthetic','bootylicious',n,'T',spm,inj,eq);
+    const names = [].concat(...p.days.map(d => d.exercises.map(e => e.name)));
+    names.forEach(nm => { if (chestLed(nm) || (BICEP.test(nm) && !/leg curl|nordic/i.test(nm))) bad.push(`${n}d/${spm}/${eq}/${inj}: ${nm}`); });
+    const vol = {};
+    p.days.forEach(d => d.exercises.forEach(e => { const sp = G.getExSplits(e.name); Object.keys(sp).forEach(g => { if (typeof sp[g] === 'number' && g !== 'factor' && g !== 'cable' && g !== 'mechFactor') vol[g] = (vol[g]||0) + sp[g]*String(e.sets).split('-').length; }); }));
+    if (eq === 'gym' && !inj.length) {
+      if (!names.includes('Hip Thrust')) miss.push(`${n}d/${spm}: Hip Thrust`);
+      if (n >= 3 && !names.includes('Hip Abductor (outside hips)')) miss.push(`${n}d/${spm}: Hip Abductor`);
+      if (!names.some(x => CORE.includes(x))) miss.push(`${n}d/${spm}: core`);
+      if (!names.some(x => /tricep|skull/i.test(x))) miss.push(`${n}d/${spm}: triceps`);
+      if (!names.some(x => /press|lateral raise|rear delt/i.test(x) && (G.getExSplits(x).shoulders||0) >= 0.5)) miss.push(`${n}d/${spm}: shoulders`);
+      if (!(vol.back > 0)) miss.push(`${n}d/${spm}: back`);
+      if (!(vol.legs > vol.chest + vol.arms)) miss.push(`${n}d/${spm}: legs dominate`);
+    }
+  }))));
+  check('Bootylicious never has a chest press, push-up, dip or bicep curl (gym, home, injuries)', bad.length === 0, bad.slice(0,8).join(' | '));
+  check('Bootylicious trains glutes (Hip Thrust + Hip Abductor), legs, core, back, triceps and shoulders', miss.length === 0, miss.slice(0,8).join(' | '));
+  check('Bootylicious is offered as a Feminine Aesthetic focus in the wizard',
+    /\['bootylicious','Bootylicious',/.test(html) && G._generateWorkoutProgram('aesthetic','bootylicious',4,'T',12).days.length === 4);
+}
+
 // ── Face Pulls: at most one day per generated program ──────────────────────────
 // Rule (2026-07-24): Face Pulls must NEVER sit on a push/press day — any day containing a
 // pressing movement — even in shoulder rehab. The shoulder-injury cuff block injects Cable
@@ -3862,7 +3893,7 @@ if (typeof G._generateWorkoutProgram === 'function') {
   // Sweep every goal/sub/day-count, with and without shoulder injury: no Face Pulls (prehab or
   // not) may share a day with a pressing movement.
   const _allCombos = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],
-    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],
+    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],['aesthetic','bootylicious'],
     ['rehab','shoulder'],['rehab','back'],['rehab','knee']];
   const _nd = { strength:[3,4,5,6], hypertrophy:[3,4,5,6,7], aesthetic:[3,5], rehab:[6] };
   let _pressFP = [];
@@ -3921,7 +3952,7 @@ if (typeof G._seedHypertrophyProgram === 'function') {
 // Generator: no exercise may precede a pull-up variant on a pull day, across the catalogue
 if (typeof G._generateWorkoutProgram === 'function') {
   const _combos = [['strength','pure'],['strength','hybrid'],['hypertrophy','balanced'],
-    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],
+    ['hypertrophy','upper'],['hypertrophy','lower'],['aesthetic','fullbody'],['aesthetic','upperlower'],['aesthetic','bootylicious'],
     ['rehab','shoulder'],['rehab','back'],['rehab','knee']];
   const _nd = { strength:[3,4,5,6], hypertrophy:[3,4,5,6,7], aesthetic:[3,5], rehab:[6] };
   const _bad = [];

@@ -50,6 +50,14 @@ straddles strength (2–6) and volume (8–12), so it is not a range any tag def
 - **Bulgarian Split Squat — banned from `hypertrophy-*` programs only.** Allowed in
   `aesthetic-*`, `strength-*`, and `rehab-*`.
 
+- **Bootylicious (`aesthetic-bootylicious`, Henrik 2026-11-10)** — the third Feminine Aesthetic
+  focus: *"includes legs all glutes muscles core and back. arms focus triceps shoulders no chest
+  presses."* Glute max (Hip Thrust, RDL, lunges, Deadlift), glute med/min (Hip Abductor), core
+  (Dead Bug, Plank, Pallof Press, Bird Dog), back, shoulders and triceps; no chest presses,
+  push-ups, dips or curls. After the home/injury swaps any chest-led exercise (chest split ≥ 0.5,
+  e.g. Diamond Push-ups at bodyweight) is removed. The Hip Abductor and one triceps exercise per
+  upper day carry `keep:true`, which drop-to-fit never prunes.
+
 ### Volume allocation (rule rewritten 2026-07-31)
 **The wizard's sets-per-muscle is a target the generator must actually hit — for every goal,
 including strength.** Applies to `hypertrophy-*`, `aesthetic-*`, `strength-*` and all full-body
