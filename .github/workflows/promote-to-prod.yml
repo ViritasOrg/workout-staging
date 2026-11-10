@@ -43,6 +43,7 @@ jobs:
           cp ../staging/index.html ./index.html
           cp ../staging/tests/test_frontend.js ./tests/test_frontend.js
           cp ../staging/training-icon.png ./training-icon.png
+          cp ../staging/muscles-*.webp ./
           [ -f ../staging/manifest.json ] && cp ../staging/manifest.json ./
 
           # Reset VERSION in the promoted index.html to prod's current version so

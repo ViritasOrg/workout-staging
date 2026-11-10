@@ -2241,7 +2241,7 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   check('_progWizGenerate passes setsPerMuscle to _generateWorkoutProgram',
     src.includes('wiz.setsPerMuscle||12'));
   check('_generateWorkoutProgram accepts setsPerMuscle + injuries params',
-    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equip)'));
+    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equip,muscles)'));
   check('scaleSets helper scales exercise set counts',
     src.includes('function scaleSets(setsStr)'));
   check('pool padding loop fills short pools up to nDays',
@@ -3813,6 +3813,80 @@ if (typeof G._generateWorkoutProgram === 'function') {
         _legA.exercises.map(e => e.name + ' ' + _ns(e)).join(' | '));
     }
   }
+}
+
+// ── Muscle planner (Henrik 2026-11-10) ─────────────────────────────────────────
+// "enable user to click and choose muscles to train after choosing goal … marked muscles should
+// be shown in red." Answers: 1 A (ONLY marked muscles are trained), 2 B (individual muscles).
+check('muscle planner exists (_musclePlanPool, _muscleFigureHtml)', typeof G._musclePlanPool === 'function' && typeof G._muscleFigureHtml === 'function');
+if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool === 'function') {
+  console.log('\n── Muscle planner ───────');
+  const M = G.MUSCLES.map(m => m.id);
+  // exercise → the muscles it is in the library for
+  const owner = {};
+  Object.keys(G.MUSCLE_LIB).forEach(k => G.MUSCLE_LIB[k].forEach(([n]) => { const id = k === 'glutesF' ? 'glutes' : k; (owner[n] = owner[n] || new Set()).add(id); }));
+  const legRule = { 'Squat': ['quads'], 'Deadlift': ['hamstrings','glutes'] };
+  const sets = [['chest','triceps'], ['biceps'], ['glutes','abs'], ['quads','hamstrings','glutes'], ['lats','upperback','reardelts'],
+    ['chest','frontdelts','sidedelts','lats','biceps','triceps'], ['calves'], ['abs'], M.slice(), ['quads','chest','lats']];
+  const stray = [], missing = [], empty = [];
+  ['strength','hypertrophy','aesthetic'].forEach(g => sets.forEach(ms => [1,2,3,4,5,6,7].forEach(n => [9,16].forEach(spm => {
+    const p = G._generateWorkoutProgram(g, null, n, 'T', spm, [], 'gym', ms);
+    if (p.days.length !== n || p.days.some(d => !d.exercises.length)) empty.push(`${g}/${ms}/${n}`);
+    const seen = new Set();
+    p.days.forEach(d => d.exercises.forEach(e => {
+      const own = owner[e.name] ? [...owner[e.name]] : (legRule[e.name] || []);
+      own.forEach(x => seen.add(x));
+      if (!own.some(x => ms.includes(x))) stray.push(`${g}/${ms}/${n}d: ${e.name}`);
+    }));
+    ms.forEach(x => { if (!seen.has(x)) missing.push(`${g}/${ms}/${n}d/${spm}: ${x}`); });
+  }))));
+  check('muscle plan: only marked muscles are trained (no exercise for an unmarked muscle)', stray.length === 0, stray.slice(0,6).join(' | '));
+  check('muscle plan: every marked muscle is trained', missing.length === 0, missing.slice(0,6).join(' | '));
+  check('muscle plan: the requested number of days, none empty', empty.length === 0, empty.slice(0,6).join(' | '));
+  const glF = G._generateWorkoutProgram('aesthetic', null, 2, 'T', 12, [], 'gym', ['glutes']);
+  check('muscle plan: glutes alone get no Squat or Deadlift (leg-day rule only when quads+hamstrings+glutes are marked)',
+    !glF.days.some(d => d.exercises.some(e => /^(Squat|Deadlift)$/.test(e.name))) && glF.days.every(d => d.exercises.some(e => e.name === 'Hip Thrust')));
+  const hyGl = G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes']);
+  check('muscle plan: no Hip Thrust outside Feminine Aesthetic', !hyGl.days.some(d => d.exercises.some(e => e.name === 'Hip Thrust')));
+  const leg = G._generateWorkoutProgram('hypertrophy', null, 2, 'T', 12, [], 'gym', ['quads','hamstrings','glutes']);
+  check('muscle plan: with quads, hamstrings and glutes marked the leg-day rule still applies',
+    leg.days.every(d => d.exercises[0].name === 'Squat' && d.exercises[d.exercises.length-1].name === 'Deadlift'));
+  check('muscle plan: the program keeps the marked muscles', JSON.stringify(G._generateWorkoutProgram('strength', null, 3, 'T', 12, [], 'gym', ['chest']).muscles) === '["chest"]');
+  const bal = G._generateWorkoutProgram('hypertrophy', null, 2, 'T', 12, [], 'gym', ['abs']);
+  check('muscle plan: core only gives core days, no volume aimed at unmarked groups', bal.days.every(d => d.exercises.every(e => String(e.sets).split('-').length === 3)));
+  // Home and injuries still produce a program for every set (swaps may rename exercises)
+  let homeErr = [];
+  sets.forEach(ms => [G._homeEquipId([]), G._homeEquipId(['kettlebell','bands'])].forEach(eq => [[],['knees'],['shoulders']].forEach(inj => {
+    try { const p = G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, inj, eq, ms); if (p.days.length !== 3) homeErr.push(ms + '/' + eq); }
+    catch (e) { homeErr.push(ms + '/' + eq + ': ' + e.message); }
+  })));
+  check('muscle plan: builds at home and with injuries', homeErr.length === 0, homeErr.slice(0,4).join(' | '));
+  // The picture: marked muscles red, on both sexes, front and back
+  const fig = G._muscleFigureHtml('m', ['glutes','chest']);
+  const redEll = (fig.match(/<ellipse[^>]*fill="rgba\(255,30,30,0\.55\)"[^>]*>/g) || []);
+  check('muscle picture: the male front and back images are shown', fig.includes('muscles-m-front.webp') && fig.includes('muscles-m-back.webp'));
+  check('muscle picture: marked muscles (both sides) are red, nothing else is',
+    redEll.length === 4 && redEll.every(e => /data-muscle="(glutes|chest)"/.test(e)), redEll.length);
+  check('muscle picture: every muscle can be tapped on the picture and as a chip',
+    M.every(id => fig.includes(`data-muscle="${id}"`) && fig.includes(`data-muscle-chip="${id}"`)) && M.every(id => G._muscleFigureHtml('f', []).includes(`data-muscle="${id}"`)));
+  check('muscle picture: no ellipse is red when nothing is marked', !/255,30,30/.test(G._muscleFigureHtml('f', [])));
+  check('muscle picture: Feminine Aesthetic shows the female body', G._muscleSex('aesthetic') === 'f' && G._muscleFigureHtml('f', []).includes('muscles-f-front.webp'));
+  // Every image the app references ships with Push to Prod
+  const wf = fs.readFileSync(path.join(__dirname, '..', '.github/workflows/promote-to-prod.yml'), 'utf8');
+  check('muscle pictures exist and Push to Prod copies them', ['m','f'].every(x => ['front','back'].every(v => fs.existsSync(path.join(__dirname, '..', `muscles-${x}-${v}.webp`)))) && wf.includes('cp ../staging/muscles-*.webp ./'));
+  // The wizard: goal → muscles step → toggle → Next
+  const el = () => ({ textContent: '', innerHTML: '' });
+  vm.runInContext("_progWiz={step:'muscles',goal:'hypertrophy',sub:null,muscles:[],nDays:3,setsPerMuscle:12,injuries:[],name:'',homeItems:[]}", sandbox);
+  let b = el(), f = el(); G._renderProgWiz(el(), b, f);
+  check('wizard: the muscles step shows the body picture, Next disabled until a muscle is marked', /<ellipse/.test(b.innerHTML) && /disabled/.test(f.innerHTML) && /ready-made focus/.test(f.innerHTML));
+  vm.runInContext("var __rpoSaved=_renderProgOverlay;_renderProgOverlay=function(){}", sandbox);
+  G._progWizToggleMuscle('triceps');
+  b = el(); f = el(); G._renderProgWiz(el(), b, f);
+  check('wizard: tapping a muscle marks it red and enables Next', /data-muscle="triceps"[^>]*fill="rgba\(255,30,30/.test(b.innerHTML) && !/disabled/.test(f.innerHTML));
+  G._progWizToggleMuscle('triceps');
+  check('wizard: tapping it again unmarks it', vm.runInContext('_progWiz.muscles.length', sandbox) === 0);
+  vm.runInContext('_renderProgOverlay=__rpoSaved;_progWiz=null', sandbox);
+  check('wizard: strength, hypertrophy and Feminine Aesthetic go to the muscles step, rehab does not', /_progWiz\.step=_progWiz\.goal===\\'rehab\\'\?1:\\'muscles\\'/.test(String(G._renderProgWiz)));
 }
 
 // ── Hip Thrust: Feminine Aesthetic + Knee Rehab only ───────────────────────────
@@ -7712,7 +7786,7 @@ console.log('\n── Training at home ─────────────�
     /data-home-item="dumbbells" style="[^"]*background:var\(--accent\)/.test(w) && !/data-home-item="barbell" style="[^"]*background:var\(--accent\)/.test(w));
   check('wizard: Gym is the default', /cur=cur\|\|'gym'/.test(String(G._progWizEquipHtml)));
   check('wizard: both the preview and Generate pass the ticked equipment to the generator',
-    (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\)\)/g) || []).length === 1 && /wiz\.injuries,_eq\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
+    (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\),wiz\.muscles\)/g) || []).length === 1 && /wiz\.injuries,_eq,wiz\.muscles\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
   check('wizard: step 2 shows the choice, and the saved equipment is preselected', /_progWizEquipHtml\(wiz\.equip\)/.test(String(G._renderProgWiz)) && /homeItems:\(getData\('wkt-home-equip',\[\]\)/.test(html));
 }
 
@@ -7968,7 +8042,7 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   const sv = String(G.saveHomeEquip);
   check('saving equipment stores it for the user AND on the backend', String(G._saveHomeItems).includes("setData('wkt-home-equip'") && String(G._saveHomeItems).includes("pushSettingsToAgent({'wkt-home-equip'") && sv.includes('_saveHomeItems(_heq.items)'));
   check('…and rebuilds the program from its own wizard choices, after a confirm that hand edits are replaced',
-    sv.includes('confirm(') && /hand are replaced/.test(sv) && sv.includes('_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items))') && sv.includes('savePrograms()'));
+    sv.includes('confirm(') && /hand are replaced/.test(sv) && sv.includes('_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items),g.muscles)') && sv.includes('savePrograms()'));
   check('…keeping the program in the same slot (active program and its index unchanged)', sv.includes('_programs[idx]=np'));
   check('the equipment list comes back from the backend after a cache wipe', String(G.syncSettingsFromAgent).includes("setData('wkt-home-equip',s['wkt-home-equip'])"));
   check('the equipment editor opens above the program view', /id="homeEquipModal" style="z-index:500"/.test(html));
