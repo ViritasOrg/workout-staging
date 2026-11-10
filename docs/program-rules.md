@@ -57,6 +57,13 @@ straddles strength (2–6) and volume (8–12), so it is not a range any tag def
   push-ups, dips or curls. After the home/injury swaps any chest-led exercise (chest split ≥ 0.5,
   e.g. Diamond Push-ups at bodyweight) is removed. The Hip Abductor and one triceps exercise per
   upper day carry `keep:true`, which drop-to-fit never prunes.
+  **1–3 days a week every day is a booty day** (Henrik, 2026-11-10: *"it needs to have booty focus
+  both days at least for 1,2,3 day programs … no butt exercises will be a skipped day. Unless they
+  start going 4-7days per week"*): three glute-led full-body sessions ("Booty Full Body A/B/C"),
+  each opening with Hip Thrust plus the Hip Abductor, back/shoulder/triceps work after; the glute
+  lifts and one back and one triceps exercise per day are `keep:true`. 4–7 days use the split.
+  Volume: legs/glutes get 2× the weekly sets-per-muscle, back, shoulders and arms 0.75×. At home
+  the Hip Abductor machine becomes a Single-leg Glute Bridge.
 
 ### Volume allocation (rule rewritten 2026-07-31)
 **The wizard's sets-per-muscle is a target the generator must actually hit — for every goal,
