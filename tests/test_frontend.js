@@ -3871,6 +3871,23 @@ if (typeof G._generateWorkoutProgram === 'function') {
   }))));
   check('Bootylicious never has a chest press, push-up, dip or bicep curl (gym, home, injuries)', bad.length === 0, bad.slice(0,8).join(' | '));
   check('Bootylicious trains glutes (Hip Thrust + Hip Abductor), legs, core, back, triceps and shoulders', miss.length === 0, miss.slice(0,8).join(' | '));
+  // Henrik 2026-11-10: "it needs to have booty focus both days at least for 1,2,3 day programs …
+  // no butt exercises will be a skipped day". Every day opens with a glute lift and trains legs/glutes more than any other muscle.
+  const GLUTE = /hip thrust|glute bridge/i;
+  const notBooty = [];
+  [1,2,3].forEach(n => [9,12,16,21].forEach(spm => equips.forEach(eq => [[],['shoulders'],['knees']].forEach(inj => {
+    const p = G._generateWorkoutProgram('aesthetic','bootylicious',n,'T',spm,inj,eq);
+    p.days.forEach(d => {
+      const v = {legs:0,back:0,chest:0,shoulders:0,arms:0};
+      d.exercises.forEach(e => { const sp = G.getExSplits(e.name), k = String(e.sets).split('-').length;
+        Object.keys(v).forEach(g => { if (sp[g]) v[g] += sp[g]*k; }); });
+      const top = Math.max(v.back, v.chest, v.shoulders, v.arms);
+      if (!GLUTE.test(d.exercises[0].name) || !(v.legs > top)) notBooty.push(`${n}d/${spm}/${eq}/${inj}: ${d.name} [${d.exercises[0].name}, legs ${v.legs.toFixed(1)} vs ${top.toFixed(1)}]`);
+    });
+  }))));
+  check('Bootylicious 1-3 days: every day is a booty day (opens with a glute lift, legs/glutes the most-trained muscle)', notBooty.length === 0, notBooty.slice(0,6).join(' | '));
+  const hb = G._generateWorkoutProgram('aesthetic','bootylicious',2,'T',12,[],G._homeEquipId([]));
+  check('Bootylicious at home never keeps the Hip Abductor machine', !hb.days.some(d => d.exercises.some(e => /abductor/i.test(e.name))));
   check('Bootylicious is offered as a Feminine Aesthetic focus in the wizard',
     /\['bootylicious','Bootylicious',/.test(html) && G._generateWorkoutProgram('aesthetic','bootylicious',4,'T',12).days.length === 4);
 }
