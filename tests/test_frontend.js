@@ -3789,7 +3789,22 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
   G._progWizToggleMuscle('triceps');
   check('wizard: tapping it again unmarks it', vm.runInContext('_progWiz.muscles.length', sandbox) === 0);
   vm.runInContext('_renderProgOverlay=__rpoSaved;_progWiz=null', sandbox);
-  check('wizard: strength, hypertrophy and Feminine Aesthetic go to the muscles step, rehab does not', /_progWiz\.step=_progWiz\.goal===\\'rehab\\'\?1:\\'muscles\\'/.test(String(G._renderProgWiz)));
+  // Henrik 2026-11-10: "the picker should not be a mandatory step, the wizard should give user a
+  // choice, automatic or pick muscles".
+  check('wizard: strength, hypertrophy and Feminine Aesthetic go to the Automatic / Pick muscles choice, rehab does not', /_progWiz\.step=_progWiz\.goal===\\'rehab\\'\?1:\\'mode\\'/.test(String(G._renderProgWiz)));
+  vm.runInContext("var __rpoSaved2=_renderProgOverlay;_renderProgOverlay=function(){};_progWiz={step:'mode',goal:'hypertrophy',sub:null,muscles:['chest'],nDays:3,setsPerMuscle:12,injuries:[],name:'',homeItems:[]}", sandbox);
+  b = el(); f = el(); G._renderProgWiz(el(), b, f);
+  const modeCards = {};
+  (b.innerHTML.match(/<div class="wiz-goal-card" data-wiz-mode="(\w+)" onclick="([^"]*)"/g) || []).forEach(m => { const x = m.match(/data-wiz-mode="(\w+)" onclick="([^"]*)"/); modeCards[x[1]] = x[2]; });
+  check('wizard: the choice screen offers Automatic and Pick muscles', /Automatic/.test(b.innerHTML) && /Pick muscles/.test(b.innerHTML) && modeCards.auto && modeCards.pick, Object.keys(modeCards).join(','));
+  vm.runInContext(modeCards.pick, sandbox);
+  check('wizard: Pick muscles opens the body picture', vm.runInContext('_progWiz.step', sandbox) === 'muscles');
+  vm.runInContext("_progWiz.step='mode'", sandbox);
+  vm.runInContext(modeCards.auto, sandbox);
+  check('wizard: Automatic goes to the ready-made focus step, with no muscles marked', vm.runInContext('_progWiz.step', sandbox) === 1 && vm.runInContext('_progWiz.muscles.length', sandbox) === 0);
+  b = el(); f = el(); G._renderProgWiz(el(), b, f);
+  check('wizard: Back from the focus step returns to the choice', /_progWiz\.step=_progWiz\.goal===\\'rehab\\'\?0:\\'mode\\'/.test(f.innerHTML.replace(/'/g, "\\'")) || /_progWiz\.step=_progWiz\.goal==='rehab'\?0:'mode'/.test(f.innerHTML));
+  vm.runInContext('_renderProgOverlay=__rpoSaved2;_progWiz=null', sandbox);
 }
 
 // ── Hip Thrust: Feminine Aesthetic + Knee Rehab only ───────────────────────────
