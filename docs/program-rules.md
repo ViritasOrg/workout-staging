@@ -806,3 +806,18 @@ show the male/female with the muscles marked in red for this specific exercise."
   `adductors` (listed, no area on the pictures).
 - The popup shows "Trains: …" in red (#ff8080, AAA on the dark modal) right above the stick
   figures, and below them the profile's body (male/female) with those muscles red, display only.
+
+### Per-muscle volume (Henrik, 2026-11-11)
+Asked whether Bootylicious and the muscle picker give glutes the volume they need, Henrik said
+*"Yes"* to: every marked muscle gets the weekly sets-per-muscle chosen, and Bootylicious glutes 2×.
+- The group allocator only knows legs/back/chest/shoulders/arms, so glutes shared "legs" with quads
+  (a 3-day hypertrophy plan of glutes, quads, hamstrings, calves gave glutes 3 main sets, quads 15).
+- `_muscleTargets(key, muscles, spm)`: a muscle plan → each marked muscle (not abs) `spm` per week;
+  Bootylicious → glutes `2×spm`, quads and hamstrings `spm`. Other programs are unchanged.
+- `_applyMuscleTargets` runs after the group allocator: an exercise counts fully for its main muscle
+  (`exMuscles()[0]`) and half for a supporting one; each muscle's main exercises share what the
+  supporting sets leave (2–5 sets each, two passes so bench → triceps is counted).
+- The 25-set session cap (`MUSCLE_SESSION_CAP`, same value as the allocator's `SESSION_CEILING`)
+  trims unowned work first, then the target muscle furthest over its own target, so glutes keep
+  their sets. Where every glute day is full at 25 sets, glutes stop short of 2× (e.g. 2 days at 16
+  sets/muscle: 27 of 32); raising that cap is the lever.

@@ -2372,6 +2372,40 @@ function _musclePlanPool(goal,muscles,nDays,pw,d){
     pool.push(d(name,dayCats.indexOf('lower')<0||dayCats.length>1,exs));
   }
   return pool;}
+// ── Per-muscle volume ─────────────────────────────────────────────────────────
+// Weekly sets each target muscle should get: a muscle plan → every marked muscle (not abs) gets
+// setsPerMuscle; Bootylicious → glutes 2×, quads and hamstrings 1×. Other programs: none.
+function _muscleTargets(key,mp,spm){spm=spm||12;
+  if(mp&&mp.length){var t={};mp.forEach(function(m){if(m!=='abs')t[m]=spm;});return Object.keys(t).length?t:null;}
+  if(key==='aesthetic-bootylicious')return {glutes:2*spm,quads:spm,hamstrings:spm};
+  return null;}
+// Effective weekly sets for a muscle: main muscle counts 1, supporting 0.5 (prehab excluded).
+function _muscleVolume(days,m){var v=0;days.forEach(function(d){(d.exercises||[]).forEach(function(ex){if(ex.prehab)return;var ms=exMuscles(ex.name),i=ms.indexOf(m);if(i<0)return;v+=String(ex.sets).split('-').length*(i===0?1:0.5);});});return v;}
+var MUSCLE_SET_MIN=2,MUSCLE_SET_MAX=5,MUSCLE_SESSION_CAP=25;
+function _applyMuscleTargets(days,targets,nSets,resize){
+  var owned=[];
+  // Two passes: a muscle's supporting sets come from exercises another target sizes (bench → triceps),
+  // so the second pass sizes every muscle against the others' settled counts.
+  for(var _pass=0;_pass<2;_pass++)Object.keys(targets).forEach(function(m){
+    var mains=[],sec=0;
+    days.forEach(function(d){(d.exercises||[]).forEach(function(ex){if(ex.prehab)return;var ms=exMuscles(ex.name),i=ms.indexOf(m);
+      if(i===0&&!ex.fixed)mains.push(ex);else if(i>0)sec+=nSets(ex)*0.5;});});
+    if(!mains.length)return;
+    var rem=Math.max(0,targets[m]-sec),n=mains.length,base=Math.floor(rem/n),extra=Math.round(rem-base*n);
+    mains.forEach(function(ex,i){var k=Math.max(MUSCLE_SET_MIN,Math.min(MUSCLE_SET_MAX,base+(i<extra?1:0)));if(k!==nSets(ex))resize(ex,k);if(owned.indexOf(ex)<0)owned.push(ex);});
+  });
+  // Session ceiling: trim what no target owns first, then the largest owned exercise.
+  days.forEach(function(d){var g=60;while(g-->0){var exs=(d.exercises||[]).filter(function(e){return !e.prehab&&!e.fixed;});
+    var tot=(d.exercises||[]).reduce(function(s,e){return s+nSets(e);},0);if(tot<=MUSCLE_SESSION_CAP)break;
+    var c=exs.filter(function(e){return owned.indexOf(e)<0&&nSets(e)>MUSCLE_SET_MIN;});
+    var big;
+    if(c.length)big=c.reduce(function(a,b){return nSets(b)>nSets(a)?b:a;});
+    else{ // every trimmable set belongs to a target: take it from the muscle furthest over its own target
+      c=exs.filter(function(e){return nSets(e)>MUSCLE_SET_MIN;});if(!c.length)break;
+      var over=function(e){var m=exMuscles(e.name)[0];return targets[m]?_muscleVolume(days,m)/targets[m]:9;};
+      big=c.reduce(function(a,b){return over(b)>over(a)?b:a;});}
+    resize(big,nSets(big)-1);}});
+}
 function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equip,muscles){
   var _mp=(muscles&&muscles.length&&goal!=='rehab')?muscles.slice():null;
   var _home=_isHomeEquip(equip);var _custom=_home&&equip.indexOf('home:')===0;var _swapped=[];
@@ -2687,6 +2721,13 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equi
   }else{
     days.forEach(function(day){(day.exercises||[]).forEach(function(ex){if(ex.prehab||ex.fixed)return;ex.sets=scaleSets(ex.sets);});});
   }
+  // ── Per-muscle volume (Henrik, 2026-11-11: "Yes" to "every marked muscle gets the weekly
+  // sets-per-muscle you chose; Bootylicious glutes at 2× the setting"). The group allocator above
+  // sees legs/back/chest/shoulders/arms only, so glutes shared "legs" with quads and could come
+  // out at 3 sets while quads got 15. Here each target muscle is sized on its own: an exercise
+  // counts fully for its main muscle (exMuscles()[0]) and half for a supporting one.
+  var _mt=_muscleTargets(key,_mp,setsPerMuscle);
+  if(_mt)_applyMuscleTargets(days,_mt,_nSets,_resizeEx);
   // Pull-ups lead every pull day (rule 2026-08-08). Henrik: "In no Pull program should any
   // exercise be before Pull-ups." A pull-up/chin-up variant is the most demanding movement a
   // pull session carries, so it is done fresh — the seeded Pull A had Barbell Row ahead of it,
