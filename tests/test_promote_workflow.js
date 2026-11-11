@@ -259,6 +259,8 @@ console.log('\n── Push to Prod: the promoted tests read only what prod has �
 // The pictures are built from names in code ('muscles-'+sex+'-'+view+'.webp'), which no scan finds.
 {
   check('the sync step copies the muscle pictures', /cp \.\.\/staging\/muscles-\*\.webp \.\//.test(stepRun('Sync files into prod branch')));
+  // The warnings link to help.html (Polestar, 2026-11-11); prod needs it or the link is a 404 there.
+  check('the sync step copies the help page the warnings link to', /cp \.\.\/staging\/help\.html \.\/help\.html/.test(stepRun('Sync files into prod branch')));
 }
 
 console.log('\n' + passes + ' passed, ' + fails + ' failed');

@@ -9717,12 +9717,15 @@ console.log('\n── Polestar climate ─────────────�
       check('  …the weather is read at the phone\'s location', t.calls.some(c => /latitude=60\.170&longitude=24\.938&current=temperature_2m/.test(c.url)));
       const p = t.C.psYes(); await tick();
       check('  …Turn on shows a waiting message while the car answers', /Starting climate…/.test(t.els['ps-modal-body'].innerHTML) && /Waiting for the car/.test(t.els['ps-modal-body'].innerHTML));
-      t.C.psClose(); check('  …and the card cannot be closed while waiting', t.open.has('psModal'));
+      // Henrik, 2026-11-11: "Pressing X here doesnt do anything you have to wait for the response from the car! Rather have it close".
+      t.C.psClose(); check('  …X closes the card at once while the car answers', !t.open.has('psModal'));
       t.release(); await p;
+      check('  …the start still finishes after closing: the header car turns red', /#e53935/.test(t.els['hdr-car'].innerHTML) && !/ps-warn/.test(t.els['hdr-car'].innerHTML));
+      t.C.psOpenStatus();
       check('  …then says climate is on, for 30 minutes', /Climate is on/.test(t.els['ps-modal-body'].innerHTML) && /warming up for 30 minutes/.test(t.els['ps-modal-body'].innerHTML));
       check('  …the start went to the backend', t.calls.some(c => c.url === 'https://agent/polestar/climate' && c.method === 'POST'));
       check('  …the red car with the heat symbol shows in the header', t.els['hdr-car'].hidden === false && /#e53935/.test(t.els['hdr-car'].innerHTML) && /ps-car-heat/.test(t.els['hdr-car'].innerHTML));
-      check('  …and the car is re-checked in 3 minutes', t.timers.length === 1 && t.timers[0].ms === 180000);
+      check('  …and the car is re-checked in 3 minutes', t.timers.filter(x => x.ms !== 90000).length === 1 && t.timers[t.timers.length - 1].ms === 180000);
       t.C.psClose(); check('  …OK closes the card', !t.open.has('psModal'));
       await t.C._psCheck(r[1]);
       check('  …asked once per workout, not on every keystroke', t.calls.filter(c => /open-meteo/.test(c.url)).length === 1);
@@ -9736,14 +9739,14 @@ console.log('\n── Polestar climate ─────────────�
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, status: { active: false, starting: false, status: 'IDLE', action: 'UNDEFINED' } });
       r[1].value = '8'; await t.C._psCheck(r[1]); await t.C.psYes();
-      await t.timers[0].f();
+      await t.timers.find(x => x.ms !== 90000).f();   // the car's re-check, not the 90 s answer timer
       check('polestar: the header car turns grey when the car says climate stopped', t.els['hdr-car'].hidden === false && /ps-car-off/.test(t.els['hdr-car'].innerHTML) && !/#e53935/.test(t.els['hdr-car'].innerHTML));
     }
     {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 2, status: { active: false, starting: true, status: 'START_ATTEMPT', action: 'COOLING' } });
       r[1].value = '8'; await t.C._psCheck(r[1]); await t.C.psYes();
-      await t.timers[0].f();
-      check('polestar: still starting keeps the car and follows the car\'s heat/cool action', t.els['hdr-car'].hidden === false && /ps-car-cool/.test(t.els['hdr-car'].innerHTML) && t.timers.length === 2);
+      await t.timers.find(x => x.ms !== 90000).f();   // the car's re-check, not the 90 s answer timer
+      check('polestar: still starting keeps the car and follows the car\'s heat/cool action', t.els['hdr-car'].hidden === false && /ps-car-cool/.test(t.els['hdr-car'].innerHTML) && t.timers.filter(x => x.ms !== 90000).length === 2);
       for (let i = 1; i < 9; i++) await t.timers[t.timers.length - 1].f();
       check('  …still there after 27 minutes of checks', t.els['hdr-car'].hidden === false);
       await t.timers[t.timers.length - 1].f();
@@ -9797,9 +9800,52 @@ console.log('\n── Polestar climate ─────────────�
       check('  …and from then on it is asked every 3 minutes', t.timers[t.timers.length - 1].ms === 180000);
       const p = t.C.psTurnOff(); 
       check('  …Turn off shows a waiting message', /Stopping climate…/.test(t.els['ps-modal-body'].innerHTML));
-      t.C.psClose(); check('  …which cannot be closed while waiting', t.open.has('psModal'));
-      await p;
+      t.C.psClose(); check('  …X closes it at once while the car answers', !t.open.has('psModal'));
+      await p; t.C.psOpenStatus();
       check('  …stops climate on the backend and turns the car grey', t.calls.some(c => c.url === 'https://agent/polestar/climate/stop' && c.method === 'POST') && /ps-car-off/.test(t.els['hdr-car'].innerHTML) && /Climate is off/.test(t.els['ps-modal-body'].innerHTML));
+    }
+
+    // Henrik, 2026-11-11: "if car doesn't respond show a warning triangle over the car symbol".
+    {
+      const t = ctx({ cards: [], answer: { ok: false, status: 'CAR_OFFLINE', message: '' } });
+      await t.C.syncPolestarCar(); t.C.psOpenStatus();
+      const p = t.C.psTurnOn(); t.C.psClose(); await p;
+      const car = t.els['hdr-car'].innerHTML;
+      check('polestar: a refused start puts a warning triangle over the header car', /class="ps-warn"/.test(car) && /ps-car-off/.test(car));
+      t.C.psOpenStatus(); const card = t.els['ps-modal-body'].innerHTML;
+      check('  …tapping the car shows what happened, with Try again and a link to why', t.open.has('psModal') && /Climate did not start/.test(card) && /The car answered CAR_OFFLINE/.test(card) &&
+        /psTurnOn\(\)/.test(card) && /href="help\.html#polestar-no-answer"/.test(card));
+      t.C.psDismiss();
+      check('  …OK closes it and the triangle goes', !t.open.has('psModal') && !/ps-warn/.test(t.els['hdr-car'].innerHTML) && /ps-car-off/.test(t.els['hdr-car'].innerHTML));
+    }
+    {
+      const t = ctx({ cards: [], hold: true });
+      await t.C.syncPolestarCar(); t.C.psOpenStatus();
+      const p = t.C.psTurnOn(); await tick(); t.C.psClose();
+      const wait = t.timers.find(x => x.ms === 90000);
+      check('polestar: the car gets 90 seconds to answer', !!wait && !/ps-warn/.test(t.els['hdr-car'].innerHTML));
+      wait.f();
+      check('  …no answer by then puts the triangle on the car', /class="ps-warn"/.test(t.els['hdr-car'].innerHTML));
+      t.C.psOpenStatus();
+      check('  …and the car says it did not answer', /did not answer within 90 seconds/.test(t.els['ps-modal-body'].innerHTML) && /help\.html#polestar-no-answer/.test(t.els['ps-modal-body'].innerHTML));
+      t.release(); await p;
+      check('  …a late answer that worked clears it and turns the car red', !/ps-warn/.test(t.els['hdr-car'].innerHTML) && /#e53935/.test(t.els['hdr-car'].innerHTML) && /Climate is on/.test(t.els['ps-modal-body'].innerHTML));
+    }
+    {
+      const t = ctx({ cards: [] });
+      await t.C.syncPolestarCar(); await t.C.psTurnOn();
+      const _f = t.C.fetch; t.C.fetch = async (url, o) => url.endsWith('/climate/stop') ? { ok: true, json: async () => ({ ok: false, status: 'CAR_OFFLINE' }) } : _f(url, o);
+      await t.C.psTurnOff();
+      check('polestar: a refused stop also shows the triangle, on the red car', /class="ps-warn"/.test(t.els['hdr-car'].innerHTML) && /#e53935/.test(t.els['hdr-car'].innerHTML));
+      t.C.psOpenStatus();
+      check('  …and its card offers to try the stop again', /Climate did not stop/.test(t.els['ps-modal-body'].innerHTML) && /psTurnOff\(\)/.test(t.els['ps-modal-body'].innerHTML));
+    }
+    {
+      const help = fs.readFileSync(path.join(__dirname, '..', 'help.html'), 'utf8');
+      check('help page: the Polestar warning has its section, saying what it means, what happens and how to fix it',
+        /id="polestar-no-answer"/.test(help) && /What it means/.test(help) && /What happens if you ignore it/.test(help) && /How to fix it/.test(help));
+      check('help page: it carries the app icon and manifest', /rel="icon"[^>]*training-icon\.png/.test(help) && /rel="apple-touch-icon"/.test(help) && /rel="manifest"/.test(help));
+      check('help page: readable, no text under 15px and no grey', !/font-size:\s*1[0-4]px/.test(help) && !/#[89a-c][0-9a-f]{5}\b/i.test(help.replace(/#7fd0ff/i, '')));
     }
     {
       const t = ctx({ cards: [], creds: { set: false, email: '' } });

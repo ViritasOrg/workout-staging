@@ -341,7 +341,13 @@ exercise … in settigns we need to add a Polestar card where a user can add the
   (claude-agent-backend `routers/polestar.py`, which starts climate at 21 °C).
 - The question is the **Polestar card** (`#psModal`, `_psModalHtml`), never a native confirm/alert (Henrik, 2026-11-04:
   "needs a status that shows climate is started and a message while waiting for the update"): ask → **Starting
-  climate…** (cannot be closed while the car answers) → **Climate is on** or **Climate did not start** with the reason.
+  climate…** → **Climate is on** or **Climate did not start** with the reason.
+- **The card closes at any time; a car that does not answer gets a warning triangle** (Henrik, 2026-11-11: "Pressing X here
+  doesnt do anything you have to wait for the response from the car! Rather have it close and if car doesn't respond show a
+  warning triangle over the car symbol"). X closes the card while the car answers; the request carries on and the header car
+  turns red when it works. A refusal, or no answer within `PS_ANSWER_MS` (90 s), puts a yellow triangle on the header car
+  (`_psWarn`, `_psWarnSvg`), for a start and for a stop. Tapping the car shows the reason, **Try again** and a link to
+  `help.html#polestar-no-answer` (copied to prod by the Sync step). **OK** or a later answer that works removes the triangle.
 - While climate runs, a **red car with a heat (orange waves) or AC (blue snowflake) symbol** sits in the header
   (`#hdr-car`, `_psCarSvg`; Henrik: "In the main app view a red car with a heating/ac symbol should be shown"). The app
   asks `GET /polestar/climate` every 3 minutes and removes it when the car is neither active nor starting, or after
