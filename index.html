@@ -2323,15 +2323,17 @@ function _muscleLib(id,goal){return (id==='glutes'&&goal==='aesthetic')?MUSCLE_L
 // Which figure: Feminine Aesthetic shows the female body, otherwise the profile's sex.
 function _muscleSex(goal){if(goal==='aesthetic')return'f';var pr=getData('wkt-profile',{})||{};return pr.gender==='female'?'f':'m';}
 // Pure: the two pictures (front, back) with a tappable ellipse per muscle side; marked = red.
-function _muscleFigureHtml(sex,marked,toggleFn){marked=marked||[];toggleFn=toggleFn||'_progWizToggleMuscle';
+// toggleFn===false: display only (the exercise ? popup) — no taps, no chips, only the marked muscles drawn.
+function _muscleFigureHtml(sex,marked,toggleFn){marked=marked||[];var ro=toggleFn===false;toggleFn=toggleFn||'_progWizToggleMuscle';
   var lab={};MUSCLES.forEach(function(m){lab[m.id]=m.label;});
   var h='<div style="display:flex;gap:8px;justify-content:center;">';
   ['front','back'].forEach(function(v){
     h+='<div style="flex:1;max-width:180px;position:relative;"><div style="text-align:center;font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">'+(v==='front'?'Front':'Back')+'</div><div style="position:relative;"><img src="muscles-'+sex+'-'+v+'.webp" alt="'+(sex==='f'?'Female':'Male')+' body, '+v+'" style="width:100%;display:block;border-radius:8px;">'
       +'<svg viewBox="0 0 360 920" style="position:absolute;inset:0;width:100%;height:100%;">';
-    Object.keys(MUSCLE_REGIONS[sex][v]).forEach(function(id){var on=marked.indexOf(id)>=0;
-      _muscleShapes(sex,v,id).forEach(function(pt){h+='<path data-muscle="'+id+'" d="'+_smoothPath(pt)+'" onclick="'+toggleFn+'(\''+id+'\')" style="cursor:pointer;" fill="'+(on?'rgba(255,30,30,0.55)':'rgba(255,255,255,0.01)')+'" stroke="'+(on?'#ff1e1e':'rgba(80,80,80,0.55)')+'" stroke-width="'+(on?3:2)+'"'+(on?'':' stroke-dasharray="6 5"')+'><title>'+lab[id]+'</title></path>';});});
+    Object.keys(MUSCLE_REGIONS[sex][v]).forEach(function(id){var on=marked.indexOf(id)>=0;if(ro&&!on)return;
+      _muscleShapes(sex,v,id).forEach(function(pt){h+='<path data-muscle="'+id+'" d="'+_smoothPath(pt)+'"'+(ro?'':' onclick="'+toggleFn+'(\''+id+'\')" style="cursor:pointer;"')+' fill="'+(on?'rgba(255,30,30,0.55)':'rgba(255,255,255,0.01)')+'" stroke="'+(on?'#ff1e1e':'rgba(80,80,80,0.55)')+'" stroke-width="'+(on?3:2)+'"'+(on?'':' stroke-dasharray="6 5"')+'><title>'+lab[id]+'</title></path>';});});
     h+='</svg></div></div>';});
+  if(ro)return h+'</div>';
   h+='</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">';
   MUSCLES.forEach(function(m){var on=marked.indexOf(m.id)>=0;
     h+='<div data-muscle-chip="'+m.id+'" onclick="'+toggleFn+'(\''+m.id+'\')" style="padding:9px 12px;border-radius:50px;cursor:pointer;font-size:15px;font-weight:600;background:'+(on?'#ff1e1e':'var(--surface2)')+';color:'+(on?'#fff':'var(--text)')+';border:1px solid '+(on?'#ff1e1e':'var(--border)')+';">'+m.label+'</div>';});
@@ -3813,16 +3815,42 @@ function _exMenuRemove(){closeModal('exMenuModal');if(_exMenuBtn)removeExCard(_e
 function _exMenuGear(i){var card=_exMenuBtn&&_exMenuBtn.closest('.ex-card');if(!card)return;var b=card.querySelectorAll('.gear-slot button')[i];if(b)b.click();_renderGearChip(card);_renderExMenu();scheduleDraft();}
 // Exercise sketch viewer (Henrik, 2026-10-12): the "?" on a Log Workout card opens how to do that exercise.
 function _exSketchSpec(name){var f=SK[name]||SK[_exCanonName(name)];return f?f():null;}
-function _exSketchHtml(name){var s=_exSketchSpec(name);if(!s)return '<div data-sk-none="1" style="color:var(--muted);font-size:13px">No sketch for '+_escP(name||'this exercise')+' yet.</div>';
+// ── Muscles each exercise trains (Henrik, 2026-11-11) ─────────────────────────
+// "under the question mark, in red list muscles trained by each exercise next to the stick figure
+// and show the male/female with the muscles marked in red for this specific exercise."
+// First pattern that matches the name wins; the main muscle is listed first. Ids are MUSCLES', plus
+// 'adductors', which is listed but has no area on the pictures.
+var EX_MUSCLE_RULES=[
+  [/hip thrust|glute bridge/,['glutes','hamstrings']],[/abductor/,['glutes']],[/adductor/,['adductors']],
+  [/nordic|leg curl/,['hamstrings']],[/leg extension|sissy/,['quads']],[/calf/,['calves']],
+  [/good morning|romanian|\brdl\b/,['hamstrings','glutes']],[/deadlift/,['glutes','hamstrings','quads','traps']],
+  [/lunge|bulgarian|split squat/,['quads','glutes']],[/leg press|squat/,['quads','glutes','hamstrings']],
+  [/straight-arm|straight arm/,['lats']],[/face pull|rear delt|t-raise/,['reardelts','upperback']],
+  [/shrug/,['traps']],[/upright row/,['sidedelts','traps']],[/y-raise|y raise/,['sidedelts','traps']],
+  [/lateral raise/,['sidedelts']],[/front raise/,['frontdelts']],[/external rotation/,['reardelts']],
+  [/overhead tricep|tricep|pushdown|skull|diamond/,['triceps']],[/close grip/,['triceps','chest']],
+  [/pike push|overhead press|shoulder press|arnold|behind the neck|half-kneeling press|landmine press/,['frontdelts','sidedelts','triceps']],
+  [/chin-?up/,['lats','biceps']],[/muscle.?up/,['lats','biceps','chest','triceps']],[/pull-?up|pulldown|lat pull/,['lats','biceps']],
+  [/row/,['upperback','lats','reardelts','biceps']],[/curl/,['biceps']],
+  [/dip/,['chest','triceps','frontdelts']],[/fly|pec deck/,['chest','frontdelts']],
+  [/bench|push-?up|chest press|incline|decline|floor press|chest machine/,['chest','frontdelts','triceps']],
+  [/plank|dead bug|pallof|bird dog/,['abs']]];
+function exMuscles(name){var n=String(name||'').toLowerCase();for(var i=0;i<EX_MUSCLE_RULES.length;i++)if(EX_MUSCLE_RULES[i][0].test(n))return EX_MUSCLE_RULES[i][1].slice();return [];}
+// Pure: the red "Trains:" line and the body with those muscles red, for the ? popup.
+function _exMusclesHtml(name,sex){var ids=exMuscles(name);if(!ids.length)return '';
+  var lab={adductors:'Adductors (inner thigh)'};MUSCLES.forEach(function(m){lab[m.id]=m.label;});
+  return {line:'<div data-ex-muscles="1" style="margin-top:10px;font-size:15px;font-weight:700;color:#ff8080;line-height:1.5">Trains: '+ids.map(function(i){return _escP(lab[i]);}).join(' · ')+'</div>',
+    body:'<div data-ex-body="1" style="margin-top:12px">'+_muscleFigureHtml(sex||_muscleSex(null),ids,false)+'</div>'};}
+function _exSketchHtml(name){var s=_exSketchSpec(name);var _mu=_exMusclesHtml(name)||{line:'',body:''};if(!s)return '<div data-sk-none="1" style="color:var(--muted);font-size:13px">No sketch for '+_escP(name||'this exercise')+' yet.</div>'+_mu.line+_mu.body;
   var V={side:'Side',front:'Front',top:'From above'},W=150,H=170;
   function fig(svg,l){return '<figure style="margin:0;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center">'+svg+'<figcaption style="font-size:10px;color:#8d8d93;letter-spacing:.08em;text-transform:uppercase">'+_escP(l)+'</figcaption></figure>';}
   function tile(lbl,a,b,la,lb,mid,extra){return '<div data-sk-view="1" style="background:#151517;border:1px solid #2a2a2e;border-radius:10px;padding:6px 6px 4px;margin-top:10px"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8d8d93;padding:0 4px">'+lbl+'</div><div style="display:flex;align-items:center">'+fig(a,la)+mid+fig(b,lb)+'</div>'+(extra||'')+'</div>';}
   var P=skPanels(s,W,H),arr='<span style="color:#e8ff3c;font-size:16px;padding:0 2px">→</span>';
-  var out='<div style="font-size:13px;color:var(--text);line-height:1.5">'+_escP(s.cue)+'</div>';
+  var out='<div style="font-size:13px;color:var(--text);line-height:1.5">'+_escP(s.cue)+'</div>'+_mu.line;
   s.views.forEach(function(v){out+=tile(V[v],P[v][0],P[v][1],'Start','Finish',arr);});
   if(s.grips){var g=s.grips,G=skPanels({views:[g.view],start:g.items[0],end:g.items[1],floor:g.floor},W,H)[g.view];
     out+=tile('Grip · '+V[g.view],G[0],G[1],g.labels[0],g.labels[1],'<span style="font-size:11px;color:#8d8d93;padding:0 4px">or</span>','<div data-sk-grip="1" style="font-size:11.5px;line-height:1.45;color:#c4c4c9;margin:4px">'+_escP(g.note)+'</div>');}
-  return out;}
+  return out+_mu.body;}
 function _openExSketch(n){document.getElementById('exSketchTitle').textContent=(n||'Exercise').toUpperCase();document.getElementById('exSketchContent').innerHTML=_exSketchHtml(n);openModal('exSketchModal');}
 function showExSketch(btn){_openExSketch(_exCardName(btn.closest('.ex-card')));}
 // The same blue ? on the Program day view and in the program editor (Henrik, 2026-10-12). onclick is JS, so it is attribute-escaped.

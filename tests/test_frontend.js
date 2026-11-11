@@ -7682,7 +7682,23 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
     Object.keys(G.SK).filter(n => !cat.includes(n) && !gen.has(n)).join(', '));
   const h = G._exSketchHtml('Squat'), s = G._exSketchSpec('Squat');
   check('the viewer shows the cue and one start/finish tile per view',
-    h.includes(G._escP(s.cue)) && (h.match(/data-sk-view="1"/g) || []).length === s.views.length && (h.match(/<svg /g) || []).length === 2 * s.views.length);
+    h.includes(G._escP(s.cue)) && (h.match(/data-sk-view="1"/g) || []).length === s.views.length && (h.split('data-ex-body')[0].match(/<svg /g) || []).length === 2 * s.views.length);
+  // Henrik 2026-11-11: "under the question mark, in red list muscles trained by each exercise next to
+  // the stick figure and show the male/female with the muscles marked in red for this specific exercise."
+  const noMus = cat.concat([...gen]).filter(n => !G.exMuscles(n).length);
+  check('every catalogue and generated exercise names the muscles it trains', noMus.length === 0, [...new Set(noMus)].join(', '));
+  const lineAt = h.indexOf('data-ex-muscles'), tileAt = h.indexOf('data-sk-view');
+  check('the ? popup lists the muscles in red, next to (just above) the stick figures',
+    lineAt > 0 && lineAt < tileAt && /color:#ff8080[^>]*>Trains: Quads · Glutes · Hamstrings</.test(h), h.slice(lineAt - 10, lineAt + 160));
+  const bodyRed = (h.split('data-ex-body')[1] || '').match(/data-muscle="(\w+)"[^>]*fill="rgba\(255,30,30/g) || [];
+  check('…and shows the body with exactly those muscles red', bodyRed.length > 0 && bodyRed.every(x => /"(quads|glutes|hamstrings)"/.test(x))
+    && ['quads','glutes','hamstrings'].every(m => bodyRed.some(x => x.includes('"' + m + '"'))), bodyRed.join(' '));
+  check('…display only: no taps and no chips on the popup body', !/onclick/.test(h.split('data-ex-body')[1] || '') && !/data-muscle-chip/.test(h));
+  check('…male or female from the profile', G._exMusclesHtml('Bench Press', 'f').body.includes('muscles-f-front.webp') && G._exMusclesHtml('Bench Press', 'm').body.includes('muscles-m-front.webp'));
+  check('…right muscles for a few exercises', JSON.stringify(G.exMuscles('Leg Curl')) === '["hamstrings"]' && G.exMuscles('Straight-Arm Lat Pushdown')[0] === 'lats'
+    && G.exMuscles('Tricep Pushdown')[0] === 'triceps' && G.exMuscles('Barbell Row')[0] === 'upperback' && G.exMuscles('Hip Thrust')[0] === 'glutes'
+    && G.exMuscles('Kettlebell Romanian Deadlift')[0] === 'hamstrings' && G.exMuscles('Pike Push-ups')[0] === 'frontdelts' && G.exMuscles('Shrug')[0] === 'traps'
+    && /Trains: Adductors \(inner thigh\)/.test(G._exMusclesHtml('Hip Adductor (inside hips)', 'm').line));
   const pu = G._exSketchHtml('Pull-ups');
   check('…a grip-variation exercise adds the grip tile and its sourced note', /data-sk-grip="1"/.test(pu) && /smaller than gym lore/i.test(pu));
   check('…Weighted Dips falls back to the Dips sketch (one movement)',
