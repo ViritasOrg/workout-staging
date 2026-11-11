@@ -852,3 +852,23 @@ again (legs 24% in both at 4 days). The weekly target is now weighted per focus:
 chest, shoulders, arms 1.5× and legs 0.75×; Lower Heavy legs 1.5× and the upper groups 0.75×
 (`_gMul` in the allocator). At 4 days and 12 sets/muscle legs are now 16% vs 34% of weekly sets.
 A test checks Upper < Balanced < Lower on leg share for 3–7 days.
+
+### Gym and Home equipment tabs (Henrik, 2026-11-11)
+> "add gym and home equipment tabs to Plan. In gym list most common machines as checked and the rest as unchecked. For home list the home equipments as unchecked unless the user chose some when creating a Home program"
+>
+> Asked whether the list changes the programs and whether existing Home programs are rebuilt: "1 obviously yes (how else would this work)? 2. Obviously yes 3. Yes we start like that"
+
+- **Where they are:** Plan has the sub-tabs Plan · Gym · Home equipment (`PRIMARY_GROUPS.plan`). Each tab is two columns of tick boxes; checked items come first in a fixed order.
+- **The Gym list:**
+  - It is `GYM_ITEMS`. Until the user ticks anything (`wkt-gym-equip` unset), the items with `on:1` are ticked.
+  - Unticked by default: hack squat, hip thrust machine, T-bar row, assisted pull-up/dip, bicep curl, tricep extension and lateral raise machines, kettlebells and bands.
+- **The Home list** reads and writes the same `wkt-home-equip` the Home wizard saves. If no Home program chose anything, nothing is ticked.
+- **Saving:** ticking saves the list on the device and on the backend (`/user-settings`). It also comes back in `syncSettingsFromAgent`.
+- **How a gym program follows the list:**
+  - A gym program is generated with `gym:<ids>`.
+  - Each exercise that needs an unticked item is swapped by `_gymResolve`: `GYM_PREF` first, then `HOME_PREF`, and the first candidate the list allows wins. A `null` candidate drops the exercise.
+  - `GYM_EX_EQUIP` names each machine's item. A pulldown or row also works on a cable station.
+  - With the default list a program is exactly what plain `gym` gives (tested).
+  - Plain `gym`, used by programs made before the list, is no constraint.
+- **Rebuilding:** a program generated with an older list is rebuilt by the tab's "Rebuild N … programs" button. It asks for confirmation first, the same as the program's own equipment editor, because hand edits are replaced. Programs not generated with a list keep their exercises, and the tab says how many there are.
+- **Ask AI** is sent only the exercises the active program's equipment allows (`_exCatalogueFor`).
