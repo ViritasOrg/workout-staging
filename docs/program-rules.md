@@ -821,3 +821,13 @@ Asked whether Bootylicious and the muscle picker give glutes the volume they nee
   trims unowned work first, then the target muscle furthest over its own target, so glutes keep
   their sets. Where every glute day is full at 25 sets, glutes stop short of 2× (e.g. 2 days at 16
   sets/muscle: 27 of 32); raising that cap is the lever.
+
+### Male or female body: the profile decides (Henrik, 2026-11-11)
+*"a female user gets the female images everywhere and a male the male pictures. Right now my wife
+get male models."*
+- `_muscleSex()` reads only the profile's sex (`wkt-profile.gender`, synced as `user_sex`), for every
+  goal and every picture (muscle picker, exercise ? popup). Feminine Aesthetic no longer forces the
+  female body.
+- An unknown sex (first-run setup skipped) is never shown as male: the picture spot asks "Which body
+  should the pictures show? ♀ Female / ♂ Male", and `_setProfileSex` saves the answer to the profile
+  and the backend; the Profile card then shows it.
