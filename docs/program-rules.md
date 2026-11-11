@@ -789,6 +789,9 @@ unmarked ones are left out; **2 B** — individual muscles are clickable.
   `MUSCLE_REGIONS` holds a polygon per muscle for the figure's left side, mirrored to the right
   (`_muscleShapes`; traps on the back and abs are one central shape), drawn as smooth curves
   (`_smoothPath`).
+- **Upper body re-traced 2026-11-11** (Henrik: *"the muscle areas in red are too low on the body"*):
+  shoulders, arms, back, lats and traps were 10–35 px low on both bodies; re-traced at 4× zoom on a
+  10 px grid. A test pins each upper-body shape inside the band its muscle occupies on the picture.
 - `_musclePlanPool`: Lower / Push / Pull days for the marked muscles when there are at least as
   many days as categories, otherwise full-body days; abs ride along every day. Each marked
   muscle's lead exercise per day is `keep:true`. Weekly sets-per-muscle counts once per marked
