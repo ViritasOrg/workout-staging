@@ -327,6 +327,7 @@
   <div class="page" id="page-plan">
     <div id="prog-ai-card" style="margin-top:14px"></div>
     <div id="s-programs-card" style="margin-top:14px"></div>
+    <div id="plan-log" style="margin-top:14px"></div>
   </div>
   <div class="page" id="page-gym"><div id="gym-equip-card" style="margin-top:14px"></div></div>
   <div class="page" id="page-homeequip"><div id="home-equip-card" style="margin-top:14px"></div></div>
@@ -1441,8 +1442,40 @@ function rebuildLogDaySelect(){
 function _progActivateToggle(i,isActive,marginBottom){
   return '<div onclick="event.stopPropagation();_activateProg('+i+')" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:'+(marginBottom||'0')+';"><div style="width:34px;height:18px;border-radius:9px;background:'+(isActive?'var(--accent)':'rgba(255,255,255,0.15)')+';position:relative;flex-shrink:0;"><div style="position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:'+(isActive?'18px':'2px')+';box-shadow:0 1px 3px rgba(0,0,0,0.35);"></div></div><span style="font-size:10px;font-weight:600;color:'+(isActive?'var(--accent)':'var(--muted)')+';letter-spacing:0.3px;">'+(isActive?'Active':'Inactive')+'</span></div>';
 }
+// ── Log (staging only; Henrik, 2026-11-11: "In stage add a log button in the plan pages so I can click it and get the
+// program and other info from generator on clipboard"): the program, what the generator was given, the equipment, the
+// profile answers it reads, every day's exercises with their muscles, and the weekly sets per muscle, as text.
+function _planLogBtnHtml(idx){if(!IS_STAGING)return'';var a=idx==null?'':String(idx);
+  return'<div style="margin-bottom:16px"><button data-plan-log="1" onclick="planLogCopy('+(a===''?'':a)+')" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Log: copy program + generator info</button></div>';}
+function _planLogText(prog){
+  var L=[],now=new Date();if(!prog)return'No program.';
+  var prof=getData('wkt-profile',{})||{};
+  L.push('Workout staging v'+VERSION+' — program log '+now.toISOString());
+  L.push('Program: '+(prog.name||'')+(prog===getActiveProgram()?' (active)':''));
+  L.push('Generator: '+(prog.gen?JSON.stringify(prog.gen):'(no generator record: made before lists, by hand or seeded)')+' goal='+(prog.goal||'')+' setsPerMuscle='+(prog.setsPerMuscle||'')+' injuries='+JSON.stringify(prog.injuries||[])+' muscles='+JSON.stringify(prog.muscles||[])+(prog.noPullUps?' noPullUps':''));
+  L.push('Equipment: '+_equipLabel(prog.equipment||'gym')+' ['+(prog.equipment||'gym')+']');
+  L.push('Gym list: '+_gymItems().join(', '));
+  L.push('Home list: '+((getData('wkt-home-equip',[])||[]).join(', ')||'(none)'));
+  L.push('Profile: sex='+(prof.gender||'?')+' pull-ups answer='+(_pullUpsAnswer()||'not asked')+' pull-ups logged='+(_hasLoggedPullUps()?'yes':'no'));
+  if((prog.tempChanges||[]).length)L.push('Temporary changes: '+JSON.stringify(prog.tempChanges));
+  var vol={};
+  (prog.days||[]).forEach(function(d,i){var n=0;L.push('');L.push('Day '+(i+1)+': '+(d.name||''));
+    (d.exercises||[]).forEach(function(e){var sets=String(e.sets||'').split('-').filter(Boolean).length;n+=sets;var ms=exMuscles(e.name);
+      ms.forEach(function(m,k){vol[m]=(vol[m]||0)+sets*(k?0.5:1);});
+      L.push('  '+e.name+' | '+(e.scheme||'')+' | sets '+(e.sets||'')+' | '+(e.tag||'')+' | '+(e.kg||0)+' kg | '+(ms.join(', ')||'-')+(e.keep?' | keep':''));});
+    L.push('  = '+n+' sets');});
+  L.push('');L.push('Weekly sets per muscle (main 1, supporting 0.5): '+Object.keys(vol).sort(function(a,b){return vol[b]-vol[a];}).map(function(m){return m+' '+vol[m];}).join(', '));
+  L.push('');L.push('Program JSON:');L.push(JSON.stringify(prog));
+  return L.join('\n');}
+async function planLogCopy(idx){var prog=(idx!=null&&_programs[idx])?_programs[idx]:getActiveProgram();var t=_planLogText(prog);
+  var ok=false;try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(t);ok=true;}}catch(e){}
+  if(!ok){try{var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');document.body.removeChild(ta);}catch(e){}}
+  document.querySelectorAll('[data-plan-log]').forEach(function(b){b.textContent=ok?'Copied ✓':'Copy failed: long-press the program and copy by hand';});
+  setTimeout(function(){document.querySelectorAll('[data-plan-log]').forEach(function(b){b.textContent='Log: copy program + generator info';});},2500);
+  return ok;}
 function buildProgramSettingsCard(){
   var card=document.getElementById('s-programs-card');if(!card)return;
+  var _pl=document.getElementById('plan-log');if(_pl)_pl.innerHTML=_planLogBtnHtml(null);
   card.innerHTML=_programLibraryHtml()+_templateLibraryHtml();
   _renderProgAi();
 }
@@ -1879,6 +1912,7 @@ function _progViewHtml(prog,isActive,progIdx){
   var html='';
   if(isActive)html+='<div style="margin-bottom:14px;"><span style="background:var(--accent);color:#000;padding:3px 12px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;">ACTIVE</span></div>';
   html+='<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:20px;">'+_escP(prog.name)+'</div>';
+  html+=_planLogBtnHtml(progIdx);
   var _ext=_progExtension(prog);
   // The banner is where the extension is announced, so it is where the way out belongs — one
   // control, next to the thing it undoes, rather than a button at the far bottom of the list.
