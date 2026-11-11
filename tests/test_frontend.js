@@ -3724,6 +3724,7 @@ if (typeof G._generateWorkoutProgram === 'function') {
 // ── Muscle planner (Henrik 2026-11-10) ─────────────────────────────────────────
 // "enable user to click and choose muscles to train after choosing goal … marked muscles should
 // be shown in red." Answers: 1 A (ONLY marked muscles are trained), 2 B (individual muscles).
+G.setData('wkt-profile', Object.assign({}, G.getData('wkt-profile', {}) || {}, { gender: 'male' }));
 check('muscle planner exists (_musclePlanPool, _muscleFigureHtml)', typeof G._musclePlanPool === 'function' && typeof G._muscleFigureHtml === 'function');
 if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool === 'function') {
   console.log('\n── Muscle planner ───────');
@@ -3838,7 +3839,23 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
   })));
   check('muscle picture: every upper-body shape sits on its muscle (not too low / too high)', offBand.length === 0, offBand.slice(0, 8).join(' | '));
   check('muscle picture: no shape is red when nothing is marked', !/255,30,30/.test(G._muscleFigureHtml('f', [])));
-  check('muscle picture: Feminine Aesthetic shows the female body', G._muscleSex('aesthetic') === 'f' && G._muscleFigureHtml('f', []).includes('muscles-f-front.webp'));
+  // Henrik 2026-11-11: "a female user gets the female images everywhere and a male the male pictures.
+  // Right now my wife get male models." The body follows the profile's sex for every goal.
+  G.setData('wkt-profile', { gender: 'female', onboarded: true });
+  check('sex: a female profile gets the female body (Hypertrophy, Strength and the ? popup alike)', G._muscleSex() === 'f' && G._exMusclesHtml('Squat').body.includes('muscles-f-back.webp'));
+  G.setData('wkt-profile', { gender: 'male', onboarded: true });
+  check('sex: a male profile gets the male body, even for Feminine Aesthetic', G._muscleSex() === 'm' && G._exMusclesHtml('Hip Thrust').body.includes('muscles-m-back.webp'));
+  G.setData('wkt-profile', { onboarded: true });
+  check('sex: an unknown sex (setup skipped) is never shown as male — the picture asks instead',
+    G._muscleSex() === null && /data-sex-ask/.test(G._exMusclesHtml('Squat').body) && !/muscles-m-/.test(G._exMusclesHtml('Squat').body)
+    && /data-sex-ask/.test(G._muscleFigureHtml(G._muscleSex(), [])) && /data-muscle-chip="glutes"/.test(G._muscleFigureHtml(G._muscleSex(), [])));
+  const _pushed = []; const _savedPush = G.pushSettingsToAgent; G.pushSettingsToAgent = (o) => _pushed.push(o);
+  G._setProfileSex('female');
+  check('sex: answering saves it to the profile and the backend, and the female body shows from then on',
+    G.getData('wkt-profile', {}).gender === 'female' && G.getData('wkt-profile', {}).onboarded === true
+    && _pushed.length === 1 && _pushed[0].user_sex === 'female' && _pushed[0]['wkt-profile'].gender === 'female' && G._muscleSex() === 'f');
+  G.pushSettingsToAgent = _savedPush;
+  G.setData('wkt-profile', { gender: 'male', onboarded: true });
   // This file ships to prod, which has no promote workflow: that Push to Prod copies the pictures
   // is checked in tests/test_promote_workflow.js (staging-only).
   check('muscle pictures exist', ['m','f'].every(x => ['front','back'].every(v => fs.existsSync(path.join(__dirname, '..', `muscles-${x}-${v}.webp`)))));
@@ -7730,6 +7747,7 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
     G._exSketchSpec(n).views.every(v => G.skPanels(G._exSketchSpec(n), 150, 170)[v].every(x => x.includes('<line')))));
   check('every sketch is for a catalogue or generated exercise (no orphan sketches)', Object.keys(G.SK).every(n => cat.includes(n) || gen.has(n)),
     Object.keys(G.SK).filter(n => !cat.includes(n) && !gen.has(n)).join(', '));
+  G.setData('wkt-profile', Object.assign({}, G.getData('wkt-profile', {}) || {}, { gender: 'male' }));
   const h = G._exSketchHtml('Squat'), s = G._exSketchSpec('Squat');
   check('the viewer shows the cue and one start/finish tile per view',
     h.includes(G._escP(s.cue)) && (h.match(/data-sk-view="1"/g) || []).length === s.views.length && (h.split('data-ex-body')[0].match(/<svg /g) || []).length === 2 * s.views.length);
