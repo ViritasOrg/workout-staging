@@ -195,9 +195,11 @@ const PROD_CI = ['node tests/test_frontend.js index.html'];
 // needed that the prod tree did not hold.
 //
 // So this RUNS the real "Sync files into prod branch" step against a fake prod repo holding only
-// the files prod keeps of its own, stops it before the commit, and runs prod's CI commands in the
-// tree it produced. Whatever prod CI would trip over, this trips over first, in staging CI.
-console.log('\n── Push to Prod: the promoted tree passes prod CI ─────────────');
+// the files prod keeps of its own, stops it before the commit, and from prod's CI commands in the
+// tree it produced, then checks statically that every file the promoted tests read is in that tree
+// (seconds, no GitHub; running the whole suite a second time took minutes, Henrik: "we cant have a
+// added 5-8min step").
+console.log('\n── Push to Prod: the promoted tests read only what prod has ─────────────');
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'promote-sim-'));
   const sh = (cmd, cwd) => cp.execSync(cmd, { cwd, stdio: 'pipe', encoding: 'utf8' });
@@ -225,14 +227,32 @@ console.log('\n── Push to Prod: the promoted tree passes prod CI ───�
   const refs = [...new Set((pageSrc.match(/["'(]([A-Za-z0-9._-]+\.(?:png|jpe?g|svg|webp|gif|ico))/g) || []).map(m => m.slice(1)))];
   const missing = refs.filter(r => fs.existsSync(path.join(root, r)) && !fs.existsSync(path.join(prod, r)));
   check('every local image the promoted page references is in the prod tree', missing.length === 0, missing.join(', '));
-  const bad = [];
-  PROD_CI.forEach(cmd => {
-    const r = cp.spawnSync('bash', ['-c', cmd], { cwd: prod, encoding: 'utf8', timeout: 300000,
-      env: Object.assign({}, process.env, { GITHUB_REPOSITORY: PROD_REPO }) });
-    if (r.status !== 0) bad.push(cmd + ' → exit ' + r.status + '\n      ' +
-      ((r.stdout || '') + (r.stderr || '')).split('\n').filter(l => /✗|Error|ENOENT/.test(l)).slice(0, 6).join('\n      '));
+  // Every file the promoted tests read must be in the prod tree. Read statically (no second run of
+  // the suite, which takes minutes): each path.join/resolve(__dirname, '…') and each literal
+  // readFileSync/existsSync/readdirSync path in the test files prod CI runs.
+  const testFiles = [...new Set(PROD_CI.map(c => (c.match(/node (\S+\.js)/) || [])[1]).filter(Boolean))];
+  const needs = [];
+  testFiles.forEach(tf => {
+    const abs = path.join(prod, tf);
+    if (!fs.existsSync(abs)) { needs.push([tf, tf]); return; }
+    const src = fs.readFileSync(abs, 'utf8'), dir = path.dirname(abs);
+    let m; const reJoin = /\w*path\.(?:join|resolve)\(\s*__dirname\s*((?:,\s*(?:'[^'$]*'|"[^"$]*"))+)\s*\)/g;
+    // A read in a statement guarded by _isProdCheckout(…) is skipped on prod by design.
+    const guarded = (at) => /_isProdCheckout\(/.test(src.slice(src.lastIndexOf(';', at) + 1, at));
+    while ((m = reJoin.exec(src))) {
+      if (guarded(m.index)) continue;
+      const parts = m[1].match(/'[^']*'|"[^"]*"/g).map(q => q.slice(1, -1));
+      needs.push([tf, path.relative(prod, path.join(dir, ...parts))]);
+    }
+    const reLit = /\b\w*fs\.(?:readFileSync|existsSync|readdirSync|statSync)\(\s*(?:'([^']+)'|"([^"]+)")/g;
+    while ((m = reLit.exec(src))) if (!guarded(m.index)) needs.push([tf, m[1] || m[2]]);
   });
-  check('prod CI passes on the promoted tree (' + PROD_CI.join(' ; ') + ')', bad.length === 0, bad.join('\n      '));
+  // A path the file only tests for (existsSync) may legitimately be absent everywhere; what matters
+  // is a path staging HAS that the prod tree LACKS — that is a staging-only file the tests read.
+  const prodLacks = needs.filter(([tf, p]) => fs.existsSync(path.join(root, p)) && !fs.existsSync(path.join(prod, p)))
+    .map(([tf, p]) => tf + ' reads ' + p);
+  check('the promoted tests read no file that only staging has', prodLacks.length === 0 && testFiles.length > 0,
+    prodLacks.join('\n      ') || ('tests scanned: ' + testFiles.join(', ')));
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
