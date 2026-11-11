@@ -3754,6 +3754,41 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
     !glF.days.some(d => d.exercises.some(e => /^(Squat|Deadlift)$/.test(e.name))) && glF.days.every(d => d.exercises.some(e => e.name === 'Hip Thrust')));
   const hyGl = G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes']);
   check('muscle plan: no Hip Thrust outside Feminine Aesthetic', !hyGl.days.some(d => d.exercises.some(e => e.name === 'Hip Thrust')));
+  // Henrik 2026-11-11: "Yes" — every marked muscle gets the weekly sets-per-muscle chosen, and
+  // Bootylicious glutes 2× that. Effective weekly sets: main muscle 1, supporting 0.5.
+  {
+    // Counted here, not with the app's own _muscleVolume, so the check stands on its own.
+    const vol = (days, m) => { let v = 0; days.forEach(d => d.exercises.forEach(e => { if (e.prehab) return; const ms = G.exMuscles(e.name), k = ms.indexOf(m);
+      if (k >= 0) v += String(e.sets).split('-').length * (k === 0 ? 1 : 0.5); })); return v; };
+    const cap = (p, m) => { let c = 0; p.days.forEach(d => d.exercises.forEach(e => { if (e.prehab) return; const ms = G.exMuscles(e.name), i = ms.indexOf(m);
+      if (i === 0) c += 5; else if (i > 0) c += String(e.sets).split('-').length * 0.5; })); return c; };
+    const floor = (p, m) => { let c = 0; p.days.forEach(d => d.exercises.forEach(e => { if (e.prehab) return; const ms = G.exMuscles(e.name), i = ms.indexOf(m);
+      if (i === 0) c += 2; else if (i > 0) c += String(e.sets).split('-').length * 0.5; })); return c; };
+    const under = [], over = [], sess = [];
+    ['strength','hypertrophy','aesthetic'].forEach(g => sets.filter(ms => ms.length <= 6).forEach(ms => [2,3,4,5,6,7].forEach(n => [9,12,16].forEach(spm => {
+      const p = G._generateWorkoutProgram(g, null, n, 'T', spm, [], 'gym', ms);
+      p.days.forEach(d => { const t = d.exercises.reduce((a, e) => a + String(e.sets).split('-').length, 0); if (t > 25) sess.push(`${g}/${ms}/${n}d ${d.name}: ${t}`); });
+      ms.filter(m => m !== 'abs').forEach(m => { const v = vol(p.days, m), c = cap(p, m), f = floor(p, m);
+        if (v < Math.min(0.75 * spm, c) - 0.5) under.push(`${g}/${ms}/${n}d/${spm}: ${m} ${v} of ${spm} (room ${c})`);
+        if (v > Math.max(1.35 * spm, f) + 0.5) over.push(`${g}/${ms}/${n}d/${spm}: ${m} ${v} of ${spm} (floor ${f})`); });
+    }))));
+    check('muscle plan: every marked muscle gets its weekly sets (as far as its exercises can hold them)', under.length === 0, under.slice(0, 5).join(' | '));
+    check('muscle plan: no marked muscle is given far more than its weekly sets', over.length === 0, over.slice(0, 5).join(' | '));
+    check('muscle plan: no session goes over 25 sets', sess.length === 0, sess.slice(0, 4).join(' | '));
+    const pk = G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes','quads','hamstrings','calves']);
+    check('muscle plan: glutes are no longer starved next to quads (hypertrophy, 3 days, 12 sets)', vol(pk.days, 'glutes') >= 9, String(vol(pk.days, 'glutes')));
+    const bad = [];
+    [2,3,4,5,6,7].forEach(n => [9,12,16,21].forEach(spm => {
+      const p = G._generateWorkoutProgram('aesthetic', 'bootylicious', n, 'T', spm, [], 'gym');
+      const gl = vol(p.days, 'glutes'), q = vol(p.days, 'quads'), h = vol(p.days, 'hamstrings');
+      // Short of 2× is allowed only where every day that trains glutes is already at the 25-set session cap.
+      const gDays = p.days.filter(d => d.exercises.some(e => G.exMuscles(e.name)[0] === 'glutes'));
+      const full = gDays.every(d => d.exercises.reduce((a, e) => a + String(e.sets).split('-').length, 0) >= 25);
+      if (!(gl > q && gl > h) || (gl < Math.min(2 * spm, cap(p, 'glutes')) - 0.5 && !full))
+        bad.push(`${n}d/${spm}: glutes ${gl} (2× = ${2 * spm}) quads ${q} hams ${h}`);
+    }));
+    check('Bootylicious: glutes get 2× the sets-per-muscle and more than quads and hamstrings', bad.length === 0, bad.slice(0, 5).join(' | '));
+  }
   check('muscle plan: the program keeps the marked muscles', JSON.stringify(G._generateWorkoutProgram('strength', null, 3, 'T', 12, [], 'gym', ['chest']).muscles) === '["chest"]');
   const bal = G._generateWorkoutProgram('hypertrophy', null, 2, 'T', 12, [], 'gym', ['abs']);
   check('muscle plan: core only gives core days, no volume aimed at unmarked groups', bal.days.every(d => d.exercises.every(e => String(e.sets).split('-').length === 3)));
