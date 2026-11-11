@@ -808,6 +808,11 @@ unmarked ones are left out; **2 B** — individual muscles are clickable.
   without injection sites). Feminine Aesthetic shows the female body, otherwise the profile's sex.
   Tapping a muscle on the picture or its chip marks it red. "Use a ready-made focus instead" goes
   to the old focus step; Next is disabled until one muscle is marked.
+- **Feminine Aesthetic trains glutes often** (Henrik, 2026-11-11: "it only trains glutes 1 day out of three? It need to train glutes
+  much more, 1-3 days per week gets glutes every day, 4-7 2-3 days of glutes"): `_gluteDays` adds a glute-led exercise (Hip Thrust,
+  Hip Abductor, or the glute bridge the equipment allows; `keep`) to days without one until 1–3 day programs have glutes every
+  day and 4–7 day programs on at least two. It runs before and again after the equipment swaps. With picked muscles only when
+  glutes are marked.
 - **Pull-ups only for someone who can do 1–2** (Henrik, 2026-11-11: "for anyone before adding pull-ups, the generator needs
   to actually ask if the user can do 1-2 pullups at all"):
   - When the program would hold a pull-up (Pull-ups, Weighted Pull-ups, Chin-ups, Clapping Pull-ups, Muscle Up), the wizard's last step asks **Can you do 1–2 pull-ups?** (Yes / Not yet). Generate waits for the answer.
