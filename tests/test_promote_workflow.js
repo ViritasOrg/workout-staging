@@ -178,5 +178,88 @@ console.log('\n── Push to Prod: promote PRs a failed run left open ───
   check('  …only promote/staging-* branches are touched', /startswith\("promote\/staging-"\)/.test(block));
 }
 
+// What ViritasOrg/workout keeps of its own (read from its main branch 2026-11-11): version.json,
+// CLAUDE.md, tests.html, its CI and version-bump workflows, and a tests/ folder. Its CI runs
+// exactly PROD_CI. A change to prod's ci.yml or owned files is mirrored here.
+const PROD_REPO = 'ViritasOrg/workout';
+const PROD_OWNS = { 'version.json': '{"version":"1.200"}\n', 'CLAUDE.md': '# prod\n', 'tests.html': '<!doctype html>\n',
+  '.github/workflows/ci.yml': 'name: CI\n', '.github/workflows/version-bump.yml': 'name: Version Bump\n', 'tests/test_frontend.js': '// old\n' };
+const PROD_CI = ['node tests/test_frontend.js index.html'];
+// ── Push to Prod ships a test suite that passes on prod ─────────────────────────
+// Henrik, 2026-11-11: "promotion to prod fails … add claude.md rule for all repos to make sure
+// you dont repeat this again (it has happened multiple times). Also write tests to make sure
+// this cannot be repeated!" On 2026-11-10 the promoted tests/test_frontend.js read
+// .github/workflows/promote-to-prod.yml, which prod does not have, crashed with ENOENT and failed
+// the promotion (workout prod PR #334). Earlier: inj-writer.js (2026-08-20), inject-sites.jpg
+// (2026-10-03), retired images (2026-10-22). Every one was a file the promoted tests or page
+// needed that the prod tree did not hold.
+//
+// So this RUNS the real "Sync files into prod branch" step against a fake prod repo holding only
+// the files prod keeps of its own, stops it before the commit, and from prod's CI commands in the
+// tree it produced, then checks statically that every file the promoted tests read is in that tree
+// (seconds, no GitHub; running the whole suite a second time took minutes, Henrik: "we cant have a
+// added 5-8min step").
+console.log('\n── Push to Prod: the promoted tests read only what prod has ─────────────');
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'promote-sim-'));
+  const sh = (cmd, cwd) => cp.execSync(cmd, { cwd, stdio: 'pipe', encoding: 'utf8' });
+  const gitInit = (dir) => { sh('git init -q -b main . && git config user.email t@t && git config user.name t && git add -A && git commit -q -m init --allow-empty', dir); };
+  // staging: this checkout's tracked and untracked (not ignored) files, as a git repo
+  const stg = path.join(tmp, 'staging'); fs.mkdirSync(stg);
+  sh('git ls-files -co --exclude-standard', root).split('\n').filter(Boolean).forEach(f => {
+    const src = path.join(root, f); if (!fs.existsSync(src)) return;
+    fs.mkdirSync(path.dirname(path.join(stg, f)), { recursive: true }); fs.copyFileSync(src, path.join(stg, f));
+  });
+  gitInit(stg);
+  // prod: only what prod keeps of its own
+  const prod = path.join(tmp, 'prod'); fs.mkdirSync(prod);
+  Object.entries(PROD_OWNS).forEach(([f, body]) => { fs.mkdirSync(path.dirname(path.join(prod, f)), { recursive: true }); fs.writeFileSync(path.join(prod, f), body); });
+  gitInit(prod);
+  let script = stepRun('Sync files into prod branch');
+  const cut = script.indexOf('\ngit add -A');
+  check('the sync step ends in a commit this simulation can stop before', cut > 0);
+  script = script.slice(0, cut) + '\n';
+  const env = Object.assign({}, process.env, { GITHUB_ENV: path.join(tmp, 'github_env') });
+  const syncRun = cp.spawnSync('bash', ['-e', '-c', script], { cwd: tmp, env, encoding: 'utf8' });
+  check('the real sync step runs against a prod repo', syncRun.status === 0, (syncRun.stdout + syncRun.stderr).slice(-800));
+  // every local asset the promoted page or its modules name is in the prod tree
+  const pageSrc = ['index.html'].concat(fs.readdirSync(prod).filter(f => /\.js$/.test(f))).map(f => fs.readFileSync(path.join(prod, f), 'utf8')).join('\n');
+  const refs = [...new Set((pageSrc.match(/["'(]([A-Za-z0-9._-]+\.(?:png|jpe?g|svg|webp|gif|ico))/g) || []).map(m => m.slice(1)))];
+  const missing = refs.filter(r => fs.existsSync(path.join(root, r)) && !fs.existsSync(path.join(prod, r)));
+  check('every local image the promoted page references is in the prod tree', missing.length === 0, missing.join(', '));
+  // Every file the promoted tests read must be in the prod tree. Read statically (no second run of
+  // the suite, which takes minutes): each path.join/resolve(__dirname, '…') and each literal
+  // readFileSync/existsSync/readdirSync path in the test files prod CI runs.
+  const testFiles = [...new Set(PROD_CI.map(c => (c.match(/node (\S+\.js)/) || [])[1]).filter(Boolean))];
+  const needs = [];
+  testFiles.forEach(tf => {
+    const abs = path.join(prod, tf);
+    if (!fs.existsSync(abs)) { needs.push([tf, tf]); return; }
+    const src = fs.readFileSync(abs, 'utf8'), dir = path.dirname(abs);
+    let m; const reJoin = /\w*path\.(?:join|resolve)\(\s*__dirname\s*((?:,\s*(?:'[^'$]*'|"[^"$]*"))+)\s*\)/g;
+    // A read in a statement guarded by _isProdCheckout(…) is skipped on prod by design.
+    const guarded = (at) => /_isProdCheckout\(/.test(src.slice(src.lastIndexOf(';', at) + 1, at));
+    while ((m = reJoin.exec(src))) {
+      if (guarded(m.index)) continue;
+      const parts = m[1].match(/'[^']*'|"[^"]*"/g).map(q => q.slice(1, -1));
+      needs.push([tf, path.relative(prod, path.join(dir, ...parts))]);
+    }
+    const reLit = /\b\w*fs\.(?:readFileSync|existsSync|readdirSync|statSync)\(\s*(?:'([^']+)'|"([^"]+)")/g;
+    while ((m = reLit.exec(src))) if (!guarded(m.index)) needs.push([tf, m[1] || m[2]]);
+  });
+  // A path the file only tests for (existsSync) may legitimately be absent everywhere; what matters
+  // is a path staging HAS that the prod tree LACKS — that is a staging-only file the tests read.
+  const prodLacks = needs.filter(([tf, p]) => fs.existsSync(path.join(root, p)) && !fs.existsSync(path.join(prod, p)))
+    .map(([tf, p]) => tf + ' reads ' + p);
+  check('the promoted tests read no file that only staging has', prodLacks.length === 0 && testFiles.length > 0,
+    prodLacks.join('\n      ') || ('tests scanned: ' + testFiles.join(', ')));
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// The pictures are built from names in code ('muscles-'+sex+'-'+view+'.webp'), which no scan finds.
+{
+  check('the sync step copies the muscle pictures', /cp \.\.\/staging\/muscles-\*\.webp \.\//.test(stepRun('Sync files into prod branch')));
+}
+
 console.log('\n' + passes + ' passed, ' + fails + ' failed');
 process.exit(fails ? 1 : 0);

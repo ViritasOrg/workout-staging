@@ -3789,9 +3789,9 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
   })());
   check('muscle picture: no shape is red when nothing is marked', !/255,30,30/.test(G._muscleFigureHtml('f', [])));
   check('muscle picture: Feminine Aesthetic shows the female body', G._muscleSex('aesthetic') === 'f' && G._muscleFigureHtml('f', []).includes('muscles-f-front.webp'));
-  // Every image the app references ships with Push to Prod
-  const wf = fs.readFileSync(path.join(__dirname, '..', '.github/workflows/promote-to-prod.yml'), 'utf8');
-  check('muscle pictures exist and Push to Prod copies them', ['m','f'].every(x => ['front','back'].every(v => fs.existsSync(path.join(__dirname, '..', `muscles-${x}-${v}.webp`)))) && wf.includes('cp ../staging/muscles-*.webp ./'));
+  // This file ships to prod, which has no promote workflow: that Push to Prod copies the pictures
+  // is checked in tests/test_promote_workflow.js (staging-only).
+  check('muscle pictures exist', ['m','f'].every(x => ['front','back'].every(v => fs.existsSync(path.join(__dirname, '..', `muscles-${x}-${v}.webp`)))));
   // The wizard: goal → muscles step → toggle → Next
   const el = () => ({ textContent: '', innerHTML: '' });
   vm.runInContext("_progWiz={step:'muscles',goal:'hypertrophy',sub:null,muscles:[],nDays:3,setsPerMuscle:12,injuries:[],name:'',homeItems:[]}", sandbox);
