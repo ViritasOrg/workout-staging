@@ -2241,7 +2241,7 @@ console.log('\n── 48. Program wizard days/sets ─────────�
   check('_progWizGenerate passes setsPerMuscle to _generateWorkoutProgram',
     src.includes('wiz.setsPerMuscle||12'));
   check('_generateWorkoutProgram accepts setsPerMuscle + injuries params',
-    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equip,muscles)'));
+    src.includes('function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equip,muscles,opts)'));
   check('scaleSets helper scales exercise set counts',
     src.includes('function scaleSets(setsStr)'));
   check('pool padding loop fills short pools up to nDays',
@@ -3889,7 +3889,29 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
   vm.runInContext('_renderProgOverlay=__rpoSaved;_progWiz=null', sandbox);
   // Henrik 2026-11-10: "the picker should not be a mandatory step, the wizard should give user a
   // choice, automatic or pick muscles".
-  check('wizard: strength, hypertrophy and Feminine Aesthetic go to the Automatic / Pick muscles choice, rehab does not', /_progWiz\.step=_progWiz\.goal===\\'rehab\\'\?1:\\'mode\\'/.test(String(G._renderProgWiz)));
+  {
+    vm.runInContext("var __rpoG=_renderProgOverlay;_renderProgOverlay=function(){}", sandbox);
+    const steps = ['strength', 'hypertrophy', 'aesthetic', 'rehab'].map(g => { vm.runInContext("_progWiz={step:0,goal:null,sub:null,muscles:[],nDays:3,setsPerMuscle:12,injuries:[],name:'',homeItems:[]}", sandbox); G._progWizGoal(g); return vm.runInContext('_progWiz.step', sandbox); });
+    check('wizard: strength, hypertrophy and Feminine Aesthetic go to the Automatic / Pick muscles choice, rehab does not', JSON.stringify(steps) === JSON.stringify(['mode', 'mode', 'mode', 1]), JSON.stringify(steps));
+    // Henrik, 2026-11-11: "the wizard must support to back trough in reverse if you want to go back and change one thing,
+    // now you have to start over"
+    vm.runInContext("_progWiz={step:'muscles',goal:'hypertrophy',sub:null,muscles:['chest','lats'],nDays:3,setsPerMuscle:12,injuries:['knees'],name:'My plan',nameTyped:true,homeItems:[]}", sandbox);
+    G._progWizGoal('hypertrophy');
+    const w1 = vm.runInContext('JSON.stringify(_progWiz)', sandbox);
+    check('wizard back: the same goal picked again keeps the muscles, days, injuries and name', /"muscles":\["chest","lats"\]/.test(w1) && /"injuries":\["knees"\]/.test(w1) && /"name":"My plan"/.test(w1), w1);
+    vm.runInContext("_progWizStash();_progWiz.step=1", sandbox);
+    vm.runInContext("_progWiz.sub='balanced'", sandbox);
+    check('wizard back: Automatic puts the picked muscles aside…', vm.runInContext('_progWiz.muscles.length', sandbox) === 0);
+    vm.runInContext("_progWizUnstash();_progWiz.step='muscles'", sandbox);
+    check('wizard back: …and Pick muscles brings them back', vm.runInContext('_progWiz.muscles.join()', sandbox) === 'chest,lats');
+    vm.runInContext('_progWizAutoName()', sandbox);
+    check('wizard back: a typed name is never replaced by the default', vm.runInContext('_progWiz.name', sandbox) === 'My plan');
+    vm.runInContext('_progWiz.nameTyped=false;_progWizAutoName()', sandbox);
+    check('wizard back: …an untyped one follows the choices', vm.runInContext('_progWiz.name', sandbox) !== 'My plan' && /Hypertrophy/.test(vm.runInContext('_progWiz.name', sandbox)));
+    G._progWizGoal('strength');
+    check('wizard back: a different goal starts the muscles and focus afresh', vm.runInContext('_progWiz.muscles.length===0&&_progWiz.sub===null&&!_progWiz.keptMuscles', sandbox));
+    vm.runInContext('_renderProgOverlay=__rpoG;_progWiz=null', sandbox);
+  }
   vm.runInContext("var __rpoSaved2=_renderProgOverlay;_renderProgOverlay=function(){};_progWiz={step:'mode',goal:'hypertrophy',sub:null,muscles:['chest'],nDays:3,setsPerMuscle:12,injuries:[],name:'',homeItems:[]}", sandbox);
   b = el(); f = el(); G._renderProgWiz(el(), b, f);
   const modeCards = {};
@@ -7688,7 +7710,7 @@ console.log('\n── Training at home ─────────────�
     /data-home-item="dumbbells" style="[^"]*background:var\(--accent\)/.test(w) && !/data-home-item="barbell" style="[^"]*background:var\(--accent\)/.test(w));
   check('wizard: Gym is the default', /cur=cur\|\|'gym'/.test(String(G._progWizEquipHtml)));
   check('wizard: both the preview and Generate pass the ticked equipment to the generator',
-    (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\),wiz\.muscles\)/g) || []).length === 1 && /wiz\.injuries,_eq,wiz\.muscles\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
+    (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\),wiz\.muscles,\{noPullUps:wiz\.pullups==='no'\}\)/g) || []).length === 1 && /wiz\.injuries,_eq,wiz\.muscles,\{noPullUps:wiz\.pullups==='no'&&!_hasLoggedPullUps\(\)\}\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
   check('wizard: step 2 shows the choice, and the saved equipment is preselected', /_progWizEquipHtml\(wiz\.equip\)/.test(String(G._renderProgWiz)) && /homeItems:\(getData\('wkt-home-equip',\[\]\)/.test(html));
 }
 
@@ -7961,7 +7983,7 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   const sv = String(G.saveHomeEquip);
   check('saving equipment stores it for the user AND on the backend', String(G._saveHomeItems).includes("setData('wkt-home-equip'") && String(G._saveHomeItems).includes("pushSettingsToAgent({'wkt-home-equip'") && sv.includes('_saveHomeItems(_heq.items)'));
   check('…and rebuilds the program from its own wizard choices, after a confirm that hand edits are replaced',
-    sv.includes('confirm(') && /hand are replaced/.test(sv) && sv.includes('_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items),g.muscles)') && sv.includes('savePrograms()'));
+    sv.includes('confirm(') && /hand are replaced/.test(sv) && sv.includes('_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items),g.muscles,{noPullUps:!!g.noPullUps})') && sv.includes('savePrograms()'));
   check('…keeping the program in the same slot (active program and its index unchanged)', sv.includes('_programs[idx]=np'));
   check('the equipment list comes back from the backend after a cache wipe', String(G.syncSettingsFromAgent).includes("setData('wkt-home-equip',s['wkt-home-equip'])"));
   check('the equipment editor opens above the program view', /id="homeEquipModal" style="z-index:500"/.test(html));
@@ -10053,4 +10075,57 @@ Promise.resolve(globalThis.__aiCannot).then(() => {
     check(`…nor the automatic ${sub} programs`, auto.length === 0, auto.join(' | '));
   }
   check('other goals keep pull-ups for the lats', G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['lats']).days.some(d => d.exercises.some(e => e.name === 'Pull-ups')));
+}
+
+
+// ── Pull-ups only for someone who can do 1–2 (Henrik, 2026-11-11: "for anyone before adding pull-ups, the generator needs to
+// actually ask if the user can do 1-2 pullups at all") ──
+{
+  console.log('\n── Pull-ups: asked first ───────');
+  const PU = /^(Pull-ups|Weighted Pull-ups|Chin-ups|Clapping Pull-ups|Muscle Up)$/;
+  const names = (p) => [].concat(...p.days.map(d => d.exercises.map(e => e.name)));
+  const bad = [], reps = [];
+  for (const [g, sub] of [['strength', 'pure'], ['strength', 'hybrid'], ['hypertrophy', 'balanced'], ['hypertrophy', 'upper'], ['aesthetic', 'fullbody']])
+    for (const n of [2, 3, 4, 5, 6]) for (const eq of ['gym', G._gymEquipId(G._gymDefaults()), G._homeEquipId(['pullup']), G._homeEquipId(['bands', 'pullup']), G._homeEquipId([])]) {
+      const p = G._generateWorkoutProgram(g, sub, n, 'T', 12, [], eq, null, { noPullUps: true });
+      names(p).filter(x => PU.test(x)).forEach(x => bad.push(`${g}/${sub} ${n}d ${eq}: ${x}`));
+      p.days.forEach(d => d.exercises.forEach(e => { if (['Lat Pulldown', 'Assisted Pull-up Machine', 'Band Lat Pull'].includes(e.name) && /max/.test(String(e.sets))) reps.push(`${g}/${sub} ${n}d ${eq}: ${e.name} ${e.sets}`); }));
+    }
+  check('"Not yet": no program has a pull-up, whatever the goal, days or equipment', bad.length === 0, bad.slice(0, 3).join(' | '));
+  check('…the loaded work that takes its place has real reps, never AMRAP', reps.length === 0, reps.slice(0, 3).join(' | '));
+  const gymP = G._generateWorkoutProgram('hypertrophy', 'upper', 6, 'T', 12, [], 'gym', null, { noPullUps: true });
+  check('…in the gym it is the lat pulldown', names(gymP).includes('Lat Pulldown'));
+  const homeP = G._generateWorkoutProgram('strength', 'pure', 4, 'T', 12, [], G._homeEquipId(['bands', 'pullup']), null, { noPullUps: true });
+  check('…at home with bands it is the band lat pull', names(homeP).includes('Band Lat Pull') && !names(homeP).some(x => PU.test(x)), names(homeP).join(', '));
+  check('…and a rebuilt program remembers the answer', G._generateWorkoutProgram('hypertrophy', 'upper', 6, 'T', 12, [], G._gymEquipId(G._gymDefaults()), null, { noPullUps: true }).gen.noPullUps === true);
+  check('"Yes" (or not asked): pull-ups stay', names(G._generateWorkoutProgram('hypertrophy', 'upper', 6, 'T', 12, [], 'gym')).includes('Pull-ups'));
+
+  // The wizard asks before a program with pull-ups is generated, and only then.
+  const _w = G._progWiz, _ls = G.localStorage, prof = _ls.getItem('wkt-profile'), _push = G.pushSettingsToAgent, pushed = [];
+  G.pushSettingsToAgent = (kv) => pushed.push(kv);
+  G._progWiz = { step: 3, goal: 'hypertrophy', sub: 'upper', nDays: 6, setsPerMuscle: 12, injuries: [], muscles: [], equip: 'gym', pullups: '' };
+  check('wizard: a program with pull-ups asks "Can you do 1–2 pull-ups?"', G._progWizNeedsPullUps() && /Can you do 1–2 pull-ups\?/.test(G._progWizPullUpsHtml(G._progWiz)) && /data-pullups="no"/.test(G._progWizPullUpsHtml(G._progWiz)));
+  const before = G._programs.length; G._progWizGenerate();
+  check('wizard: …and Generate waits for the answer', G._programs.length === before && !!G._progWiz);
+  const _r = G._renderProgOverlay; G._renderProgOverlay = () => {};
+  G._progWizPullUps('no');
+  check('wizard: the answer is kept on the profile and on the backend', G._progWiz.pullups === 'no' && JSON.parse(_ls.getItem('wkt-profile')).pullups === 'no' && pushed.some(k => k['wkt-profile'] && k['wkt-profile'].pullups === 'no'));
+  check('wizard: …and the next program starts with it', G._pullUpsAnswer() === 'no');
+  G._progWiz = { step: 3, goal: 'aesthetic', sub: 'bootylicious', nDays: 3, setsPerMuscle: 12, injuries: [], muscles: [], equip: 'gym', pullups: '' };
+  check('wizard: a program without pull-ups does not ask', !G._progWizNeedsPullUps() && G._progWizPullUpsHtml(G._progWiz) === '');
+  // Henrik, 2026-11-11: "if a user has logged pull ups in history already it should of course be added to pull days
+  // (without asking a unnecessary question)"
+  const _logs = G.logs;
+  G.logs = [{ id: 1, date: '2026-10-01', day: 2, exercises: [{ name: 'Pull-ups', sets: [{ reps: 6, kg: 0 }, { reps: 5, kg: 0 }] }] }];
+  G._progWiz = { step: 3, goal: 'hypertrophy', sub: 'upper', nDays: 6, setsPerMuscle: 12, injuries: [], muscles: [], equip: 'gym', pullups: 'no' };
+  check('wizard: pull-ups already logged: no question, and they stay on the pull days', !G._progWizNeedsPullUps() && G._progWizPullUpsHtml(G._progWiz) === '' && G._pullUpsAnswer() === 'yes');
+  const n0 = G._programs.length; const _bp = G.buildProgramSettingsCard; G.buildProgramSettingsCard = () => {}; G._renderProgOverlay = () => {};
+  G._progWizGenerate(); const made = G._programs[G._programs.length - 1];
+  check('wizard: …even when an older answer said "Not yet", the program keeps its pull-ups', G._programs.length === n0 + 1 && names(made).includes('Pull-ups') && !made.noPullUps);
+  G._programs.pop(); G.buildProgramSettingsCard = _bp;
+  G.logs = [{ id: 1, date: '2026-10-01', day: 2, exercises: [{ name: 'Pull-ups', sets: [{ reps: 0, kg: 0 }] }] }];
+  check('wizard: a pull-up card with no reps logged does not count', !G._hasLoggedPullUps());
+  G.logs = _logs;
+  G._renderProgOverlay = _r; G._progWiz = _w; G.pushSettingsToAgent = _push;
+  if (prof === null) _ls.removeItem('wkt-profile'); else _ls.setItem('wkt-profile', prof);
 }

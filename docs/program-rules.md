@@ -808,6 +808,16 @@ unmarked ones are left out; **2 B** — individual muscles are clickable.
   without injection sites). Feminine Aesthetic shows the female body, otherwise the profile's sex.
   Tapping a muscle on the picture or its chip marks it red. "Use a ready-made focus instead" goes
   to the old focus step; Next is disabled until one muscle is marked.
+- **Pull-ups only for someone who can do 1–2** (Henrik, 2026-11-11: "for anyone before adding pull-ups, the generator needs
+  to actually ask if the user can do 1-2 pullups at all"):
+  - When the program would hold a pull-up (Pull-ups, Weighted Pull-ups, Chin-ups, Clapping Pull-ups, Muscle Up), the wizard's last step asks **Can you do 1–2 pull-ups?** (Yes / Not yet). Generate waits for the answer.
+  - The answer is kept on the profile (`wkt-profile.pullups`, synced) and starts the next wizard.
+  - **Not yet** passes `opts.noPullUps`: every pull-up becomes the first of Lat Pulldown, Assisted Pull-up Machine, Band Lat Pull or Underhand Inverted Row that the equipment allows. Loaded work gets 10 reps instead of max. A rebuilt program remembers the answer (`gen.noPullUps`).
+  - **Pull-ups already logged with reps answer it** (Henrik, 2026-11-11: "if a user has logged pull ups in history already it should of course be added to pull days (without asking a unnecessary question)"): no question, and the pull-ups stay (`_hasLoggedPullUps`).
+- **Back keeps every answer** (Henrik, 2026-11-11: "the wizard must support to back trough in reverse if you want to go back and change one thing, now you have to start over"):
+  - The same goal picked again keeps the muscles, focus, days, sets, injuries and equipment; only a different goal starts the muscles and focus afresh (`_progWizGoal`).
+  - Automatic puts picked muscles aside and Pick muscles brings them back (`_progWizStash`/`_progWizUnstash`).
+  - A typed name is never replaced by the default (`nameTyped`, `_progWizAutoName`).
 - **Feminine Aesthetic never gets pull-ups** (Henrik, 2026-11-11: "pull-ups isnt an exercise almost any women can do at all"):
   its lats lead with Lat Pulldown (`MUSCLE_LIB.latsF`, `_muscleLib`), as its own templates do; other goals keep Pull-ups.
 - Muscles: chest, traps, front/side/rear delts, triceps, biceps, lats, upper back, quads,
