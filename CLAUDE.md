@@ -1,7 +1,7 @@
 # Workout Staging — Claude Instructions
 
-<!-- BEGIN ORG-WIDE RULES v23. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there; the Sync org rules workflow opens the PRs that copy this block into every other ViritasOrg repo, and the daily drift check reports any copy that differs. -->
-## Org-wide rules: every ViritasOrg repo (canonical v23, 2026-11-09)
+<!-- BEGIN ORG-WIDE RULES v24. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there; the Sync org rules workflow opens the PRs that copy this block into every other ViritasOrg repo, and the daily drift check reports any copy that differs. -->
+## Org-wide rules: every ViritasOrg repo (canonical v24, 2026-11-11)
 
 Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file adds repo-specific rules. If one seems to contradict this block, say so to Henrik instead of picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent). The quote and incident behind each rule: https://github.com/ViritasOrg/claude-agent-backend/blob/main/docs/org-rules-history.md.
 
@@ -50,6 +50,7 @@ Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file 
 - Files he is meant to look at or listen to go to `~/Downloads/<what>/<what was tested> <date time>`, one new folder per run; never a hidden app folder, one generic folder or an overwrite.
 - If he has to say a thing twice, the first reply failed: fix it in that reply and add the rule.
 - **Only fix what was asked**: one PR = one requested change; appearance, layout and unrelated logic untouched; an improvement is mentioned, never made. **Do not ask permission for the fix itself** (2026-08-20): what caused, hid or misreported the bug is part of it. **Build the MVP, suggest the rest** (2026-09-03): the smallest version that does what was asked; a setting, extra panel, second way or unasked case ships as one sentence, not code.
+- **A requested feature is done only when it works end to end** (Henrik, 2026-11-11, https://github.com/ViritasOrg/flyt/issues/1402): every piece it needs is built in the same piece of work and the whole flow has run end to end outside production before it is reported; never report it done, or stop, with its prerequisites left as follow-up issues; only the go for production stays his.
 - **"My fix made it redundant" is not permission to remove it** (2026-06-25): only code named in the request is removed; say so and ask.
 - **A file he will use is pasted whole in the reply** (2026-09-12) and committed too; complete files, never partial edits.
 
@@ -119,7 +120,7 @@ Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file 
 
 ### CLAUDE.md holds rules, not records
 - A repo's root `CLAUDE.md` is loaded into every session, so it stays under 200 lines: imperative rules, one line each, an issue URL as provenance, at most one line of why. Quotes, incident stories, feature logs, "current state" and design notes go to `docs/` (pointed to from `CLAUDE.md` in one line), or to `.claude/rules/<area>.md` with `paths:` frontmatter when a rule only matters for part of the repo. A rule Henrik gives goes in as a rule; the quote goes to `docs/rule-history.md`.
-<!-- END ORG-WIDE RULES v23 -->
+<!-- END ORG-WIDE RULES v24 -->
 
 ## This repo
 Single-file PWA: `index.html` (JS, CSS, HTML inline), `css/main.css`; `const VERSION` matches `version.json`, both bumped by the version-bump workflow on merge. GitHub Pages deploys on push to `main` (the live `version.json` cannot be fetched from a session). All development happens here; `workout` (prod) is read-only for Claude. Shared infrastructure with `peptidetracker-staging` (Push to Prod, settings sync, update checker, auth, backend calls, `IS_STAGING`): **a fix in one app is made in the other in the same session**. Tests: `node tests/test_frontend.js`, 0 failures before any PR. **Program generation, the Log screen, drafts, 1RM, sketches, home equipment, Ask AI and Polestar have their own rule file, `docs/program-rules.md`: read it before touching any of them and update it in the same PR.** The old `CLAUDE.md` is `docs/claude-md-archive-2026-11-05.md`; a new rule goes below as one line, its story into `docs/rule-history.md`. **Scan the conversation for rules each session** and extract what Henrik gave into this file; point out a contradiction rather than silently picking one.
