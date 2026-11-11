@@ -2773,6 +2773,20 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equi
   // still before allocation, so volume is sized on what will actually be done. Two gym lifts can
   // land on the same home exercise; the de-dupe keeps one and the allocator redistributes.
   function _homeSwapDays(){days.forEach(function(day){(day.exercises||[]).forEach(function(ex){var nn=_equipSwap(ex.name,equip,injuries);if(nn!==ex.name){ex.name=nn;ex.kg=0;_swapped.push(ex);}});var _seen={};day.exercises=(day.exercises||[]).filter(function(ex){if(!ex.name||_seen[ex.name])return false;_seen[ex.name]=1;return true;});});}
+  // Feminine Aesthetic trains glutes often (Henrik, 2026-11-11: "it only trains glutes 1 day out of three? It need to
+  // train glutes much more, 1-3 days per week gets glutes every day, 4-7 2-3 days of glutes"): a day with no glute-led
+  // exercise gets one until 1–3 day programs have glutes every day and 4–7 day programs on at least two. With picked
+  // muscles only when glutes are marked (only marked muscles are trained).
+  function _gluteDays(){if(!(goal==='aesthetic'&&(!_mp||_mp.indexOf('glutes')>=0)))return;
+    var _gNeed=nDays<=3?days.length:Math.min(days.length,2),_isG=function(day){return(day.exercises||[]).some(function(e){return exMuscles(e.name)[0]==='glutes';});};
+    var _hi=_homeItemsOf(equip),_gi=_gymItemsOf(equip),_can=function(n){return _hi!==null?_canDoAtHome(n,_hi):_gi?_canDoAtGym(n,_gi):true;};
+    var _gHave=days.filter(_isG).length,_gLib=['Hip Thrust','Hip Abductor (outside hips)','Kettlebell Glute Bridge','Single-leg Glute Bridge'].filter(_can),_gk=0;
+    days.forEach(function(day){if(_gHave>=_gNeed||_isG(day))return;var has=(day.exercises||[]).map(function(e){return e.name;});
+      var opts=_gLib.filter(function(n){return has.indexOf(n)<0;});var nm=opts[_gk++%Math.max(1,opts.length)]||'Single-leg Glute Bridge';
+      var ex=Object.assign(pw(nm,'3×10-12','volume','10-10-10',0),{keep:true});
+      day.exercises=[ex].concat(day.exercises||[]);_gHave++;});
+  }
+  _gluteDays();
   if(_home||_gymIt)_homeSwapDays();
   _noPullUpDays();
   // Bootylicious has no chest presses: whatever a home or injury swap turned into a chest-led
@@ -2975,6 +2989,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equi
   // rep count, since only bodyweight work is prescribed as 'max'.
   if(_gymIt){_homeSwapDays();_swapped.forEach(function(ex){if(/max/.test(String(ex.sets))&&!isBWExName(ex.name)){ex.sets=String(ex.sets).split('-').map(function(r){return r==='max'?'10':r;}).join('-');ex.scheme=String(ex.scheme||'').replace(/^(\d+)×max/,'$1×10');}});}
   _noPullUpDays();
+  _gluteDays();   // again after the equipment swaps, which can turn glute work into other work
   days.forEach(function(day){(day.exercises||[]).forEach(applyTagFromReps);});
   // Bodyweight at home: higher reps allowed (Henrik, 2026-10-12, "B for reps"). Every set is
   // AMRAP ('max'), the representation this app already uses for bodyweight work — tagForReps

@@ -10129,3 +10129,22 @@ Promise.resolve(globalThis.__aiCannot).then(() => {
   G._renderProgOverlay = _r; G._progWiz = _w; G.pushSettingsToAgent = _push;
   if (prof === null) _ls.removeItem('wkt-profile'); else _ls.setItem('wkt-profile', prof);
 }
+
+// ── Feminine Aesthetic trains glutes often (Henrik, 2026-11-11: "it only trains glutes 1 day out of three? It need to train
+// glutes much more, 1-3 days per week gets glutes every day, 4-7 2-3 days of glutes") ──
+{
+  console.log('\n── Feminine Aesthetic: glutes often ───────');
+  const gDays = (p) => p.days.filter(d => d.exercises.some(e => G.exMuscles(e.name)[0] === 'glutes')).length;
+  const bad = [];
+  for (const sub of ['fullbody', 'upperlower', 'bootylicious', null]) for (const n of [1, 2, 3, 4, 5, 6, 7])
+    for (const inj of [[], ['knees']]) for (const eq of ['gym', G._homeEquipId(['dumbbells', 'bench'])]) {
+      const p = G._generateWorkoutProgram('aesthetic', sub, n, 'T', 12, inj, eq, sub === null ? ['glutes', 'quads', 'lats', 'sidedelts'] : null);
+      const want = n <= 3 ? p.days.length : 2, got = gDays(p);
+      if (got < want) bad.push(`${sub} ${n}d ${inj} ${eq}: glutes on ${got} of ${p.days.length} days`);
+    }
+  check('Feminine Aesthetic: 1–3 days a week have glutes every day, 4–7 days on at least two (every focus, picked muscles, injuries, home)', bad.length === 0, bad.slice(0, 4).join(' | '));
+  const lpp = G._generateWorkoutProgram('aesthetic', null, 3, 'T', 12, [], 'gym', ['glutes', 'quads', 'lats', 'sidedelts']);
+  check('…the 3-day Lower / Push / Pull split from picked muscles gets glutes on all three', gDays(lpp) === 3, JSON.stringify(lpp.days.map(d => d.exercises.map(e => e.name))));
+  check('…but picked muscles without glutes get none added', gDays(G._generateWorkoutProgram('aesthetic', null, 3, 'T', 12, [], 'gym', ['lats', 'sidedelts'])) === 0);
+  check('…and other goals are untouched', JSON.stringify(G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes', 'quads', 'lats']).days) === JSON.stringify(G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes', 'quads', 'lats']).days) && gDays(G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes', 'quads', 'lats'])) < 3);
+}
