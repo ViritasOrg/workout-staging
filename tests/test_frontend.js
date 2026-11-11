@@ -9611,9 +9611,10 @@ globalThis.__aiReply = (async function(){
   check('AI reply: the first ask sends no conversation', sent[0].history.length === 0 && sent[0].request === 'Swap the row');
   check('AI reply: the request stays on screen and the box is free for a reply',
     G._pai.last === 'Swap the row' && G._pai.text === '' && G._pai.plan && /T-Bar Row/.test(G._pai.plan.lines.join(' ')));
-  check('AI reply: the card offers Reply next to Apply', /progAiReply\(\)/.test(G._progAiHtml()) && /progAiApply\(\)/.test(G._progAiHtml()));
+  check('AI chat: the proposed change is the AI\'s last message, with Apply under it',
+    /data-pai="ai">[^<]*T-Bar Row[^<]*<div[^>]*><button onclick="progAiApply\(\)"/.test(G._paiMsgsHtml()), G._paiMsgsHtml());
   G._pai.text = 'My gym has no T-bar row';
-  await ask(() => G.progAiReply());
+  await ask(() => G.progAiSend());   // the Send button: after the first message every one is a reply
   check('AI reply: the reply carries the first turn and what was proposed',
     sent[1].request === 'My gym has no T-bar row' && sent[1].history.length === 1 &&
     sent[1].history[0].request === 'Swap the row' && /T-Bar Row/.test(sent[1].history[0].answer), JSON.stringify(sent[1].history));
@@ -9621,8 +9622,11 @@ globalThis.__aiReply = (async function(){
   await ask(() => G.progAiReply());
   check('AI reply: the whole conversation goes with every reply', sent[2] && sent[2].history.length === 2 &&
     sent[2].history[1].request === 'My gym has no T-bar row' && /Cable Row/.test(sent[2].history[1].answer), JSON.stringify(sent[2]) + ' ' + JSON.stringify(G._pai));
-  const html = G._progAiHtml();
-  check('AI reply: the card shows the conversation', /Swap the row/.test(html) && /My gym has no T-bar row/.test(html) && /No cables either/.test(html));
+  const html = G._paiMsgsHtml();
+  check('AI chat: the whole conversation, oldest first, yours on the right and the AI\'s on the left',
+    html.indexOf('Swap the row') < html.indexOf('My gym has no T-bar row') && html.indexOf('My gym has no T-bar row') < html.indexOf('No cables either') &&
+    (html.match(/class="pai-msg pai-me"/g) || []).length === 3 && (html.match(/class="pai-msg pai-ai"/g) || []).length === 4, html);
+  check('AI chat: what the AI said earlier is its own message', /data-pai="ai">[^<]*T-Bar Row/.test(html) && /data-pai="ai">[^<]*Cable Row/.test(html));
   check('AI reply: the plan on screen is the latest', /Lat Pulldown/.test(G._pai.plan.lines.join(' ')));
   // a request that never reached the AI is not a turn
   const cur = G.fetch; G.fetch = async () => { throw new Error('offline'); };
@@ -9631,10 +9635,13 @@ globalThis.__aiReply = (async function(){
   check('AI reply: …and adds nothing to the conversation', G._pai.hist.length === 2, JSON.stringify(G._pai.hist));
   G.progAiCancel();
   check('AI reply: Cancel starts a fresh conversation', G._pai.hist.length === 0 && G._pai.last === '' && !G._pai.plan);
+  check('AI chat: a fresh chat has only the AI\'s greeting', (G._paiMsgsHtml().match(/class="pai-msg/g) || []).length === 1 && /Nothing changes until you tap Apply/.test(G._paiMsgsHtml()));
+  { let calls = 0; const cur2 = G.fetch; G.fetch = async () => { calls++; return answers.shift(); }; G._pai.text = '   '; await G.progAiSend(); G.fetch = cur2;
+    check('AI chat: Send with nothing typed sends nothing and says nothing', calls === 0 && !G._pai.err && !G._pai.last); }
   G._programs = []; G._activeProgramIndex = 0;
 })().catch(e => check('AI reply checks ran', false, String(e && e.stack || e)));
 
-Promise.resolve(globalThis.__aiReply).then(async function(){
+globalThis.__aiCannot = Promise.resolve(globalThis.__aiReply).then(async function(){
   const prog = {name: 'T', days: [{name: 'Day 1', exercises: [{name: 'Squat', sets: '3', kg: 0}]}]};
   G._programs = [prog]; G._activeProgramIndex = 0; G._pai = G._paiFresh(); G._pai.text = 'Make it easier on my shoulders';
   const cur = G.fetch; G.fetch = async () => ({ok: true, status: 200, json: async () => ({ops: [{op: 'cannot', days: [], exercise: '',
@@ -9997,3 +10004,31 @@ globalThis.__promoteResumeRun = (async function(){
   await t.C.resumePromote(); await settle();
   check('with the Deploy card hidden (prod) nothing is asked', t.calls.length === 0);
 })().catch(e => { check('promote resume checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
+
+// ── Ask AI is a chat over the app (Henrik, 2026-11-11: "The AI dialog to update program needs to open as an overlay,
+// and the UI needs to be a traditional message chatt not this weird page we have today") ──
+// (after the async AI reply and AI cannot checks, which share G._pai and G._programs)
+Promise.resolve(globalThis.__aiCannot).then(() => {
+  console.log('\n── Ask AI chat overlay ───────');
+  const ov = html.slice(html.indexOf('id="progAiModal"'), html.indexOf('id="psModal"'));
+  check('AI chat: an overlay over the whole app, with a message list, a message box and Send',
+    /class="pai-overlay" id="progAiModal"/.test(html) && /\.pai-overlay\{[^}]*position:fixed;inset:0/.test(html) &&
+    ov.includes('id="pai-msgs"') && ov.includes('id="prog-ai-text"') && /onclick="progAiSend\(\)"/.test(ov) && /onclick="closeProgAi\(\)"/.test(ov) && /onclick="progAiCancel\(\)"/.test(ov));
+  check('AI chat: Enter sends, shift-Enter is a new line', /if\(event\.key==='Enter'&&!event\.shiftKey\)\{event\.preventDefault\(\);progAiSend\(\);\}/.test(ov));
+  check('AI chat: readable: messages 16px, nothing greyed', /\.pai-msg\{[^}]*font-size:16px/.test(html) && !/var\(--muted\)/.test(ov) && !/var\(--muted\)/.test(G._paiMsgsHtml()));
+  G._programs = [{name: 'T', days: [{name: 'Day 1', exercises: [{name: 'Squat', sets: '3', kg: 0}]}]}]; G._activeProgramIndex = 0; G._pai = G._paiFresh();
+  check('AI chat: the Plan card is a button that opens it', /onclick="openProgAi\(\)"[^>]*>Ask AI</.test(G._progAiHtml()) && !/<textarea/.test(G._progAiHtml()));
+  G._pai.last = 'x';
+  check('AI chat: …"Open the chat" while a conversation is going', />Open the chat</.test(G._progAiHtml()));
+  const els = {}, mk = (id) => (els[id] = { id, innerHTML: '', value: '', scrollTop: 0, scrollHeight: 999, disabled: false, cls: new Set(), classList: { add(c) { els[id].cls.add(c); }, remove(c) { els[id].cls.delete(c); }, contains(c) { return els[id].cls.has(c); } }, focus() {} });
+  ['progAiModal', 'pai-msgs', 'prog-ai-text', 'pai-send', 'prog-ai-card'].forEach(mk);
+  const doc = G.document; G.document = Object.assign(Object.create(doc), { getElementById: (id) => els[id] || doc.getElementById(id) });
+  G._pai = G._paiFresh(); G.openProgAi();
+  check('AI chat: opening shows the overlay with its messages', els.progAiModal.cls.has('open') && /pai-msg pai-ai/.test(els['pai-msgs'].innerHTML) && els['pai-msgs'].scrollTop === 999);
+  G._pai.busy = true; G._pai.last = 'Swap the row'; G._renderProgAi();
+  check('AI chat: while the AI thinks, its bubble says so and Send waits', /Thinking…/.test(els['pai-msgs'].innerHTML) && els['pai-send'].disabled === true);
+  G._pai = G._paiFresh(); G.closeProgAi();
+  check('AI chat: X closes it', !els.progAiModal.cls.has('open'));
+  check('AI chat: Apply closes it too', /_pai=_paiFresh\(\);closeProgAi\(\);/.test(String(G.progAiApply)));
+  G.document = doc; G._programs = []; G._pai = G._paiFresh();
+}).catch(e => check('AI chat overlay checks ran', false, String(e && e.stack || e)));

@@ -751,7 +751,14 @@ PR maintains them.
 
 ### Ask AI to change the program (rule 2026-11-03)
 Henrik: *"use [the Claude key] to allow AI guided changes to training programs ... Use cheapest model still capable of this."*
-- The **Ask AI** card on Plan sends the request, the active program's day and exercise names, today's day and the exercise
+- **It is a chat over the app** (Henrik, 2026-11-11: "The AI dialog to update program needs to open as an overlay, and the UI
+  needs to be a traditional message chatt"):
+  - The Plan card holds the temporary changes and an **Ask AI** button. It reads **Open the chat** while a conversation is going.
+  - The button opens `#progAiModal`, full screen: your messages on the right, the AI's on the left, oldest first (`_paiMsgsHtml`).
+  - The proposed change is the AI's last message, with **Apply** under it.
+  - One message box: Enter or **Send** asks the first time, and replies with the whole conversation after that (`progAiSend`).
+  - **New chat** starts over; **×** closes the chat and keeps the conversation; Apply closes it.
+- Ask AI sends the request, the active program's day and exercise names, today's day and the exercise
   catalogue (`_exCatalogue`, read from `EX_OPTS_HTML`) to `POST /program-ai` in claude-agent-backend. That runs on the
   user's own food-log key; for an Anthropic key it is Claude Haiku 5.5, the cheapest current Claude model.
 - **The AI returns operations, never a program**: `remove`, `replace`, `add` (on numbered days), `today` (a one-off
