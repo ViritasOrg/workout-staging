@@ -9385,6 +9385,42 @@ setTimeout(() => { check('every async check finished within 30 s', false); _summ
   const before = JSON.stringify(prog);
   const op = (o) => Object.assign({days: [], exercise: '', with: '', exercises: [], title: ''}, o);
 
+  // Henrik 2026-11-11: "I want the AI to be able to change a saved program. Like for the next x weeks
+  // no presses due to my shoulder but still train chest and triceps". A change for N weeks carries
+  // its own undo and end date; once the date has come everything it touched is put back.
+  {
+    const today = new Date().toISOString().split('T')[0];
+    const ops = [op({op: 'replace', days: [1], exercise: 'Bench Press', with: 'Cable Fly'}),
+                 op({op: 'replace', days: [3], exercise: 'Overhead Press', with: 'Lateral Raise'}),
+                 op({op: 'add', days: [1], exercises: [{name: 'Tricep Pushdown', sets: 3, reps: '12'}]}),
+                 op({op: 'remove', days: [3], exercise: 'Cable External Rotation'})];
+    const t = G._applyAiOps(prog, ops, 1, cat, 1, 4);
+    check('AI for N weeks: the change applies now and says when it changes back',
+      t.prog && t.temp && t.temp.weeks === 4 && t.temp.until === G._isoPlusDays(today, 28)
+      && t.prog.days[0].exercises.some(x => x.name === 'Cable Fly') && !t.prog.days[0].exercises.some(x => x.name === 'Bench Press')
+      && t.lines.some(l => /For 4 weeks: on .* it changes back by itself/.test(l)), JSON.stringify(t.lines));
+    check('AI with no time limit: no end date, nothing to change back', !G._applyAiOps(prog, ops, 1, cat, 1, 0).temp && !G._applyAiOps(prog, ops, 1, cat, 1).temp);
+    const saved = Object.assign(JSON.parse(JSON.stringify(t.prog)), {tempChanges: [t.temp]});
+    check('AI for N weeks: nothing changes back before the end date', G._endTempChanges(saved, G._isoPlusDays(today, 27)).ended.length === 0);
+    const back = G._endTempChanges(saved, t.temp.until);
+    const strip = (pp) => JSON.stringify(pp.days);
+    check('AI for N weeks: on the end date the program is exactly as before (sets, weights, order)', back.ended.length === 1 && strip(back.prog) === strip(prog), strip(back.prog));
+    check('…the change is no longer pending and shows as ended', back.prog.tempChanges.length === 0 && back.prog.tempEnded.length === 1
+      && /Changed back on/.test(G._tempChangesHtml(back.prog)) && /Until .*then it changes back by itself/.test(G._tempChangesHtml(saved)));
+    // An exercise the user edited away in the meantime is left alone, never forced back over it.
+    const edited = JSON.parse(JSON.stringify(saved)); edited.days[0].exercises = edited.days[0].exercises.filter(x => x.name !== 'Cable Fly');
+    const back2 = G._endTempChanges(edited, t.temp.until);
+    check('…a step whose exercise the user has since removed is skipped, the rest still changes back',
+      !back2.prog.days[0].exercises.some(x => x.name === 'Bench Press') && back2.prog.days[2].exercises.some(x => x.name === 'Overhead Press')
+      && !back2.prog.days[0].exercises.some(x => x.name === 'Tricep Pushdown'));
+    vm.runInContext('var __progSaved=_programs;', sandbox);
+    sandbox.__tp = [Object.assign(JSON.parse(JSON.stringify(saved)), {tempChanges: [Object.assign({}, t.temp, {until: G._isoPlusDays(today, -1)})]})];
+    const any = vm.runInContext('_programs=__tp;_endDueTempChanges()', sandbox);
+    const after = vm.runInContext('_programs', sandbox);
+    check('…when the programs load, a change past its end date is undone and reported for saving', any === true && after[0].days[0].exercises.some(x => x.name === 'Bench Press') && after[0].tempChanges.length === 0);
+    vm.runInContext('_programs=__progSaved;', sandbox);
+    check('…and both load paths run it', /_endDueTempChanges\(\)/.test(String(G.initPrograms)) && /_endDueTempChanges\(\)/.test(String(G.syncProgramsFromAgent)));
+  }
   let p = G._applyAiOps(prog, [op({op: 'remove', days: [1, 3], exercise: 'cable external rotation'})], 1, cat);
   check('AI remove: gone from every day named', p.prog && p.prog.days.every(d => d.exercises.every(x => x.name !== 'Cable External Rotation')));
   check('AI remove: everything else is exactly as it was',
