@@ -1309,7 +1309,7 @@ function initPrograms(){
   var saved=getData('workout_programs',null);
   if(saved&&saved.programs&&saved.programs.length){_programs=saved.programs;_activeProgramIndex=Math.min(saved.active_index||0,_programs.length-1);}
   else{_programs=[];_activeProgramIndex=0;}
-  if(_ensurePrograms())savePrograms();
+  var _ec=_ensurePrograms();if(_endDueTempChanges())_ec=true;if(_ec)savePrograms();
   rebuildDayGrid();rebuildLogDaySelect();
 }
 function savePrograms(){setData('workout_programs',{programs:_programs,active_index:_activeProgramIndex});pushProgramsToAgent();}
@@ -1323,7 +1323,7 @@ async function syncProgramsFromAgent(){
       _programs=remote.programs;
       _activeProgramIndex=Math.min(remote.active_index||0,_programs.length-1);
     }
-    _ensurePrograms();
+    _ensurePrograms();_endDueTempChanges();
     setData('workout_programs',{programs:_programs,active_index:_activeProgramIndex});
     pushProgramsToAgent();
     rebuildDayGrid();rebuildLogDaySelect();buildProgramSettingsCard();(function(){var _ls=document.getElementById('log-day');var _lc=document.getElementById('structured-log');var _hr=_lc&&Array.from(_lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});if(_ls&&!_hr&&parseInt(_ls.value)!==_selectedProgramDay){_ls.value=_selectedProgramDay;prefillLog(_selectedProgramDay);}})();
@@ -1390,8 +1390,8 @@ function _aiEx(e){
 }
 // Pure: the operations applied to a copy of prog. Returns {prog, oneOff, lines, errors}; prog is
 // null when nothing in the program changes. Any error blocks the whole change.
-function _applyAiOps(prog,ops,today,catalogue,extraDay){
-  var cp=JSON.parse(JSON.stringify(prog)),changed=false,oneOff=null,lines=[],errors=[],said=[];
+function _applyAiOps(prog,ops,today,catalogue,extraDay,weeks){
+  var cp=JSON.parse(JSON.stringify(prog)),changed=false,oneOff=null,lines=[],errors=[],said=[],undo=[];
   var known={};(catalogue||[]).forEach(function(n){known[n.toLowerCase()]=n;});
   cp.days.forEach(function(d){(d.exercises||[]).forEach(function(x){known[String(x.name).toLowerCase()]=x.name;});});
   function real(n){return known[String(n||'').trim().toLowerCase()]||null;}
@@ -1403,16 +1403,16 @@ function _applyAiOps(prog,ops,today,catalogue,extraDay){
       var hit=inDays(o.exercise,o.days||[]);
       if(!hit.length){errors.push(o.exercise+' is not in '+((o.days||[]).length?dayNames((o.days||[]).filter(function(i){return cp.days[i-1];})):'the program')+'.');return;}
       var lc=String(o.exercise).trim().toLowerCase();
-      if(o.op==='remove'){hit.forEach(function(i){var d=cp.days[i-1];d.exercises=d.exercises.filter(function(x){return String(x.name).toLowerCase()!==lc;});});
+      if(o.op==='remove'){hit.forEach(function(i){var d=cp.days[i-1];d.exercises.forEach(function(x,k){if(String(x.name).toLowerCase()===lc)undo.push({kind:'reinsert',day:i,index:k,was:JSON.parse(JSON.stringify(x))});});d.exercises=d.exercises.filter(function(x){return String(x.name).toLowerCase()!==lc;});});
         lines.push('Remove '+o.exercise+' from '+dayNames(hit));changed=true;return;}
       var w=real(o['with']);if(!w){errors.push(o['with']+' is not an exercise the app knows.');return;}
-      hit.forEach(function(i){cp.days[i-1].exercises.forEach(function(x){if(String(x.name).toLowerCase()===lc){x.name=w;x.kg=0;}});});
+      hit.forEach(function(i){cp.days[i-1].exercises.forEach(function(x){if(String(x.name).toLowerCase()===lc){undo.push({kind:'replace',day:i,now:w,was:JSON.parse(JSON.stringify(x))});x.name=w;x.kg=0;}});});
       lines.push('Replace '+o.exercise+' with '+w+' in '+dayNames(hit));changed=true;return;}
     var exs=[],bad=(o.exercises||[]).filter(function(e){return!real(e.name);}).map(function(e){return e.name;});
     if(bad.length){errors.push(bad.join(', ')+(bad.length>1?' are not exercises':' is not an exercise')+' the app knows.');return;}
     exs=(o.exercises||[]).map(function(e){return _aiEx({name:real(e.name),sets:e.sets,reps:e.reps});});
     if(o.op==='add'){var ds=(o.days||[]).filter(function(i){return cp.days[i-1];});if(!ds.length||!exs.length)return;
-      ds.forEach(function(i){exs.forEach(function(x){cp.days[i-1].exercises.push(JSON.parse(JSON.stringify(x)));});});
+      ds.forEach(function(i){exs.forEach(function(x){cp.days[i-1].exercises.push(JSON.parse(JSON.stringify(x)));undo.push({kind:'drop',day:i,name:x.name});});});
       lines.push('Add '+exs.map(function(x){return x.name+' '+x.scheme;}).join(', ')+' to '+dayNames(ds));changed=true;return;}
     if(o.op==='today'&&exs.length){var td=cp.days[today-1];
       oneOff={id:'oo'+Date.now(),date:new Date().toISOString().split('T')[0],day:today,name:'Today — '+(o.title||'One-off session'),exercises:exs};
@@ -1426,10 +1426,38 @@ function _applyAiOps(prog,ops,today,catalogue,extraDay){
       lines.push('Extra session today, the program stays where it is: '+(o.title||'extra session'));
       exs.forEach(function(x){lines.push('  • '+x.name+' '+x.scheme);});}
   });
-  return{prog:changed?cp:null,oneOff:oneOff,lines:lines,errors:errors,said:said};
+  // For a limited time (Henrik, 2026-11-11: "for the next x weeks no presses due to my shoulder"): the
+  // change carries its own way back and an end date; _endTempChanges undoes it once that date has come.
+  var wk=Math.max(0,Math.min(52,parseInt(weeks)||0)),temp=null;
+  if(changed&&wk>0){var until=_isoPlusDays(new Date().toISOString().split('T')[0],7*wk);
+    temp={id:'tc'+Date.now(),until:until,weeks:wk,lines:lines.slice(),undo:undo};
+    lines.push('For '+wk+' week'+(wk>1?'s':'')+': on '+_tcDate(until)+' it changes back by itself.');}
+  return{prog:changed?cp:null,oneOff:oneOff,lines:lines,errors:errors,said:said,temp:temp};
 }
+function _isoPlusDays(iso,n){var d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().split('T')[0];}
+function _tcDate(iso){var d=new Date(iso+'T12:00:00Z');return d.getUTCDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]+' '+d.getUTCFullYear();}
+// Pure: undo every temporary change on prog whose end date has come (today ≥ until), newest change
+// first and each change's steps in reverse. A step whose exercise the user has since edited away is
+// skipped, never forced. Returns {prog, ended:[change]}; prog is a copy only when something ended.
+function _endTempChanges(prog,today){
+  var tcs=(prog&&prog.tempChanges)||[];var due=tcs.filter(function(c){return c&&c.until&&c.until<=today;});
+  if(!due.length)return{prog:prog,ended:[]};
+  var cp=JSON.parse(JSON.stringify(prog));
+  due.slice().reverse().forEach(function(c){(c.undo||[]).slice().reverse().forEach(function(u){var d=cp.days[u.day-1];if(!d)return;var exs=d.exercises||(d.exercises=[]);
+    var at=function(n){var lc=String(n).toLowerCase();for(var k=0;k<exs.length;k++)if(String(exs[k].name).toLowerCase()===lc)return k;return -1;};
+    if(u.kind==='drop'){var k=at(u.name);if(k>=0)exs.splice(k,1);}
+    else if(u.kind==='replace'){var k2=at(u.now);if(k2>=0&&at(u.was.name)<0)exs[k2]=JSON.parse(JSON.stringify(u.was));}
+    else if(u.kind==='reinsert'){if(at(u.was.name)<0)exs.splice(Math.min(u.index,exs.length),0,JSON.parse(JSON.stringify(u.was)));}});});
+  var ids=due.map(function(c){return c.id;});
+  cp.tempChanges=tcs.filter(function(c){return ids.indexOf(c.id)<0;});
+  cp.tempEnded=(prog.tempEnded||[]).concat(due.map(function(c){return{id:c.id,until:c.until,lines:c.lines};})).slice(-3);
+  return{prog:cp,ended:due};
+}
+// Runs where the programs load: ends every temporary change that is due, on every program.
+function _endDueTempChanges(){var today=new Date().toISOString().split('T')[0],any=false;
+  _programs=_programs.map(function(p){var r=_endTempChanges(p,today);if(r.ended.length)any=true;return r.prog;});return any;}
 function _progAiHtml(){
-  var b='<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:8px">Tell the AI what to change in your active program, or ask for a different session today only. It runs on your own API key (Settings, Food log · API key). Nothing changes until you tap Apply.</div>'+
+  var b=_tempChangesHtml(getActiveProgram())+'<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:8px">Tell the AI what to change in your active program, or ask for a different session today only. It runs on your own API key (Settings, Food log · API key). Nothing changes until you tap Apply.</div>'+
     _paiConvoHtml()+
     '<textarea id="prog-ai-text" rows="2" placeholder="'+(_pai.last?'Reply, e.g. My gym has no leg press':'e.g. Replace Barbell Row with Cable Row on all pull days')+'" oninput="_pai.text=this.value" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-family:inherit">'+_escP(_pai.text)+'</textarea>';
   if(_pai.busy)b+='<div style="font-size:14px;color:var(--muted);padding:10px 0">Asking the AI…</div>';
@@ -1442,6 +1470,11 @@ function _progAiHtml(){
     (/API key/i.test(_pai.err)?'<div style="margin-top:8px">'+_flBtn('API key settings','flOpenKeySettings()',false)+'</div>':'');
   return'<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px"><div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Ask AI to change your program</div>'+b+'</div>';
 }
+// Pure: the temporary changes on a program, and those that ended in the last 7 days.
+function _tempChangesHtml(prog){if(!prog)return'';var today=new Date().toISOString().split('T')[0],wk=_isoPlusDays(today,-7),h='';
+  (prog.tempChanges||[]).forEach(function(c){h+='<div data-temp-change="1" style="margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--accent);font-size:15px;color:var(--text);line-height:1.5"><b>Until '+_escP(_tcDate(c.until))+'</b> (then it changes back by itself):'+(c.lines||[]).map(function(l){return'<div>'+_escP(l)+'</div>';}).join('')+'</div>';});
+  (prog.tempEnded||[]).filter(function(c){return c.until>=wk;}).forEach(function(c){h+='<div data-temp-ended="1" style="margin-bottom:8px;font-size:15px;color:var(--text);line-height:1.5"><b>Changed back on '+_escP(_tcDate(c.until))+':</b> '+(c.lines||[]).map(function(l){return _escP(l);}).join('; ')+'</div>';});
+  return h;}
 // The conversation on screen: every earlier turn, then the request the current answer is for.
 function _paiConvoHtml(){
   var turns=_pai.hist.concat(_pai.last?[{request:_pai.last,answer:''}]:[]);
@@ -1475,7 +1508,7 @@ async function progAiAsk(turn){
     var j=await r.json().catch(function(){return{};});
     if(turn&&(r.ok||r.status===422)){_pai.hist.push(turn);_pai.hist=_pai.hist.slice(-10);}
     if(!r.ok){_pai.err=(j&&typeof j.detail==='string')?j.detail:'The AI request failed (HTTP '+r.status+').';if(r.status!==422)back();}
-    else{var plan=_applyAiOps(prog,j.ops,today,cat,_extraDay());
+    else{var plan=_applyAiOps(prog,j.ops,today,cat,_extraDay(),j.weeks);
       if(plan.errors.length)_pai.err=plan.errors.join(' ')+' Nothing was changed.';
       else if(!plan.prog&&!plan.oneOff)_pai.err=plan.said.join(' ')||'The AI found nothing to change.';
       else _pai.plan=plan;}
@@ -1485,7 +1518,7 @@ async function progAiAsk(turn){
 function progAiCancel(){_pai=_paiFresh();_renderProgAi();}
 function progAiApply(){
   var plan=_pai.plan;if(!plan)return;
-  if(plan.prog){_programs[_activeProgramIndex]=plan.prog;_touchProgram(_activeProgramIndex);savePrograms();}
+  if(plan.prog){if(plan.temp)plan.prog.tempChanges=(plan.prog.tempChanges||[]).concat([plan.temp]);_programs[_activeProgramIndex]=plan.prog;_touchProgram(_activeProgramIndex);savePrograms();}
   if(plan.oneOff)_setOneOff(plan.oneOff);
   rebuildDayGrid();rebuildLogDaySelect();
   var lc=document.getElementById('structured-log');var hasReps=lc&&Array.from(lc.querySelectorAll('input[data-type="reps"]')).some(function(i){return parseInt(i.value)>0;});
@@ -4371,6 +4404,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.372',title:'Program changes for a few weeks',text:'On Plan, tell Ask AI how long a change should last, for example "for the next 4 weeks no presses due to my shoulder, still train chest and triceps". After Apply the change runs until its end date, shown on the Ask AI card, and then your program changes back by itself.'},
   {v:'1.349',title:'Polestar climate',text:'Settings → Polestar: sign in with your Polestar ID. On a cold or hot day the app asks on the last exercise whether to start the car\'s climate, and the car in the header turns it on or off.'},
   {v:'1.341',title:'Reply to the AI',text:'On Plan, after Ask AI suggests a change, type a reply and tap Reply (for example that your gym has no leg press). It answers with the whole conversation in mind; Apply keeps the latest suggestion.'},
   {v:'1.336',title:'Token cost',text:'Settings → Food log · API key shows what the AI calls on your own key cost each week and each month, in the currency you pick (EUR to start with).'},

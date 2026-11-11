@@ -766,6 +766,19 @@ Henrik: *"use [the Claude key] to allow AI guided changes to training programs .
   shows the conversation (`_paiConvoHtml`). Nothing is applied until Apply, so each answer is a whole revised set against
   the program as it is. A request that never reached the AI (offline, no key) is not a turn; Cancel and Apply start afresh.
 
+- **A change for a limited time undoes itself** (Henrik, 2026-11-11: *"I want the AI to be able to
+  change a saved program. Like for the next x weeks no presses due to my shoulder but still train chest
+  and triceps"*). `/program-ai` puts `weeks` on each operation (0 = lasting) and returns the largest as
+  `weeks`; the model is told to replace a ruled-out movement with a catalogue exercise for the same
+  muscle without it (chest: flyes, pec deck; triceps: pushdowns, extensions). `_applyAiOps(…, weeks)`
+  records how to undo each step (`replace` keeps the original exercise with its sets and weight, `remove`
+  its position, `add` its name) as `temp`; Apply stores it on the program in `tempChanges` with `until`
+  (today + 7×weeks). `_endTempChanges` (pure) undoes every change whose `until` has come — newest first,
+  steps in reverse, skipping a step whose exercise the user has since edited away — and keeps the last
+  three as `tempEnded`. It runs where the programs load (`initPrograms`, `syncProgramsFromAgent`); the Ask
+  AI card shows each running change with its end date and, for 7 days, the ones that changed back. This
+  is the user's own scheduled edit of their stored program, not a migration.
+
 ### Scan conversations for rules — extract to CLAUDE.md each session
 After every session in which Henrik gives a rule, constraint, or order, extract it into this file. If any extracted rule **contradicts** something already in the codebase or this file, **point it out immediately** rather than silently applying one interpretation.
 
