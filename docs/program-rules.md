@@ -831,3 +831,11 @@ get male models."*
 - An unknown sex (first-run setup skipped) is never shown as male: the picture spot asks "Which body
   should the pictures show? ♀ Female / ♂ Male", and `_setProfileSex` saves the answer to the profile
   and the backend; the Profile card then shows it.
+
+### Upper Heavy / Lower Heavy carry real weight (Henrik, 2026-11-11)
+*"Hypert Upper heavy has as much legs as lower heavy, makes no sense"*: up to 4 days both foci are the
+same full-body template (the focus added one exercise a day) and the allocator evened the groups out
+again (legs 24% in both at 4 days). The weekly target is now weighted per focus: Upper Heavy back,
+chest, shoulders, arms 1.5× and legs 0.75×; Lower Heavy legs 1.5× and the upper groups 0.75×
+(`_gMul` in the allocator). At 4 days and 12 sets/muscle legs are now 16% vs 34% of weekly sets.
+A test checks Upper < Balanced < Lower on leg share for 3–7 days.
