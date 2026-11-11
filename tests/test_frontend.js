@@ -10032,3 +10032,25 @@ Promise.resolve(globalThis.__aiCannot).then(() => {
   check('AI chat: Apply closes it too', /_pai=_paiFresh\(\);closeProgAi\(\);/.test(String(G.progAiApply)));
   G.document = doc; G._programs = []; G._pai = G._paiFresh();
 }).catch(e => check('AI chat overlay checks ran', false, String(e && e.stack || e)));
+
+// ── Feminine Aesthetic never gets pull-ups (Henrik, 2026-11-11: "choosing female astetics and not choosing biceps the
+// program still adds pull-ups … pull-ups isnt an exercise almost any women can do at all") ──
+{
+  console.log('\n── Feminine Aesthetic: no pull-ups ───────');
+  const PU = /^(Pull-ups|Weighted Pull-ups|Chin-ups)$/;
+  const picks = [['lats'], ['lats', 'glutes', 'triceps'], ['lats', 'upperback', 'sidedelts', 'glutes', 'hamstrings'], ['lats', 'upperback', 'reardelts', 'traps', 'chest', 'triceps']];
+  const bad = [];
+  for (const ms of picks) for (const n of [1, 2, 3, 4, 5, 6]) for (const inj of [[], ['shoulders']]) {
+    const p = G._generateWorkoutProgram('aesthetic', null, n, 'T', 12, inj, 'gym', ms);
+    p.days.forEach(d => d.exercises.forEach(e => { if (PU.test(e.name)) bad.push(`${ms} ${n}d ${inj}: ${d.name} ${e.name}`); }));
+  }
+  check('Feminine Aesthetic with lats picked trains them with the pulldown, never pull-ups', bad.length === 0, bad.slice(0, 3).join(' | '));
+  const fl = G._generateWorkoutProgram('aesthetic', null, 3, 'T', 12, [], 'gym', ['lats']);
+  check('…and the lats are still trained', fl.days.some(d => d.exercises.some(e => e.name === 'Lat Pulldown')));
+  for (const sub of ['fullbody', 'upperlower', 'bootylicious']) {
+    const auto = [];
+    for (const n of [2, 3, 4, 5, 6]) G._generateWorkoutProgram('aesthetic', sub, n, 'T', 12, [], 'gym').days.forEach(d => d.exercises.forEach(e => { if (PU.test(e.name)) auto.push(`${sub} ${n}d ${e.name}`); }));
+    check(`…nor the automatic ${sub} programs`, auto.length === 0, auto.join(' | '));
+  }
+  check('other goals keep pull-ups for the lats', G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['lats']).days.some(d => d.exercises.some(e => e.name === 'Pull-ups')));
+}

@@ -808,6 +808,8 @@ unmarked ones are left out; **2 B** — individual muscles are clickable.
   without injection sites). Feminine Aesthetic shows the female body, otherwise the profile's sex.
   Tapping a muscle on the picture or its chip marks it red. "Use a ready-made focus instead" goes
   to the old focus step; Next is disabled until one muscle is marked.
+- **Feminine Aesthetic never gets pull-ups** (Henrik, 2026-11-11: "pull-ups isnt an exercise almost any women can do at all"):
+  its lats lead with Lat Pulldown (`MUSCLE_LIB.latsF`, `_muscleLib`), as its own templates do; other goals keep Pull-ups.
 - Muscles: chest, traps, front/side/rear delts, triceps, biceps, lats, upper back, quads,
   hamstrings, glutes, calves, abs (`MUSCLES`, exercises in `MUSCLE_LIB`; traps → Shrug, Upright Row).
 - Shapes are traced outlines, not ovals (Henrik, 2026-11-10: *"muscle choices are oval shapes not

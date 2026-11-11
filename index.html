@@ -2466,7 +2466,7 @@ var MUSCLE_LIB={quads:[['Squat',60],['Leg Press',100],['Leg Extension',35]],hams
   glutes:[['Lunges',20],['Hip Abductor (outside hips)',40]],glutesF:[['Hip Thrust',60],['Hip Abductor (outside hips)',40],['Lunges',20]],
   calves:[['Calf Raises',50],['Seated Calf Raise',40]],chest:[['Bench Press',60],['Incline DB Press',22],['Cable Fly',15]],
   frontdelts:[['Overhead Press',35],['Arnold Press',14],['Front Raise',8]],sidedelts:[['Lateral Raise',8],['Cable Lateral Raise',6]],
-  reardelts:[['Rear Delt Fly',7],['Face Pulls',15]],lats:[['Pull-ups',0],['Lat Pulldown',45]],traps:[['Shrug',60],['Upright Row',25]],upperback:[['Barbell Row',50],['Cable Row',45]],
+  reardelts:[['Rear Delt Fly',7],['Face Pulls',15]],lats:[['Pull-ups',0],['Lat Pulldown',45]],latsF:[['Lat Pulldown',38]],traps:[['Shrug',60],['Upright Row',25]],upperback:[['Barbell Row',50],['Cable Row',45]],
   biceps:[['Barbell Curl',25],['Hammer Curl',12]],triceps:[['Tricep Pushdown',20],['Overhead Tricep Cable',18],['Skull Crushers',20]],
   abs:[['Dead Bug',0],['Plank',0],['Pallof Press',8]]};
 var MUSCLE_CENTER={traps:1,abs:1};
@@ -2477,7 +2477,9 @@ function _muscleShapes(sex,view,id){var out=[];((MUSCLE_REGIONS[sex]||{})[view]|
 function _smoothPath(p){var n=p.length,d='M'+p[0][0]+','+p[0][1];for(var i=0;i<n;i++){var p0=p[(i-1+n)%n],p1=p[i],p2=p[(i+1)%n],p3=p[(i+2)%n];
   var c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
   d+='C'+c1x.toFixed(1)+','+c1y.toFixed(1)+' '+c2x.toFixed(1)+','+c2y.toFixed(1)+' '+p2[0]+','+p2[1];}return d+'Z';}
-function _muscleLib(id,goal){return (id==='glutes'&&goal==='aesthetic')?MUSCLE_LIB.glutesF:MUSCLE_LIB[id];}
+// Feminine Aesthetic never gets pull-ups (Henrik, 2026-11-11: "pull-ups isnt an exercise almost any women can do at all"):
+// its lats lead with the pulldown, as its own templates do.
+function _muscleLib(id,goal){if(goal==='aesthetic'&&id==='glutes')return MUSCLE_LIB.glutesF;if(goal==='aesthetic'&&id==='lats')return MUSCLE_LIB.latsF;return MUSCLE_LIB[id];}
 // Which figure: Feminine Aesthetic shows the female body, otherwise the profile's sex.
 // Henrik, 2026-11-11: "a female user gets the female images everywhere and a male the male
 // pictures. Right now my wife get male models." The body follows the PROFILE's sex only, for every
