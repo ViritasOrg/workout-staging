@@ -178,5 +178,68 @@ console.log('\n── Push to Prod: promote PRs a failed run left open ───
   check('  …only promote/staging-* branches are touched', /startswith\("promote\/staging-"\)/.test(block));
 }
 
+// What ViritasOrg/workout keeps of its own (read from its main branch 2026-11-11): version.json,
+// CLAUDE.md, tests.html, its CI and version-bump workflows, and a tests/ folder. Its CI runs
+// exactly PROD_CI. A change to prod's ci.yml or owned files is mirrored here.
+const PROD_REPO = 'ViritasOrg/workout';
+const PROD_OWNS = { 'version.json': '{"version":"1.200"}\n', 'CLAUDE.md': '# prod\n', 'tests.html': '<!doctype html>\n',
+  '.github/workflows/ci.yml': 'name: CI\n', '.github/workflows/version-bump.yml': 'name: Version Bump\n', 'tests/test_frontend.js': '// old\n' };
+const PROD_CI = ['node tests/test_frontend.js index.html'];
+// ── Push to Prod ships a test suite that passes on prod ─────────────────────────
+// Henrik, 2026-11-11: "promotion to prod fails … add claude.md rule for all repos to make sure
+// you dont repeat this again (it has happened multiple times). Also write tests to make sure
+// this cannot be repeated!" On 2026-11-10 the promoted tests/test_frontend.js read
+// .github/workflows/promote-to-prod.yml, which prod does not have, crashed with ENOENT and failed
+// the promotion (workout prod PR #334). Earlier: inj-writer.js (2026-08-20), inject-sites.jpg
+// (2026-10-03), retired images (2026-10-22). Every one was a file the promoted tests or page
+// needed that the prod tree did not hold.
+//
+// So this RUNS the real "Sync files into prod branch" step against a fake prod repo holding only
+// the files prod keeps of its own, stops it before the commit, and runs prod's CI commands in the
+// tree it produced. Whatever prod CI would trip over, this trips over first, in staging CI.
+console.log('\n── Push to Prod: the promoted tree passes prod CI ─────────────');
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'promote-sim-'));
+  const sh = (cmd, cwd) => cp.execSync(cmd, { cwd, stdio: 'pipe', encoding: 'utf8' });
+  const gitInit = (dir) => { sh('git init -q -b main . && git config user.email t@t && git config user.name t && git add -A && git commit -q -m init --allow-empty', dir); };
+  // staging: this checkout's tracked and untracked (not ignored) files, as a git repo
+  const stg = path.join(tmp, 'staging'); fs.mkdirSync(stg);
+  sh('git ls-files -co --exclude-standard', root).split('\n').filter(Boolean).forEach(f => {
+    const src = path.join(root, f); if (!fs.existsSync(src)) return;
+    fs.mkdirSync(path.dirname(path.join(stg, f)), { recursive: true }); fs.copyFileSync(src, path.join(stg, f));
+  });
+  gitInit(stg);
+  // prod: only what prod keeps of its own
+  const prod = path.join(tmp, 'prod'); fs.mkdirSync(prod);
+  Object.entries(PROD_OWNS).forEach(([f, body]) => { fs.mkdirSync(path.dirname(path.join(prod, f)), { recursive: true }); fs.writeFileSync(path.join(prod, f), body); });
+  gitInit(prod);
+  let script = stepRun('Sync files into prod branch');
+  const cut = script.indexOf('\ngit add -A');
+  check('the sync step ends in a commit this simulation can stop before', cut > 0);
+  script = script.slice(0, cut) + '\n';
+  const env = Object.assign({}, process.env, { GITHUB_ENV: path.join(tmp, 'github_env') });
+  const syncRun = cp.spawnSync('bash', ['-e', '-c', script], { cwd: tmp, env, encoding: 'utf8' });
+  check('the real sync step runs against a prod repo', syncRun.status === 0, (syncRun.stdout + syncRun.stderr).slice(-800));
+  // every local asset the promoted page or its modules name is in the prod tree
+  const pageSrc = ['index.html'].concat(fs.readdirSync(prod).filter(f => /\.js$/.test(f))).map(f => fs.readFileSync(path.join(prod, f), 'utf8')).join('\n');
+  const refs = [...new Set((pageSrc.match(/["'(]([A-Za-z0-9._-]+\.(?:png|jpe?g|svg|webp|gif|ico))/g) || []).map(m => m.slice(1)))];
+  const missing = refs.filter(r => fs.existsSync(path.join(root, r)) && !fs.existsSync(path.join(prod, r)));
+  check('every local image the promoted page references is in the prod tree', missing.length === 0, missing.join(', '));
+  const bad = [];
+  PROD_CI.forEach(cmd => {
+    const r = cp.spawnSync('bash', ['-c', cmd], { cwd: prod, encoding: 'utf8', timeout: 300000,
+      env: Object.assign({}, process.env, { GITHUB_REPOSITORY: PROD_REPO }) });
+    if (r.status !== 0) bad.push(cmd + ' → exit ' + r.status + '\n      ' +
+      ((r.stdout || '') + (r.stderr || '')).split('\n').filter(l => /✗|Error|ENOENT/.test(l)).slice(0, 6).join('\n      '));
+  });
+  check('prod CI passes on the promoted tree (' + PROD_CI.join(' ; ') + ')', bad.length === 0, bad.join('\n      '));
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// The pictures are built from names in code ('muscles-'+sex+'-'+view+'.webp'), which no scan finds.
+{
+  check('the sync step copies the muscle pictures', /cp \.\.\/staging\/muscles-\*\.webp \.\//.test(stepRun('Sync files into prod branch')));
+}
+
 console.log('\n' + passes + ' passed, ' + fails + ' failed');
 process.exit(fails ? 1 : 0);
