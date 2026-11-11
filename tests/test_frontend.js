@@ -9937,6 +9937,7 @@ console.log('\n── No feature is gated to staging ─────────
     /if\(IS_STAGING\)buildDeployCard\(\)|s-deploy-card/,              // the Push to Prod card itself
     /fetch\(\(IS_STAGING\?'https:\/\/viritasorg\.github\.io\//,       // each app's own version.json
     /if\(!IS_STAGING\|\|localStorage\.getItem\('wk-bf-isol-v1'\)\)/, // staging data isolation migration
+    /function _planLogBtnHtml\(idx\)\{if\(!IS_STAGING\)return''/,   // the Log button, a tool for Henrik (2026-11-11: "In stage add a log button in the plan pages")
   ];
   const bad = [];
   _files.forEach(f => {
@@ -10147,4 +10148,37 @@ Promise.resolve(globalThis.__aiCannot).then(() => {
   check('…the 3-day Lower / Push / Pull split from picked muscles gets glutes on all three', gDays(lpp) === 3, JSON.stringify(lpp.days.map(d => d.exercises.map(e => e.name))));
   check('…but picked muscles without glutes get none added', gDays(G._generateWorkoutProgram('aesthetic', null, 3, 'T', 12, [], 'gym', ['lats', 'sidedelts'])) === 0);
   check('…and other goals are untouched', JSON.stringify(G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes', 'quads', 'lats']).days) === JSON.stringify(G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes', 'quads', 'lats']).days) && gDays(G._generateWorkoutProgram('hypertrophy', null, 3, 'T', 12, [], 'gym', ['glutes', 'quads', 'lats'])) < 3);
+}
+
+
+// ── Log button on Plan, staging only (Henrik, 2026-11-11: "In stage add a log button in the plan pages so I can click it
+// and get the program and other info from generator on clipboard") ──
+{
+  console.log('\n── Plan log button ───────');
+  const inStage = new Function('IS_STAGING', 'return (' + String(G._planLogBtnHtml) + ')')(true);
+  const inProd = new Function('IS_STAGING', 'return (' + String(G._planLogBtnHtml) + ')')(false);
+  check('Log button: shown in staging, on the Plan page and in a program view', /data-plan-log="1" onclick="planLogCopy\(\)"/.test(inStage(null)) && /onclick="planLogCopy\(3\)"/.test(inStage(3)));
+  check('Log button: never in prod', inProd(null) === '' && inProd(3) === '');
+  check('Log button: readable (15px, not greyed)', /font-size:15px/.test(inStage(null)) && !/var\(--muted\)/.test(inStage(null)));
+  check('Log button: the Plan page and the program view both carry it', html.includes('<div id="plan-log"') && /_planLogBtnHtml\(progIdx\)/.test(String(G._progViewHtml)) && /_planLogBtnHtml\(null\)/.test(String(G.buildProgramSettingsCard)));
+  const p = G._generateWorkoutProgram('aesthetic', null, 3, 'Glute plan', 12, ['knees'], G._gymEquipId(G._gymDefaults()), ['glutes', 'quads', 'lats'], { noPullUps: true });
+  const t = G._planLogText(p);
+  check('Log text: the program, what the generator was given and the equipment',
+    /program log/.test(t) && /Program: Glute plan/.test(t) && /Generator: \{"goal":"aesthetic"/.test(t) && /"noPullUps":true/.test(t) && /injuries=\["knees"\]/.test(t) && /Equipment: Gym \[gym:/.test(t) && /Gym list: /.test(t) && /Home list: /.test(t), t.slice(0, 600));
+  check('Log text: the profile answers the generator reads', /pull-ups answer=/.test(t) && /pull-ups logged=(yes|no)/.test(t));
+  check('Log text: every day and exercise with its muscles, and the weekly sets per muscle',
+    p.days.every((d, i) => t.includes('Day ' + (i + 1) + ': ' + d.name)) && /Hip Thrust \| .*\| glutes, hamstrings/.test(t) && /Weekly sets per muscle \(main 1, supporting 0\.5\): .*glutes \d/.test(t));
+  check('Log text: and the whole program as JSON', t.includes('Program JSON:\n' + JSON.stringify(p)));
+  // copying: the clipboard gets the text and the button says so
+  (async () => {
+    const btns = [{ textContent: '' }], copied = [];
+    const _nav = G.navigator, _doc = G.document, _st = G.setTimeout, _pr = G._programs;
+    G._programs = [p];
+    G.navigator = { clipboard: { writeText: async (x) => { copied.push(x); } } };
+    G.document = Object.assign(Object.create(_doc), { querySelectorAll: (sel) => sel === '[data-plan-log]' ? btns : [] });
+    G.setTimeout = () => 0;
+    const ok = await G.planLogCopy(0);
+    check('Log button: a tap puts the log on the clipboard and says Copied', ok === true && copied[0].split('\n').slice(1).join('\n') === G._planLogText(p).split('\n').slice(1).join('\n') && btns[0].textContent === 'Copied ✓', JSON.stringify([ok, copied.length, btns[0].textContent, typeof G.navigator]));
+    G.navigator = _nav; G.document = _doc; G.setTimeout = _st; G._programs = _pr;
+  })().catch(e => check('Log button copy check ran', false, String(e && e.stack || e)));
 }

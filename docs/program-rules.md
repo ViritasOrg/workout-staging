@@ -749,6 +749,21 @@ PR maintains them.
   both apps in the same session; its tour names plans from the backend-served templates, never a
   compound written into the repo.
 
+### Log button on Plan, staging only (Henrik, 2026-11-11)
+*"In stage add a log button in the plan pages so I can click it and get the program and other info from generator on clipboard."*
+- **Where:** staging only (`_planLogBtnHtml`). It is listed as a tool, not a feature, in the IS_STAGING guard of `tests/test_frontend.js`.
+- **Buttons:** one under the program library on Plan (the active program) and one in each program's view (that program).
+- **What it copies** (`_planLogText`):
+  - version and time;
+  - the program;
+  - the generator record (`gen`, goal, sets/muscle, injuries, muscles, noPullUps);
+  - the equipment, the Gym and Home lists;
+  - the profile answers the generator reads (sex, pull-up answer, pull-ups logged);
+  - temporary changes;
+  - each day's exercises with scheme, sets, tag, kg and muscles;
+  - the weekly sets per muscle;
+  - the program as JSON.
+
 ### Ask AI to change the program (rule 2026-11-03)
 Henrik: *"use [the Claude key] to allow AI guided changes to training programs ... Use cheapest model still capable of this."*
 - **It is a chat over the app** (Henrik, 2026-11-11: "The AI dialog to update program needs to open as an overlay, and the UI
