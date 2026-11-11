@@ -3787,6 +3787,21 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
     return ['m','f'].every(x => cy(x,'front','traps') < cy(x,'front','chest') && cy(x,'front','chest') < cy(x,'front','abs') && cy(x,'front','abs') < cy(x,'front','quads')
       && cy(x,'back','traps') < cy(x,'back','lats') && cy(x,'back','lats') < cy(x,'back','glutes') && cy(x,'back','glutes') < cy(x,'back','hamstrings') && cy(x,'back','hamstrings') < cy(x,'back','calves'));
   })());
+  // Henrik 2026-11-11: "the muscle areas in red are too low on the body, checking Weighted Pull-ups …
+  // all muscle areas needs to be aligned upwards". Each shape's top and bottom must lie inside the
+  // band the muscle occupies on that picture (measured at 4× zoom: shoulder cap, armpit, elbow,
+  // waist taper). The first tracing had the biceps reaching the elbow and the lats the waist.
+  const BANDS = { m: { front: { frontdelts: [185, 268], sidedelts: [185, 268], biceps: [258, 348], chest: [195, 295], traps: [150, 205] },
+                       back:  { reardelts: [190, 270], triceps: [258, 350], lats: [255, 365], upperback: [195, 270], traps: [145, 290], calves: [640, 760] } },
+                  f: { front: { frontdelts: [185, 255], sidedelts: [185, 255], biceps: [245, 340], chest: [215, 300], traps: [160, 205] },
+                       back:  { reardelts: [185, 252], triceps: [242, 342], lats: [268, 362], upperback: [190, 282], traps: [160, 280] } } };
+  const offBand = [];
+  Object.keys(BANDS).forEach(x => Object.keys(BANDS[x]).forEach(v => Object.keys(BANDS[x][v]).forEach(id => {
+    const [lo, hi] = BANDS[x][v][id];
+    G._muscleShapes(x, v, id).forEach(sh => { const ys = sh.map(q => q[1]), a = Math.min(...ys), b = Math.max(...ys);
+      if (a < lo || b > hi) offBand.push(`${x}/${v}/${id}: ${a}–${b} outside ${lo}–${hi}`); });
+  })));
+  check('muscle picture: every upper-body shape sits on its muscle (not too low / too high)', offBand.length === 0, offBand.slice(0, 8).join(' | '));
   check('muscle picture: no shape is red when nothing is marked', !/255,30,30/.test(G._muscleFigureHtml('f', [])));
   check('muscle picture: Feminine Aesthetic shows the female body', G._muscleSex('aesthetic') === 'f' && G._muscleFigureHtml('f', []).includes('muscles-f-front.webp'));
   // This file ships to prod, which has no promote workflow: that Push to Prod copies the pictures
