@@ -794,3 +794,12 @@ unmarked ones are left out; **2 B** — individual muscles are clickable.
   muscle's lead exercise per day is `keep:true`. Weekly sets-per-muscle counts once per marked
   muscle in a group; unmarked groups get 0.
 - Push to Prod copies `muscles-*.webp`.
+
+### Muscles in the exercise ? popup (Henrik, 2026-11-11)
+*"under the question mark, in red list muscles trained by each exercise next to the stick figure and
+show the male/female with the muscles marked in red for this specific exercise."*
+- `exMuscles(name)` maps every catalogue and generated exercise to the muscles it trains (main
+  muscle first) by the first matching pattern in `EX_MUSCLE_RULES`; ids are `MUSCLES`' plus
+  `adductors` (listed, no area on the pictures).
+- The popup shows "Trains: …" in red (#ff8080, AAA on the dark modal) right above the stick
+  figures, and below them the profile's body (male/female) with those muscles red, display only.
