@@ -10182,3 +10182,29 @@ Promise.resolve(globalThis.__aiCannot).then(() => {
     G.navigator = _nav; G.document = _doc; G.setTimeout = _st; G._programs = _pr;
   })().catch(e => check('Log button copy check ran', false, String(e && e.stack || e)));
 }
+
+// ── Back from a generated, unsaved program returns to the wizard with every answer (Henrik, 2026-11-11: "After generating a
+// program but before saving, if I press back to change ie muscles chosen, I have to start over still! Fix this properly!") ──
+{
+  console.log('\n── Wizard: Back after Generate ───────');
+  vm.runInContext("var __bk={r:_renderProgOverlay,b:buildProgramSettingsCard,s:savePrograms,p:_programs,a:_activeProgramIndex};_renderProgOverlay=function(){};buildProgramSettingsCard=function(){};savePrograms=function(){};_programs=[{name:'Mine',days:[{name:'D',exercises:[]}]}];_activeProgramIndex=0;", sandbox);
+  vm.runInContext("_progWiz={step:3,goal:'hypertrophy',sub:null,muscles:['chest','lats'],nDays:4,setsPerMuscle:14,injuries:['knees'],name:'My plan',nameTyped:true,homeItems:[],equip:'gym',pullups:'yes'}", sandbox);
+  vm.runInContext('_progWizGenerate()', sandbox);
+  check('Generate: the new program is open for editing, not yet saved', vm.runInContext('_progWiz===null&&_progIsNew===true&&_programs.length===2&&_programs[1].name==="My plan"', sandbox));
+  vm.runInContext('progOverlayBack()', sandbox);
+  const w = JSON.parse(vm.runInContext('JSON.stringify(_progWiz)', sandbox));
+  check('Back on the unsaved program: the wizard is back at its last step with every answer', w && w.step === 3 && w.muscles.join() === 'chest,lats' && w.nDays === 4 && w.setsPerMuscle === 14 && w.injuries.join() === 'knees' && w.name === 'My plan' && w.pullups === 'yes', JSON.stringify(w));
+  check('…and the unsaved program is gone, the saved one kept', vm.runInContext('_programs.length===1&&_programs[0].name==="Mine"&&_progIsNew===false', sandbox));
+  vm.runInContext('progOverlayBack()', sandbox);
+  check('Back again: one step back (sets and days), answers kept', vm.runInContext('_progWiz.step===2&&_progWiz.muscles.length===2', sandbox));
+  vm.runInContext('progOverlayBack()', sandbox);
+  check('Back again: the picked muscles, still marked, ready to change', vm.runInContext('_progWiz.step==="muscles"&&_progWiz.muscles.join()==="chest,lats"', sandbox));
+  vm.runInContext("_progWiz.muscles=['chest','glutes'];_progWiz.step=3;_progWizGenerate()", sandbox);
+  check('…change them and Generate again: one new program, with the new muscles', vm.runInContext('_programs.length===2&&JSON.stringify(_programs[1].muscles)===\'["chest","glutes"]\'', sandbox));
+  vm.runInContext('_saveProgEdit()', sandbox);
+  check('After Save, the wizard is forgotten: Back only closes', vm.runInContext('_progWizLast===null', sandbox));
+  vm.runInContext("_progWiz={step:'mode',goal:'hypertrophy',muscles:[],homeItems:[]};progOverlayBack()", sandbox);
+  check('In the wizard the header ‹ goes one step back, not out', vm.runInContext('_progWiz&&_progWiz.step===0', sandbox));
+  check('The header ‹ is Back, not Close', html.includes('<button class="wiz-back" onclick="progOverlayBack()"'));
+  vm.runInContext("_progWiz=null;_progIsNew=false;_progEditIdx=-1;_progEditBuf=null;_renderProgOverlay=__bk.r;buildProgramSettingsCard=__bk.b;savePrograms=__bk.s;_programs=__bk.p;_activeProgramIndex=__bk.a;", sandbox);
+}

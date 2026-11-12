@@ -838,6 +838,11 @@ unmarked ones are left out; **2 B** — individual muscles are clickable.
   - The same goal picked again keeps the muscles, focus, days, sets, injuries and equipment; only a different goal starts the muscles and focus afresh (`_progWizGoal`).
   - Automatic puts picked muscles aside and Pick muscles brings them back (`_progWizStash`/`_progWizUnstash`).
   - A typed name is never replaced by the default (`nameTyped`, `_progWizAutoName`).
+  - **The header ‹ is Back** (Henrik, 2026-11-11: "After generating a program but before saving, if I press back to change ie muscles
+    chosen, I have to start over still! Fix this properly!"), via `progOverlayBack`:
+    - in the wizard it goes one step back (`_progWizPrev`), and closes only from the first step;
+    - on a generated program not yet saved, it drops that program and returns to the wizard's last step with every answer (`_progWizLast`, kept by Generate);
+    - Save or Cancel forgets the wizard.
 - **Feminine Aesthetic never gets pull-ups** (Henrik, 2026-11-11: "pull-ups isnt an exercise almost any women can do at all"):
   its lats lead with Lat Pulldown (`MUSCLE_LIB.latsF`, `_muscleLib`), as its own templates do; other goals keep Pull-ups.
 - Muscles: chest, traps, front/side/rear delts, triceps, biceps, lats, upper back, quads,
