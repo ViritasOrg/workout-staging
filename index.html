@@ -527,7 +527,7 @@
 </nav>
 <div class="prog-overlay" id="prog-overlay">
   <div class="prog-header">
-    <button class="wiz-back" onclick="closeProgramOverlay()">&#8249;</button>
+    <button class="wiz-back" onclick="progOverlayBack()" aria-label="Back">&#8249;</button>
     <div class="prog-title" id="prog-title">PROGRAM</div>
     <button class="wiz-cancel" onclick="closeProgramOverlay()">Cancel</button>
   </div>
@@ -1809,7 +1809,7 @@ function _renderTplPick(title,body,footer){
   footer.innerHTML='<button onclick="_tplCancelPick()" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:12px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Back</button>';
 }
 function _openProgOverlay(){var ov=document.getElementById('prog-overlay');ov.classList.add('open');document.body.classList.add('locked');_renderProgOverlay();}
-function closeProgramOverlay(){if(_progTemplateId!==null){_progTemplateId=null;_progTplPick=false;_progReadOnly=false;var _tov=document.getElementById('prog-overlay');if(_tov)_tov.classList.remove('open');document.body.classList.remove('locked');return;}
+function closeProgramOverlay(){_progWizLast=null;if(_progTemplateId!==null){_progTemplateId=null;_progTplPick=false;_progReadOnly=false;var _tov=document.getElementById('prog-overlay');if(_tov)_tov.classList.remove('open');document.body.classList.remove('locked');return;}
   if(_progIsNew){(function(){var _p=_programs[_progEditIdx];if(_p&&_p.name==='6-Day Hypertrophy — Upper'){try{localStorage.setItem('wkt-hyp-deleted','1');}catch(e){}}})();_programs.splice(_progEditIdx,1);if(_activeProgramIndex>=_programs.length)_activeProgramIndex=Math.max(0,_programs.length-1);savePrograms();buildProgramSettingsCard();}_progIsNew=false;var ov=document.getElementById('prog-overlay');ov.classList.remove('open');document.body.classList.remove('locked');_progWiz=null;}
 function _exOpts(di,ei,cur){
   var groups={'Legs':['Squat','Romanian Deadlift','Deadlift','Leg Press','45° Leg Press','Bilateral Leg Press','Smith Machine Squat','Leg Curl','Leg Extension','Calf Raises','Lunges','Bulgarian Split Squat','Hip Thrust','Hip Adductor (inside hips)','Hip Abductor (outside hips)','Hack Squat','Seated Calf Raise','Kettlebell Goblet Squat','Kettlebell Front Squat','Kettlebell Reverse Lunge','Kettlebell Deadlift','Kettlebell Romanian Deadlift','Band Leg Curl','Band Leg Extension','Kettlebell Glute Bridge','Kettlebell Calf Raise','Bodyweight Squat','Single-leg RDL','Bodyweight Good Morning','Nordic Curl','Sissy Squat','Single-leg Glute Bridge','Single-leg Calf Raise'],'Back':['Pull-ups','Weighted Pull-ups','Chin-ups','Barbell Row','Barbell Row (heavy)','Cable Row','Lat Pulldown','Drape Pulldowns','Straight-Arm Lat Pushdown','T-Bar Row','Face Pulls','Rear Delt Fly','Rear Delt Cable Fly','Shrug','Chest-Supported Row','Assisted Pull-up Machine','Muscle Up','Assisted Muscle Up','Clapping Pull-ups','Band Lat Pull','Band Straight-arm Pull','Kettlebell Row','Band Seated Row','Inverted Row','Underhand Inverted Row','Band Face Pull','Band Rear Delt Fly','Prone T-Raise'],'Chest':['Chest Machine Press','Bench Press','Incline Bench Press','Incline DB Press','Cable Fly','Low-to-high Cable Fly','Push-ups','Push-ups (weighted/elevated)','Dips','Pec Deck (chest fly machine)','Assisted Dip Machine','Plyo Push-ups','Kettlebell Floor Press','Band Incline Press','Band Chest Press','Band Chest Fly','Band Low-to-high Fly','Decline Push-ups','Wide Push-ups','Archer Push-ups','Chair Dips'],'Shoulders':['Landmine Press','Overhead Press','Arnold Press','Lateral Raise','Cable Lateral Raise','Y-Raise','Front Raise','Upright Row','Shoulder Press Machine','Machine Lateral Raise','Behind the Neck Press','Kettlebell Overhead Press','Band Shoulder Press','Kettlebell Half-kneeling Press','Band Lateral Raise','Band Y-Raise','Band External Rotation','Pike Push-ups','Prone Y-Raise','Prone External Rotation'],'Arms':['Barbell Curl','Hammer Curl','EZ Bar Curl','Preacher Curl','Overhead Tricep Cable','Tricep Pushdown','Skull Crushers','Close Grip Press','Curl variation','Bicep Curl Machine','Tricep Extension Machine','Cable Bicep Curl','Band Curl','Kettlebell Hammer Curl','Band Tricep Extension','Band Overhead Tricep Extension','Diamond Push-ups']};
@@ -2034,7 +2034,7 @@ function _refreshActiveProgramViews(){
   var sel=document.getElementById('log-day');
   if(sel&&sel.value)prefillLog(sel.value);
 }
-function _saveProgEdit(){_progIsNew=false;_progEditBuf.touchedAt=_nowStamp();_programs[_progEditIdx]=_progEditBuf;savePrograms();if(_progEditIdx===_activeProgramIndex){rebuildDayGrid();rebuildLogDaySelect();_refreshActiveProgramViews();}buildProgramSettingsCard();closeProgramOverlay();}
+function _saveProgEdit(){_progIsNew=false;_progWizLast=null;_progEditBuf.touchedAt=_nowStamp();_programs[_progEditIdx]=_progEditBuf;savePrograms();if(_progEditIdx===_activeProgramIndex){rebuildDayGrid();rebuildLogDaySelect();_refreshActiveProgramViews();}buildProgramSettingsCard();closeProgramOverlay();}
 function _applyRehabSubs(exercises,prog){var subs=(prog||{}).rehabSubs||{};if(!Object.keys(subs).length)return exercises;return exercises.map(function(ex){var eff=subs[ex.name];return eff?Object.assign({},ex,{name:eff,_rehabOrig:ex.name}):ex;});}
 function _rehabSetSub(orig,val){if(!_progEditBuf.rehabSubs)_progEditBuf.rehabSubs={};_progEditBuf.rehabSubs[orig]=val;}
 function _rehabRemoveSub(orig){if(_progEditBuf.rehabSubs)delete _progEditBuf.rehabSubs[orig];_renderProgOverlay();}
@@ -2153,6 +2153,18 @@ function _progWizPullUps(v){if(!_progWiz)return;_progWiz.pullups=v;_setPullUpsAn
 // trough in reverse if you want to go back and change one thing, now you have to start over"):
 // the same goal picked again keeps the muscles and focus; Automatic puts the picked muscles aside and Pick muscles
 // brings them back; a name typed is never overwritten by the default.
+// The ‹ in the overlay's header is Back, never "throw it all away" (Henrik, 2026-11-11: "After generating a program but
+// before saving, if I press back to change ie muscles chosen, I have to start over still! Fix this properly!"):
+// in the wizard it goes one step back; on a generated program not yet saved it drops that program and returns to the
+// wizard's last step with every answer as it was (_progWizLast); anywhere else it closes as before.
+var _progWizLast=null;
+function _progWizPrev(w){var s=w.step;if(s==='mode')return 0;if(s==='muscles')return'mode';if(s===1)return w.goal==='rehab'?0:'mode';
+  if(s===2)return(w.muscles||[]).length?'muscles':1;if(s==='equip')return 2;if(s===3)return w.equip==='home'?'equip':2;return null;}
+function progOverlayBack(){
+  if(_progWiz){var prev=_progWizPrev(_progWiz);if(prev===null){_progWizLast=null;closeProgramOverlay();return;}_progWiz.step=prev;_renderProgOverlay();return;}
+  if(_progIsNew&&_progWizLast&&_progTemplateId===null){_programs.splice(_progEditIdx,1);if(_activeProgramIndex>=_programs.length)_activeProgramIndex=Math.max(0,_programs.length-1);
+    _progIsNew=false;_progEditBuf=null;_progEditIdx=-1;savePrograms();buildProgramSettingsCard();_progWiz=_progWizLast;_progWizLast=null;_progWiz.step=3;_renderProgOverlay();return;}
+  closeProgramOverlay();}
 function _progWizGoal(g){var w=_progWiz;if(!w)return;if(w.goal!==g){w.muscles=[];w.keptMuscles=null;w.sub=null;}w.goal=g;w.step=g==='rehab'?1:'mode';_renderProgOverlay();}
 function _progWizStash(){var w=_progWiz;if(!w)return;if((w.muscles||[]).length)w.keptMuscles=w.muscles.slice();w.muscles=[];}
 function _progWizUnstash(){var w=_progWiz;if(!w)return;if(!(w.muscles||[]).length&&(w.keptMuscles||[]).length)w.muscles=w.keptMuscles.slice();}
@@ -2215,6 +2227,7 @@ function _progWizGenerate(){
   var prog=_generateWorkoutProgram(wiz.goal,wiz.sub,wiz.nDays,name,wiz.setsPerMuscle||12,wiz.injuries,_eq,wiz.muscles,{noPullUps:wiz.pullups==='no'&&!_hasLoggedPullUps()});
   prog.touchedAt=_nowStamp();
   _programs.push(prog);buildProgramSettingsCard();
+  _progWizLast=JSON.parse(JSON.stringify(wiz));
   _progWiz=null;_progReadOnly=false;_progEditIdx=_programs.length-1;_progEditBuf=JSON.parse(JSON.stringify(_programs[_progEditIdx]));_progIsNew=true;_renderProgOverlay();
 }
 // Build manually (2026-07-23): skip the generator wizard entirely — create a blank
