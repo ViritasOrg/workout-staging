@@ -9393,20 +9393,27 @@ console.log('\n── Exercise search ──────────────
   ];
   const names = r => r.flatMap(g => g.names);
   check('empty search lists every group', names(G._exPickFilter(groups, '')).length === 9);
-  check('L lists only names starting with L, sorted',
-    JSON.stringify(names(G._exPickFilter(groups, 'L'))) === JSON.stringify(['Landmine Row', 'Lat Pulldown', 'Leg Curl', 'Leg Press', 'Lunges']));
-  check('La narrows to La…', JSON.stringify(names(G._exPickFilter(groups, 'la'))) === JSON.stringify(['Landmine Row', 'Lat Pulldown']));
+  check('L puts the names starting with L first, sorted',
+    JSON.stringify(names(G._exPickFilter(groups, 'L')).slice(0, 5)) === JSON.stringify(['Landmine Row', 'Lat Pulldown', 'Leg Curl', 'Leg Press', 'Lunges']));
+  check('La narrows to La…', JSON.stringify(names(G._exPickFilter(groups, 'la')).slice(0, 2)) === JSON.stringify(['Landmine Row', 'Lat Pulldown']));
   check('Lan narrows to Lan…', JSON.stringify(names(G._exPickFilter(groups, 'Lan'))) === JSON.stringify(['Landmine Row']));
-  check('a name must START with the text (Row does not match Barbell Row)', names(G._exPickFilter(groups, 'row')).length === 0);
+  // Henrik, 2026-11-13, on "row" finding nothing: "search has to be less retarded than this".
+  check('a word inside the name matches (row → Barbell Row, Landmine Row)',
+    JSON.stringify(names(G._exPickFilter(groups, 'row'))) === JSON.stringify(['Barbell Row', 'Landmine Row']));
+  check('words in any order (row bar → Barbell Row)', names(G._exPickFilter(groups, 'row bar'))[0] === 'Barbell Row');
+  check('a typo still finds it (pulldwn → Lat Pulldown)', names(G._exPickFilter(groups, 'pulldwn')).includes('Lat Pulldown'));
+  check('a typo still finds it (barbel → Barbell Row)', names(G._exPickFilter(groups, 'barbel'))[0] === 'Barbell Row');
+  check('text inside a word matches (ush → Tricep Pushdown)', names(G._exPickFilter(groups, 'ush')).includes('Tricep Pushdown'));
+  check('nothing unrelated comes back (xyz)', names(G._exPickFilter(groups, 'xyz')).length === 0);
   const arms = G._exPickFilter(groups, 'Arms');
   check('Arms lists the arm exercises', JSON.stringify(names(arms)) === JSON.stringify(['Bicep Curl', 'Tricep Pushdown']) && arms[0].label === 'Arms');
   const legs = G._exPickFilter(groups, 'leg');
-  check('Leg lists the names starting with Leg and then the rest of Legs',
-    JSON.stringify(names(legs)) === JSON.stringify(['Leg Curl', 'Leg Press', 'Lunges', 'Squat']));
-  check('one or two letters never pull in a whole group', !names(G._exPickFilter(groups, 'ar')).length);
+  check('Leg lists the names starting with Leg first and the rest of Legs too',
+    JSON.stringify(names(legs).slice(0, 2)) === JSON.stringify(['Leg Curl', 'Leg Press']) && ['Lunges', 'Squat'].every(n => names(legs).includes(n)));
+  check('one or two letters never pull in a whole group', !G._exPickFilter(groups, 'ar').some(g => g.label === 'Arms'));
   check('the program editor\'s "✦ Legs — same muscle" group still matches Legs',
     names(G._exPickFilter([{ label: '✦ Legs — same muscle', names: ['Squat'] }], 'legs')).includes('Squat'));
-  check('nothing found says so', /No exercise starts with that/.test(G._exPickListHtml([], '')));
+  check('nothing found says so', /No exercise matches that/.test(G._exPickListHtml([], '')));
   const html = G._exPickListHtml(G._exPickFilter(groups, 'lat'), '');
   check('each result is a button that picks it', /data-ex-pick="Lat Pulldown"/.test(html) && /_exPickChoose\(this\.dataset\.exPick\)/.test(html));
   check('the log\'s added exercise and the program editor use the search', /_exPickWrap\('<select data-custom-name="1"/.test(rawScript) && /return _exPickWrap\('<select onchange="_progEditBuf/.test(rawScript));
