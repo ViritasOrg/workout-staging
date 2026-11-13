@@ -180,9 +180,8 @@ variant is the most demanding movement a pull session carries, so it is done fre
   Pulls), that entry is hoisted to the first slot. Runs **after** every structural edit —
   injury swaps, prehab injection, Face Pull relocation, drop-to-fit — since
   those reorder and remove entries.
-- The seeded `6-Day Hypertrophy — Upper` Day 2 — Pull A was the trigger: it opened with
-  Barbell Row. The seed now opens with Pull-ups; Day 5 — Pull B already opened with
-  Weighted Pull-ups.
+- The (since removed) seeded `6-Day Hypertrophy — Upper` Day 2 — Pull A was the trigger: it
+  opened with Barbell Row.
 - **The hoist can only REORDER a pull-up that exists — it cannot inject one.** A pool that
   never authored a pull-up on a pull day shipped that day led by a row and the hoist was a
   no-op. Found 2026-08-22 on `6-Day Hypertrophy — Balanced` Day 5 — Pull B (Cable Row first,
@@ -922,3 +921,11 @@ A test checks Upper < Balanced < Lower on leg share for 3–7 days.
   - Plain `gym`, used by programs made before the list, is no constraint.
 - **Rebuilding:** a program generated with an older list is rebuilt by the tab's "Rebuild N … programs" button. It asks for confirmation first, the same as the program's own equipment editor, because hand edits are replaced. Programs not generated with a list keep their exercises, and the tab says how many there are.
 - **Ask AI** is sent only the exercises the active program's equipment allows (`_exCatalogueFor`).
+
+### No program and no load is ever seeded (Henrik, 2026-11-13)
+"Wife gets my old 5-day split in her workout account? Delete that from the code base asap", then
+"remove anything like that". Henrik's 5-day split (`DAYS`/`DAY_TEMPLATES`) and the
+`6-Day Hypertrophy — Upper` starter, both carrying his own weights, are gone: a new account starts
+with no program, deleting the last program leaves none, and every generated or added exercise
+starts at `kg: 0` (`pw` ignores its load argument). Loads come only from the user's own logs.
+Tests: `initPrograms seeds no program`, `no generated program carries a load`.

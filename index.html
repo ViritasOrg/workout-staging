@@ -1331,30 +1331,10 @@ function _programsByRecency(){
 }
 var _selectedProgramDay=1;
 function _escP(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function _seedHypertrophyProgram(){
-  return{name:'6-Day Hypertrophy — Upper',goal:'hypertrophy',days:[
-    {name:'Day 1 — Push A',warmup:false,exercises:[{name:'Chest Machine Press',scheme:'4×8-12',tag:'volume',sets:'8-8-8-8',kg:57},{name:'Incline Bench Press',scheme:'4×8-12',tag:'volume',sets:'8-8-8-8',kg:20},{name:'Landmine Press',scheme:'3×10-15',tag:'rehab',sets:'10-10-10',kg:25},{name:'Cable Fly',scheme:'3×12-15',tag:'volume',sets:'12-12-12',kg:20},{name:'Tricep Pushdown',scheme:'3×12-20',tag:'volume',sets:'12-12-12',kg:35}]},
-    {name:'Day 2 — Pull A',warmup:false,exercises:[{name:'Pull-ups',scheme:'4×max',tag:'strength',sets:'max-max-max-max',kg:0},{name:'Barbell Row',scheme:'4×8-12',tag:'strength',sets:'8-8-8-8',kg:80},{name:'Lat Pulldown',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:65},{name:'Face Pulls',scheme:'3×15-20',tag:'rehab',sets:'15-15-15',kg:20},{name:'Barbell Curl',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:30}]},
-    {name:'Day 3 — Legs A',warmup:false,exercises:[{name:'Squat',scheme:'4×8-12',tag:'strength',sets:'8-8-8-8',kg:100},{name:'Romanian Deadlift',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:80},{name:'Leg Press',scheme:'4×10-15',tag:'volume',sets:'10-10-10-10',kg:100},{name:'Leg Curl',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:40},{name:'Calf Raises',scheme:'4×15-20',tag:'volume',sets:'15-15-15-15',kg:60}]},
-    {name:'Day 4 — Push B',warmup:false,exercises:[{name:'Landmine Press',scheme:'4×10-15',tag:'rehab',sets:'10-10-10-10',kg:25},{name:'Incline Bench Press',scheme:'3×8-12',tag:'volume',sets:'8-8-8',kg:20},{name:'Lateral Raise',scheme:'4×15-20',tag:'rehab',sets:'15-15-15-15',kg:10},{name:'Y-Raise',scheme:'3×12-15',tag:'rehab',sets:'12-12-12',kg:15},{name:'Overhead Tricep Cable',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:32},{name:'Chest Machine Press',scheme:'5×8-12',tag:'volume',sets:'8-8-8-8-8',kg:57}]},
-    {name:'Day 5 — Pull B',warmup:false,exercises:[{name:'Weighted Pull-ups',scheme:'4×6-10',tag:'strength',sets:'6-6-6-6',kg:10},{name:'Cable Row',scheme:'4×8-12',tag:'volume',sets:'8-8-8-8',kg:60},{name:'Lat Pulldown',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:65},{name:'Rear Delt Fly',scheme:'3×12-20',tag:'rehab',sets:'12-12-12',kg:12},{name:'Hammer Curl',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:16}]},
-    {name:'Day 6 — Legs B',warmup:false,exercises:[{name:'Hip Thrust',scheme:'4×10-15',tag:'volume',sets:'10-10-10-10',kg:80},{name:'Romanian Deadlift',scheme:'4×10-15',tag:'volume',sets:'10-10-10-10',kg:80},{name:'Leg Press',scheme:'3×12-15',tag:'volume',sets:'12-12-12',kg:100},{name:'Leg Curl',scheme:'3×10-15',tag:'volume',sets:'10-10-10',kg:40},{name:'Calf Raises',scheme:'4×15-20',tag:'volume',sets:'15-15-15-15',kg:60}]}
-  ]};
-}
 function _ensurePrograms(){
   var changed=false;
-  // Re-seed the 6-Day Hypertrophy program unless the user deliberately deleted it.
-  // This used to re-add it whenever it was absent, so deleting every program silently
-  // recreated one on the next load. Deleting must stick, exactly as it already does
-  // for the 5-Day Split below (rule 2026-07-10).
-  //
-  // The signal is recorded by the DELETE, not inferred from an empty list: emptiness
-  // alone cannot tell "never had programs" from "deleted them all", and guessing is
-  // what produced the bug.
-  var _hypDeleted=false;
-  try{_hypDeleted=localStorage.getItem('wkt-hyp-deleted')==='1';}catch(e){}
-  var hasHyp=_programs.some(function(p){return p.name==='6-Day Hypertrophy — Upper';});
-  if(!hasHyp&&!_hypDeleted){_programs.unshift(_seedHypertrophyProgram());_activeProgramIndex=0;changed=true;}
+  // No program is seeded: the 6-Day Hypertrophy — Upper starter carried Henrik's own weights and
+  // was removed with his 5-day split (Henrik, 2026-11-13). A new account builds its own.
   // 5-Day Split is no longer auto-seeded (Henrik 2026-07-10) — deleting it must stick
   // The "non-rehab programs must not show a rehab tag" rewrite is GONE (rule 2026-07-31).
   // Tags are derived from the prescribed reps at generation time, so flipping rehab→volume on
@@ -1795,7 +1775,7 @@ function _renderTplPick(title,body,footer){
 }
 function _openProgOverlay(){var ov=document.getElementById('prog-overlay');ov.classList.add('open');document.body.classList.add('locked');_renderProgOverlay();}
 function closeProgramOverlay(){_progWizLast=null;if(_progTemplateId!==null){_progTemplateId=null;_progTplPick=false;_progReadOnly=false;var _tov=document.getElementById('prog-overlay');if(_tov)_tov.classList.remove('open');document.body.classList.remove('locked');return;}
-  if(_progIsNew){(function(){var _p=_programs[_progEditIdx];if(_p&&_p.name==='6-Day Hypertrophy — Upper'){try{localStorage.setItem('wkt-hyp-deleted','1');}catch(e){}}})();_programs.splice(_progEditIdx,1);if(_activeProgramIndex>=_programs.length)_activeProgramIndex=Math.max(0,_programs.length-1);savePrograms();buildProgramSettingsCard();}_progIsNew=false;var ov=document.getElementById('prog-overlay');ov.classList.remove('open');document.body.classList.remove('locked');_progWiz=null;}
+  if(_progIsNew){_programs.splice(_progEditIdx,1);if(_activeProgramIndex>=_programs.length)_activeProgramIndex=Math.max(0,_programs.length-1);savePrograms();buildProgramSettingsCard();}_progIsNew=false;var ov=document.getElementById('prog-overlay');ov.classList.remove('open');document.body.classList.remove('locked');_progWiz=null;}
 function _exOpts(di,ei,cur){
   var groups={'Legs':['Squat','Romanian Deadlift','Deadlift','Leg Press','45° Leg Press','Bilateral Leg Press','Smith Machine Squat','Leg Curl','Leg Extension','Calf Raises','Lunges','Bulgarian Split Squat','Hip Thrust','Hip Adductor (inside hips)','Hip Abductor (outside hips)','Hack Squat','Seated Calf Raise','Kettlebell Goblet Squat','Kettlebell Front Squat','Kettlebell Reverse Lunge','Kettlebell Deadlift','Kettlebell Romanian Deadlift','Band Leg Curl','Band Leg Extension','Kettlebell Glute Bridge','Kettlebell Calf Raise','Bodyweight Squat','Single-leg RDL','Bodyweight Good Morning','Nordic Curl','Sissy Squat','Single-leg Glute Bridge','Single-leg Calf Raise'],'Back':['Pull-ups','Weighted Pull-ups','Chin-ups','Barbell Row','Barbell Row (heavy)','Cable Row','Lat Pulldown','Drape Pulldowns','Straight-Arm Lat Pushdown','T-Bar Row','Face Pulls','Rear Delt Fly','Rear Delt Cable Fly','Shrug','Chest-Supported Row','Assisted Pull-up Machine','Muscle Up','Assisted Muscle Up','Clapping Pull-ups','Band Lat Pull','Band Straight-arm Pull','Kettlebell Row','Band Seated Row','Inverted Row','Underhand Inverted Row','Band Face Pull','Band Rear Delt Fly','Prone T-Raise'],'Chest':['Chest Machine Press','Bench Press','Incline Bench Press','Incline DB Press','Cable Fly','Low-to-high Cable Fly','Push-ups','Push-ups (weighted/elevated)','Dips','Pec Deck (chest fly machine)','Assisted Dip Machine','Plyo Push-ups','Kettlebell Floor Press','Band Incline Press','Band Chest Press','Band Chest Fly','Band Low-to-high Fly','Decline Push-ups','Wide Push-ups','Archer Push-ups','Chair Dips'],'Shoulders':['Landmine Press','Overhead Press','Arnold Press','Lateral Raise','Cable Lateral Raise','Y-Raise','Front Raise','Upright Row','Shoulder Press Machine','Machine Lateral Raise','Behind the Neck Press','Kettlebell Overhead Press','Band Shoulder Press','Kettlebell Half-kneeling Press','Band Lateral Raise','Band Y-Raise','Band External Rotation','Pike Push-ups','Prone Y-Raise','Prone External Rotation'],'Arms':['Barbell Curl','Hammer Curl','EZ Bar Curl','Preacher Curl','Overhead Tricep Cable','Tricep Pushdown','Skull Crushers','Close Grip Press','Curl variation','Bicep Curl Machine','Tricep Extension Machine','Cable Bicep Curl','Band Curl','Kettlebell Hammer Curl','Band Tricep Extension','Band Overhead Tricep Extension','Diamond Push-ups']};
   var allEx=[];Object.values(groups).forEach(function(g){g.forEach(function(e){allEx.push(e);});});
@@ -1992,7 +1972,7 @@ function _renderProgOverlay(){
   footer.innerHTML='<button onclick="_saveProgEdit()" style="width:100%;background:var(--accent);border:none;color:#000;border-radius:50px;padding:16px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-ui);">Save Program</button>';
 }
 function _progRmDay(di){if(_progEditBuf.days.length<=1){alert('Program needs at least 1 day');return;}_progEditBuf.days.splice(di,1);_renderProgOverlay();}
-function _progAddDay(){_progEditBuf.days.push({name:'Day '+(_progEditBuf.days.length+1)+' — New Day',warmup:false,exercises:[{name:'Squat',scheme:'3×10',tag:'strength',sets:'10-10-10',kg:60}]});_renderProgOverlay();}
+function _progAddDay(){_progEditBuf.days.push({name:'Day '+(_progEditBuf.days.length+1)+' — New Day',warmup:false,exercises:[{name:'Squat',scheme:'3×10',tag:'strength',sets:'10-10-10',kg:0}]});_renderProgOverlay();}
 function _progRmEx(di,ei){_progEditBuf.days[di].exercises.splice(ei,1);_renderProgOverlay();}
 function _progAddEx(di){_progEditBuf.days[di].exercises.push({name:'',scheme:'3×10',tag:'volume',sets:'10-10-10',kg:0});_renderProgOverlay();}
 // Editing the ACTIVE program changes what the Program and Log screens are supposed to show,
@@ -2028,7 +2008,7 @@ function _applyRehabCondition(condId){var cond=REHAB_CONDITIONS.find(function(c)
 function _useProg(){_activeProgramIndex=_progEditIdx;savePrograms();rebuildDayGrid();rebuildLogDaySelect();buildProgramSettingsCard();closeProgramOverlay();}
 function _deleteProg(){
   if(!confirmGlobalDelete('the program "'+_programs[_progEditIdx].name+'"'))return;
-  (function(){var _p=_programs[_progEditIdx];if(_p&&_p.name==='6-Day Hypertrophy — Upper'){try{localStorage.setItem('wkt-hyp-deleted','1');}catch(e){}}})();_programs.splice(_progEditIdx,1);
+  _programs.splice(_progEditIdx,1);
   _activeProgramIndex=Math.max(0,Math.min(_activeProgramIndex,_programs.length-1));
   savePrograms();rebuildDayGrid();rebuildLogDaySelect();buildProgramSettingsCard();closeProgramOverlay();
 }
@@ -2659,7 +2639,8 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equi
     var result=[];for(var i=0;i<target;i++)result.push(parts[i%parts.length]);
     return result.join('-');
   }
-  function pw(n,s,t,r,k){return{name:n,scheme:s,tag:t,sets:r,kg:k};}
+  // Every load starts as "no weight set yet": a generated program never carries anyone's weights (Henrik, 2026-11-13).
+  function pw(n,s,t,r,k){return{name:n,scheme:s,tag:t,sets:r,kg:0};}
   function d(nm,warm,exs){return{name:nm,warmup:warm,exercises:exs};}
   var poolN=Math.max(3,Math.min(nDays,6));var key=goal+'-'+sub;var pool=[];
   // Full-body at low frequency (rule 2026-07-24): 4 days/week or fewer → full-body sessions
@@ -2783,13 +2764,12 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equi
   // posterior/leg movement (Leg Curl → Leg Extension → Romanian Deadlift, first one
   // not already in the day to avoid duplicates), then de-dupe. Newly generated only.
   if(goal!=='aesthetic'&&key!=='rehab-knee'){
-    var _htSub={'Leg Curl':40,'Leg Extension':40,'Romanian Deadlift':60};
     pool.forEach(function(day){
       var names=(day.exercises||[]).map(function(e){return e.name;});
       (day.exercises||[]).forEach(function(ex){
         if(ex.name!=='Hip Thrust')return;
         var alt=['Leg Curl','Leg Extension','Romanian Deadlift'].filter(function(a){return names.indexOf(a)<0;})[0]||'Leg Curl';
-        ex.name=alt;ex.kg=_htSub[alt];names.push(alt);
+        ex.name=alt;ex.kg=0;names.push(alt);
       });
       var _seen={};day.exercises=(day.exercises||[]).filter(function(ex){if(_seen[ex.name])return false;_seen[ex.name]=1;return true;});
     });
@@ -2841,7 +2821,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equi
       if(!(day.exercises||[]).some(function(ex){return _isPress(ex.name);}))return;
       _cuffDays++;
       var _names=day.exercises.map(function(e){return e.name;});
-      if(_names.indexOf('Cable External Rotation')<0)day.exercises.push({name:'Cable External Rotation',scheme:'2×15',tag:'rehab',sets:'15-15',kg:5,prehab:true});
+      if(_names.indexOf('Cable External Rotation')<0)day.exercises.push({name:'Cable External Rotation',scheme:'2×15',tag:'rehab',sets:'15-15',kg:0,prehab:true});
     });
   }
   // Face Pulls must NEVER sit on a push/press day — any day containing a pressing movement

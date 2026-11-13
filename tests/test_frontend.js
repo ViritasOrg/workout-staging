@@ -485,10 +485,34 @@ try {
 } catch(e) {
   check('initPrograms does not throw with empty localStorage', false, e.message);
 }
-check('initPrograms seeds at least one program', Array.isArray(G._programs) && G._programs.length >= 1);
-check('seeded program has name',     typeof G._programs[0]?.name === 'string' && G._programs[0].name.length > 0);
-check('seeded program has days',     Array.isArray(G._programs[0]?.days) && G._programs[0].days.length > 0);
+// No program is seeded any more: the old starter carried Henrik's own weights (2026-11-13).
+check('initPrograms seeds no program for a new account', Array.isArray(G._programs) && G._programs.length === 0,
+  JSON.stringify((G._programs || []).map(p => p.name)));
 check('_activeProgramIndex is 0 after init', G._activeProgramIndex === 0);
+check('no seeded program function is left', typeof G._seedHypertrophyProgram === 'undefined');
+const _loadBad = (() => {
+  const combos = [['strength','pure',4],['strength','hybrid',5],['hypertrophy','balanced',6],['hypertrophy','upper',6],
+    ['hypertrophy','lower',5],['aesthetic','fullbody',3],['aesthetic','bootylicious',5],['rehab','shoulder',6],['rehab','knee',6]];
+  const bad = [];
+  combos.forEach(([g, sb, n]) => { const p = G._generateWorkoutProgram(g, sb, n, 'X', 12, ['shoulders']);
+    p.days.forEach(d => d.exercises.forEach(e => { if (e.kg) bad.push(g + '-' + sb + ' ' + e.name + ' ' + e.kg); })); });
+  return bad;
+})(); check('no generated program carries a load (every kg starts unset)', _loadBad.length === 0, _loadBad.slice(0, 6).join(' | '));
+
+// A neutral 6-day test program (no weights) for the tests below that need one active.
+function _useFixtureSixDay() {
+  const ex = (n) => ({ name: n, scheme: '3×8-12', tag: 'volume', sets: '8-8-8', kg: 0 });
+  const day = (n, exs) => ({ name: n, warmup: false, exercises: exs.map(ex) });
+  sandbox.localStorage.setItem('workout_programs', JSON.stringify({ active_index: 0, programs: [
+    { name: 'Test 6-day', goal: 'hypertrophy', days: [
+      day('Day 1 — Push A', ['Bench Press', 'Lateral Raise']),
+      day('Day 2 — Pull A', ['Pull-ups', 'Barbell Row']),
+      day('Day 3 — Legs A', ['Squat', 'Leg Curl']),
+      day('Day 4 — Push B', ['Incline Bench Press', 'Tricep Pushdown']),
+      day('Day 5 — Pull B', ['Weighted Pull-ups', 'Cable Row']),
+      day('Day 6 — Legs B', ['Romanian Deadlift', 'Leg Press'])] }] }));
+  G.initPrograms();
+}
 
 // Load with saved programs
 const fakePrograms = [
@@ -501,8 +525,7 @@ check('initPrograms loads saved programs from localStorage',
   `programs: ${G._programs.map(p => p.name).join(', ')}`);
 
 // Restore
-sandbox.localStorage.removeItem('workout_programs');
-G.initPrograms();
+_useFixtureSixDay();
 
 // ── 19. buildSessionGroupVol / buildSessionGroupStrength ──────────────────────
 console.log('\n── buildSessionGroupVol / buildSessionGroupStrength ────────');
@@ -1019,8 +1042,7 @@ check('_selectedProgramDay defined', G._selectedProgramDay !== undefined);
 check('rebuildDayGrid defined', typeof G.rebuildDayGrid === 'function');
 
 // Ensure 6-day program is active
-sandbox.localStorage.removeItem('workout_programs');
-G.initPrograms();
+_useFixtureSixDay();
 const _prog6 = G.getActiveProgram();
 check('active program has 6 days after initPrograms', _prog6 && _prog6.days.length === 6,
   `got ${_prog6 && _prog6.days.length} days`);
@@ -1072,16 +1094,14 @@ sandbox.localStorage.removeItem('wkt-draft');
 
 // Restore
 G.logs = _savedLogs23;
-sandbox.localStorage.removeItem('workout_programs');
-G.initPrograms();
+_useFixtureSixDay();
 
 // ── 23. getDayLabel ───────────────────────────────────────────────────────────
 console.log('\n── getDayLabel ────────────────────────────────────────────');
 check('getDayLabel defined', typeof G.getDayLabel === 'function');
 
 // Ensure 6-day hypertrophy program is active
-sandbox.localStorage.removeItem('workout_programs');
-G.initPrograms();
+_useFixtureSixDay();
 
 // 6-Day Hypertrophy — Upper day names: 'Day N — <Focus>'
 // getDayLabel extracts the part after '—'
@@ -2895,9 +2915,7 @@ console.log('\n── No standalone Arms day in program pools ──────
   check('no "Shoulders & Arms" day in any pool definition',
     !src.includes("'Day 4 — Shoulders & Arms'"));
 
-  // Seed program Day 6 must now be Legs B, not Arms & Delts
-  check('_seedHypertrophyProgram Day 6 is "Legs B" (not Arms & Delts)',
-    src.includes("'Day 6 — Legs B'") && !src.includes("'Day 6 — Arms & Delts'"));
+  check('no "Arms & Delts" day in any pool definition', !src.includes("'Day 6 — Arms & Delts'"));
 
   // hypertrophy-upper 6-day pool: Pull B must be followed by Legs B (not Arms)
   // Verify the pool ends with Pull B then Legs B, no arm day in between
@@ -3382,8 +3400,6 @@ check('hypertrophy 5-day generator does NOT include the fly', _flyDays(_gbal5) =
 // Reverted: never edits existing programs, and not scattered into seeds
 check('_ensurePrograms does NOT add the fly to existing programs',
   !/Low-to-high Cable Fly/.test(G._ensurePrograms.toString()));
-check('hypertrophy seed does NOT contain the fly',
-  !G._seedHypertrophyProgram().days.some(d => d.exercises.some(e => e.name === 'Low-to-high Cable Fly')));
 
 // ── Workout duration (start on first set, end on save) ────────────────────────
 console.log('\n── Workout duration ───────────────────────────────────────');
@@ -4073,18 +4089,6 @@ if (typeof G._isPullDay === 'function') {
   check('_isPullDay("Day 5 — Vertical Push/Pull") → false', !G._isPullDay('Day 5 — Vertical Push/Pull'));
   check('_isPullDay("Day 3 — Lower Pull") → false',       !G._isPullDay('Day 3 — Lower Pull'));
   check('_isPullDay("Day 2 — Full Body B") → false',      !G._isPullDay('Day 2 — Full Body B'));
-}
-// Seed program: Pull A opens with Pull-ups
-if (typeof G._seedHypertrophyProgram === 'function') {
-  const _seed = G._seedHypertrophyProgram();
-  const _pullDays = (_seed.days || []).filter(d => typeof G._isPullDay === 'function' && G._isPullDay(d.name));
-  check('Seed program has pull days', _pullDays.length > 0);
-  const _seedBad = _pullDays.filter(d => {
-    const i = (d.exercises || []).findIndex(e => G.isPullUpEx(e.name));
-    return i > 0;
-  });
-  check('Seeded pull days open with a pull-up variant',
-    _seedBad.length === 0, _seedBad.map(d => d.name + ': ' + d.exercises[0].name).join(' | '));
 }
 // Generator: no exercise may precede a pull-up variant on a pull day, across the catalogue
 if (typeof G._generateWorkoutProgram === 'function') {
@@ -5161,17 +5165,8 @@ console.log(`\n${'─'.repeat(59)}`);
 // already fixed this way on 2026-07-10 ("deleting it must stick"); the 6-Day was not.
 {
   const src = rawScript;
-  check('the re-seed is gated on a deletion signal', /!hasHyp&&!_hypDeleted/.test(src));
-  check('the signal is read from storage', /localStorage\.getItem\('wkt-hyp-deleted'\)==='1'/.test(src));
-  // Recorded by the DELETE, not inferred from an empty list — emptiness cannot tell
-  // "never had programs" from "deleted them all".
-  check('the delete path records the intent',
-    /name==='6-Day Hypertrophy — Upper'\)\{try\{localStorage\.setItem\('wkt-hyp-deleted','1'\)/.test(src));
-  check('both delete call sites record it',
-    (src.match(/localStorage\.setItem\('wkt-hyp-deleted','1'\)/g) || []).length === 2);
-  check('a fresh install still gets the seed (no signal set)',
-    !/localStorage\.getItem\('wkt-hyp-deleted'\)==='1'\)\s*\{[\s\S]{0,40}unshift/.test(src));
-  check('_seedHypertrophyProgram still exists', typeof G._seedHypertrophyProgram === 'function');
+  // Since 2026-11-13 nothing is seeded at all, so deleting every program sticks by construction.
+  check('nothing re-seeds a program on load', !/unshift\(_seed/.test(src) && !/_seedHypertrophyProgram/.test(src));
 }
 
 
