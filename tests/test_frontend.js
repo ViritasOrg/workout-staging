@@ -4164,7 +4164,7 @@ if (typeof G._swapResetWeights === 'function') {
 {
   const _swapFn = String(G.swapExercise || '');
   check('swapExercise clears the weights on swap',
-    _swapFn.includes('_swapResetWeights(card,this.value)'));
+    _swapFn.includes('_swapResetWeights(card,_new)'));
   check('…before _refreshCardGearBtns re-fills body weight for a bodyweight target',
     _swapFn.indexOf('_swapResetWeights') < _swapFn.indexOf('_refreshCardGearBtns'));
 }
@@ -5547,7 +5547,7 @@ console.log('\n── Swap keeps completed sets / blank-exercise save guard ─�
     check('swapExercise persists the draft after a set-preserving swap',
       fn.includes('scheduleDraft()'));
     check('swapExercise still renames in place when nothing was completed yet',
-      fn.includes('card.dataset.swappedName=this.value'));
+      fn.includes('card.dataset.swappedName=_new'));
   }
   {
     const fn = String(G._addSwapCardAfter || '');
@@ -5702,7 +5702,7 @@ console.log('\n── Prefill from last logged set / draft card position ──�
   {
     const fn = String(G.swapExercise || '');
     check('a rename-in-place swap prefills the new exercise too',
-      fn.includes('_prefillKgFromHistory(card,this.value)'));
+      fn.includes('_prefillKgFromHistory(card,_new)'));
     check('…still after the old load is cleared, never before',
       fn.indexOf('_swapResetWeights') < fn.indexOf('_prefillKgFromHistory'));
   }
@@ -5957,7 +5957,7 @@ console.log('\n── Swap → save the substitution to the program ────
   {
     const fn = String(G.swapExercise || '');
     check('swapExercise offers the program change after a rename-in-place swap',
-      fn.includes('_offerProgramSubstitution(card,this.value)'));
+      fn.includes('_offerProgramSubstitution(card,_new)'));
     check('…and never on the branch that kept completed sets',
       fn.indexOf('_addSwapCardAfter') < fn.indexOf('_offerProgramSubstitution') &&
       /_addSwapCardAfter\([^)]*\);scheduleDraft\(\);return;/.test(fn));
@@ -9379,6 +9379,51 @@ console.log('\n── Water ─────────────────�
   }
   check('  …and the weight, water-target and macro-target requests all use a time limit',
     /_wlFetchWithin\(AGENT_URL\+'\/weights'/.test(_src) && /_wlFetchWithin\(AGENT_URL\+'\/water-log\/target\?'/.test(_src) && /_wkFetchWithin\(AGENT_URL\+'\/macro-targets\?'/.test(_src));
+}
+
+// ── Exercise search (Henrik, 2026-11-13) ─────────────────────────────────────
+// "needs a search field on top, so you can start writing L a n (and the list resorts into only exerciese
+// starting with L then La then Lan", then "search for Legs or Arms should show exercises for legs or arms".
+console.log('\n── Exercise search ────────────────────────────────────────');
+{
+  const groups = [
+    { label: 'Legs', names: ['Leg Press', 'Lunges', 'Squat', 'Leg Curl'] },
+    { label: 'Back', names: ['Lat Pulldown', 'Barbell Row', 'Landmine Row'] },
+    { label: 'Arms', names: ['Bicep Curl', 'Tricep Pushdown'] },
+  ];
+  const names = r => r.flatMap(g => g.names);
+  check('empty search lists every group', names(G._exPickFilter(groups, '')).length === 9);
+  check('L lists only names starting with L, sorted',
+    JSON.stringify(names(G._exPickFilter(groups, 'L'))) === JSON.stringify(['Landmine Row', 'Lat Pulldown', 'Leg Curl', 'Leg Press', 'Lunges']));
+  check('La narrows to La…', JSON.stringify(names(G._exPickFilter(groups, 'la'))) === JSON.stringify(['Landmine Row', 'Lat Pulldown']));
+  check('Lan narrows to Lan…', JSON.stringify(names(G._exPickFilter(groups, 'Lan'))) === JSON.stringify(['Landmine Row']));
+  check('a name must START with the text (Row does not match Barbell Row)', names(G._exPickFilter(groups, 'row')).length === 0);
+  const arms = G._exPickFilter(groups, 'Arms');
+  check('Arms lists the arm exercises', JSON.stringify(names(arms)) === JSON.stringify(['Bicep Curl', 'Tricep Pushdown']) && arms[0].label === 'Arms');
+  const legs = G._exPickFilter(groups, 'leg');
+  check('Leg lists the names starting with Leg and then the rest of Legs',
+    JSON.stringify(names(legs)) === JSON.stringify(['Leg Curl', 'Leg Press', 'Lunges', 'Squat']));
+  check('one or two letters never pull in a whole group', !names(G._exPickFilter(groups, 'ar')).length);
+  check('the program editor\'s "✦ Legs — same muscle" group still matches Legs',
+    names(G._exPickFilter([{ label: '✦ Legs — same muscle', names: ['Squat'] }], 'legs')).includes('Squat'));
+  check('nothing found says so', /No exercise starts with that/.test(G._exPickListHtml([], '')));
+  const html = G._exPickListHtml(G._exPickFilter(groups, 'lat'), '');
+  check('each result is a button that picks it', /data-ex-pick="Lat Pulldown"/.test(html) && /_exPickChoose\(this\.dataset\.exPick\)/.test(html));
+  check('the log\'s added exercise and the program editor use the search', /_exPickWrap\('<select data-custom-name="1"/.test(rawScript) && /return _exPickWrap\('<select onchange="_progEditBuf/.test(rawScript));
+  check('swapping an exercise opens the search, not a bare dropdown', /function swapExercise\(btn\)\{[^}]*_openExPicker\(/.test(rawScript));
+  // A pick reaches the select and fires its change handler.
+  let picked = null;
+  const opts = [{ tagName: 'OPTION', value: 'Squat' }];
+  const sel = { value: '', options: opts, children: [{ tagName: 'OPTGROUP', label: 'Legs', children: opts }],
+    appendChild(o) { opts.push(o); }, dispatchEvent(e) { picked = [this.value, e.type]; return true; } };
+  const _open = G._openExPicker; let grp = null, cb = null;
+  G._openExPicker = (g, c, f) => { grp = g; cb = f; };
+  if (!G.Event) G.Event = function (t, o) { this.type = t; this.bubbles = !!(o && o.bubbles); };
+  G._pickExFor({ previousElementSibling: sel });
+  G._openExPicker = _open;
+  check('the picker offers the select\'s own options', grp && grp[0].label === 'Legs' && grp[0].names[0] === 'Squat');
+  cb && cb('Squat');
+  check('choosing sets the select and fires change', picked && picked[0] === 'Squat' && picked[1] === 'change');
 }
 
 const _summary = () => {
