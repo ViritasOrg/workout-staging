@@ -3356,16 +3356,30 @@ function _offerProgramSubstitution(card,newName){
 // exercises for legs or arms"). One picker for every place an exercise is chosen; its list is the options of the
 // select it stands in for, so each place keeps its own catalogue.
 function _exPickGroupsOf(sel){var out=[];Array.prototype.forEach.call(sel.children,function(c){if(c.tagName==='OPTGROUP'){var names=[];Array.prototype.forEach.call(c.children,function(o){if(o.value)names.push(o.value);});out.push({label:c.label,names:names});}else if(c.value){out.push({label:'',names:[c.value]});}});return out;}
-function _exPickFilter(groups,q){q=String(q||'').trim().toLowerCase();if(!q)return groups.filter(function(g){return g.names.length;});
-  var seen={},names=[],hit=[];
-  groups.forEach(function(g){var base=String(g.label||'').replace(/^✦\s*/,'').replace(/\s+—.*$/,'').toLowerCase();if(base&&q.length>=3&&base.indexOf(q)===0)hit.push(g);});
-  groups.forEach(function(g){g.names.forEach(function(n){if(!seen[n]&&n.toLowerCase().indexOf(q)===0){seen[n]=1;names.push(n);}});});
-  names.sort(function(a,b){return a.localeCompare(b);});
-  var out=names.length?[{label:'',names:names}]:[];
-  hit.forEach(function(g){var rest=g.names.filter(function(n){return !seen[n];});if(rest.length)out.push({label:g.label.replace(/^✦\s*/,'').replace(/\s+—.*$/,''),names:rest});});
+// Ranking (Henrik, 2026-11-13: "search has to be less retarded than this", on "row" finding nothing): the name
+// starts with the text, then a word in it does ("row" → Barbell Row), then every typed word starts a word in any
+// order ("row cab" → Cable Row), then the text is anywhere in it, then, only when nothing matched, a near miss (one typo per word, or the letters in order).
+function _exPickNorm(t){return String(t||'').toLowerCase().replace(/[^a-z0-9åäöé°]+/g,' ').trim();}
+function _exPickEdit1(a,b){if(Math.abs(a.length-b.length)>1)return false;var i=0,j=0,d=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;continue;}if(++d>1)return false;if(a.length>b.length)i++;else if(b.length>a.length)j++;else{i++;j++;}}return d+(a.length-i)+(b.length-j)<=1;}
+function _exPickScore(name,q){var n=_exPickNorm(name),words=n.split(' '),qs=q.split(' ');
+  if(n.indexOf(q)===0)return 1;
+  if(words.some(function(w,i){return i>0&&(words.slice(i).join(' ')).indexOf(q)===0;}))return 2;
+  if(qs.every(function(t){return words.some(function(w){return w.indexOf(t)===0;});}))return 3;
+  if(n.indexOf(q)>=0)return 4;
+  if(q.length>=3&&qs.every(function(t){return words.some(function(w){return _exPickEdit1(t,w.slice(0,t.length))||_exPickEdit1(t,w);});}))return 5;
+  if(q.length>=3){var k=0,c=n.replace(/ /g,'');for(var i=0;i<c.length&&k<q.length;i++){if(c[i]===q.replace(/ /g,'')[k])k++;}if(k===q.replace(/ /g,'').length)return 6;}
+  return 0;}
+function _exPickFilter(groups,q){q=_exPickNorm(q);if(!q)return groups.filter(function(g){return g.names.length;});
+  var seen={},hits=[],grp=[];
+  groups.forEach(function(g){var base=_exPickNorm(String(g.label||'').replace(/^✦\s*/,'').replace(/\s+—.*$/,''));if(base&&q.length>=3&&(base.indexOf(q)===0||q.indexOf(base.replace(/s$/,''))===0))grp.push(g);});
+  groups.forEach(function(g){g.names.forEach(function(n){if(seen[n])return;var sc=_exPickScore(n,q);if(sc){seen[n]=1;hits.push({n:n,s:sc});}});});
+  if(hits.some(function(h){return h.s<=4;}))hits=hits.filter(function(h){return h.s<=4;});   // near misses only when nothing matches
+  hits.sort(function(a,b){return a.s-b.s||a.n.localeCompare(b.n);});
+  var out=hits.length?[{label:'',names:hits.map(function(h){return h.n;})}]:[];
+  grp.forEach(function(g){var rest=g.names.filter(function(n){return !seen[n];});if(rest.length)out.push({label:g.label.replace(/^✦\s*/,'').replace(/\s+—.*$/,''),names:rest});});
   return out;}
 var _exPick=null;
-function _exPickListHtml(groups,cur){if(!groups.length)return '<div style="padding:12px;font-size:15px;color:var(--text)">No exercise starts with that.</div>';
+function _exPickListHtml(groups,cur){if(!groups.length)return '<div style="padding:12px;font-size:15px;color:var(--text)">No exercise matches that.</div>';
   return groups.map(function(g){return (g.label?'<div style="font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text);margin:12px 4px 4px">'+_escP(g.label)+'</div>':'')+
     g.names.map(function(n){return '<button type="button" data-ex-pick="'+_escP(n)+'" onclick="_exPickChoose(this.dataset.exPick)" style="display:block;width:100%;text-align:left;background:'+(n===cur?'var(--surface2)':'transparent')+';border:0;border-bottom:1px solid var(--border);color:var(--text);font-size:16px;padding:11px 6px;font-family:var(--font-ui);cursor:pointer">'+_escP(n)+'</button>';}).join('');}).join('');}
 function _exPickRender(){if(!_exPick)return;var q=document.getElementById('exPickQ');var list=document.getElementById('exPickList');if(list)list.innerHTML=_exPickListHtml(_exPickFilter(_exPick.groups,q?q.value:''),_exPick.cur);}
