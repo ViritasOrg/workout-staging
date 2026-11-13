@@ -232,14 +232,14 @@ check('100kg 10-10-10 = 3000',       G.calcVolume('Deadlift 100kg 10-10-10') ===
 check('no kg → null',                 G.calcVolume('Pull-ups max-max-max') === null);
 check('two exercises sum correctly', G.calcVolume('Squat 80kg 5-5\nBench 60kg 8-8') === 80 * 10 + 60 * 16);
 
-// ── 9. DAY_TEMPLATES ─────────────────────────────────────────────────────────
-console.log('\n── DAY_TEMPLATES ──────────────────────────────────────────');
-check('DAY_TEMPLATES defined',       typeof G.DAY_TEMPLATES === 'object');
-check('6 training days',             [1, 2, 3, 4, 5, 6].every(d => Array.isArray(G.DAY_TEMPLATES?.[d])));
-check('each day non-empty',          [1, 2, 3, 4, 5, 6].every(d => (G.DAY_TEMPLATES[d]?.length || 0) > 0));
-check('all exercises have name+kg',  Object.values(G.DAY_TEMPLATES || {}).flat().every(e => e.name && e.kg !== undefined));
-check('day 1 has Squat',             G.DAY_TEMPLATES?.[1]?.some(e => e.name === 'Squat'));
-check('day 4 has Deadlift',          G.DAY_TEMPLATES?.[4]?.some(e => e.name === 'Deadlift'));
+// ── 9. Henrik's old 5-day split is gone (2026-11-13) ─────────────────────────
+// Henrik: "Wife gets my old 5-day split in her workout account? Delete that from the code base asap".
+// DAYS/DAY_TEMPLATES held his own split with his weights (Squat 120 kg) and _seedDefaultProgram
+// handed it to any account that deleted its last program.
+console.log('\n── no built-in 5-day split ────────────────────────────────');
+check('DAY_TEMPLATES is gone',       typeof G.DAY_TEMPLATES === 'undefined');
+check('DAYS split is gone',          typeof G.DAYS === 'undefined');
+check('_seedDefaultProgram is gone', typeof G._seedDefaultProgram === 'undefined');
 
 // ── 10. THEMES ────────────────────────────────────────────────────────────────
 console.log('\n── THEMES ─────────────────────────────────────────────────');
@@ -3258,6 +3258,16 @@ console.log('\n── 5-Day Split deletion sticks ──────────
   check('deleted 5-Day Split is NOT recreated', !G._programs.some(p => p.name === '5-Day Split'),
     JSON.stringify(G._programs.map(p => p.name)));
   check('no _seedDefaultProgram call left in _ensurePrograms', !rawScript.includes('_programs.push(_seedDefaultProgram())'));
+  // Deleting the last program used to hand the account Henrik's own 5-day split (2026-11-13).
+  G._programs = [{ name: 'Only one', goal: 'hypertrophy', days: [{ name: 'Day 1 — A', warmup: false, exercises: [] }] }];
+  G._activeProgramIndex = 0; G._progEditIdx = 0;
+  const _cgd = G.confirmGlobalDelete; G.confirmGlobalDelete = () => true;
+  let _delErr = '';
+  try { G._deleteProg(); } catch (e) { _delErr = e.message; }
+  G.confirmGlobalDelete = _cgd;
+  check('deleting the last program leaves no program, never a seeded split',
+    !_delErr && G._programs.length === 0, _delErr || JSON.stringify(G._programs.map(p => p.name)));
+  check('  …and the app still runs with no program', (() => { try { G.rebuildDayGrid(); G.rebuildLogDaySelect(); G.renderWorkout(1); G.prefillLog(1); return true; } catch (e) { return e.message; } })() === true);
   if (savedPrograms === null) G.localStorage.removeItem('workout_programs');
   else G.localStorage.setItem('workout_programs', savedPrograms);
   G.initPrograms();
@@ -3374,8 +3384,6 @@ check('_ensurePrograms does NOT add the fly to existing programs',
   !/Low-to-high Cable Fly/.test(G._ensurePrograms.toString()));
 check('hypertrophy seed does NOT contain the fly',
   !G._seedHypertrophyProgram().days.some(d => d.exercises.some(e => e.name === 'Low-to-high Cable Fly')));
-check('5-Day Split seed Day 3 does NOT contain the fly',
-  !G.DAYS[3].exercises.some(e => e.name === 'Low-to-high Cable Fly'));
 
 // ── Workout duration (start on first set, end on save) ────────────────────────
 console.log('\n── Workout duration ───────────────────────────────────────');
@@ -7462,15 +7470,6 @@ console.log('\n── kg:0 is not a bodyweight signal ────────�
   check('saveLog’s no-card fallback decides the same way',
     saveSrc.includes("_bwCard=_exCard?_exCard.dataset.bw==='1':(isBWExName(ex.name)&&!_isWPU)"));
 
-  // Nothing genuinely bodyweight loses its handling: every kg:0 exercise in the shipped
-  // day templates is recognised by name, which is why dropping the kg test is safe.
-  const tplBw = [];
-  Object.keys(G.DAY_TEMPLATES || {}).forEach(d => (G.DAY_TEMPLATES[d] || [])
-    .forEach(ex => { if (ex.kg === 0) tplBw.push(ex.name); }));
-  check('every kg:0 exercise in DAY_TEMPLATES is name-matched by isBWExName',
-    tplBw.length > 0 && tplBw.every(n => G.isBWExName(n)),
-    tplBw.filter(n => !G.isBWExName(n)).join(', '));
-
   // …and the kg:0 that means "not set yet" is not mistaken for bodyweight.
   check('an exercise added in the program editor is not bodyweight',
     String(G._progAddEx || '').includes('kg:0') &&
@@ -8104,22 +8103,14 @@ console.log('\n── Edit opens the session that was logged ──────�
   check('editLog rebuilds from the active program day',
     fn.includes('getActiveProgramDay(log.day)') &&
     fn.includes('_applyRehabSubs(_edDay.exercises,getActiveProgram())'));
-  check('…with the built-in split only as the fallback for a pre-programs log',
-    /_edDay\?.*:\(DAY_TEMPLATES\[log\.day\]\|\|\[\]\)/.test(fn));
+  check('…and no built-in split to fall back on (Henrik\'s old split is gone, 2026-11-13)',
+    fn.includes('_edDay?_applyRehabSubs(_edDay.exercises,getActiveProgram()):[]') && !fn.includes('DAY_TEMPLATES'));
   check('…the same source prefillLog rendered the cards from',
     String(G.prefillLog || '').includes('_applyRehabSubs(_di.exercises,getActiveProgram())'));
   check('a custom card grows to hold every logged set (4-set exercises kept all 4)',
     fn.includes("while(card.querySelectorAll('input[data-type=\"reps\"]').length<ex.sets.length)addSetToCard(card)") &&
     !/ex\.sets\.forEach\(function\(s,i\)\{if\(i<3\)/.test(fn));
 
-  // His real day-1 names vs the built-in day 1 — the overlap is what editLog used to need.
-  const his = ['Chest Machine Press', 'Incline DB Press', 'Landmine Press',
-               'Cable Fly', 'Tricep Pushdown', 'Lateral Raise'];
-  const builtin = (G.DAY_TEMPLATES[1] || []).map(e => e.name);
-  check('the bug was real: his logged day 1 shares no exercise with DAY_TEMPLATES[1]',
-    his.every(n => builtin.indexOf(n) < 0), builtin.join(', '));
-  check('…and a 7-day program has no DAY_TEMPLATES entry at all to fall back on',
-    !G.DAY_TEMPLATES[7]);
 }
 
 // ── Section 102: "Are you done?" before a workout is written ────────────────
