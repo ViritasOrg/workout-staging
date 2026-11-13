@@ -929,3 +929,12 @@ A test checks Upper < Balanced < Lower on leg share for 3–7 days.
 with no program, deleting the last program leaves none, and every generated or added exercise
 starts at `kg: 0` (`pw` ignores its load argument). Loads come only from the user's own logs.
 Tests: `initPrograms seeds no program`, `no generated program carries a load`.
+
+### Choosing an exercise is a search (Henrik, 2026-11-13)
+"needs a search field on top, so you can start writing L a n (and the list resorts into only exerciese starting
+with L then La then Lan", then "search for Legs or Arms should show exercises for legs or arms". Swapping an
+exercise in the log, adding one to the log and picking one in the program editor all open `exPickModal`
+(`_openExPicker`): a search box on top and the list below. Typing keeps only names that start with the text,
+sorted; three or more letters that start a muscle group's name (Leg, Arms, Back, Chest, Shoulders) also list that
+group (`_exPickFilter`). The selects stay in the page, since everything reads their value; a transparent button
+over each opens the search (`_exPickWrap`, `_pickExFor`), and the list is that select's own options.
