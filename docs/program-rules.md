@@ -974,7 +974,12 @@ over each opens the search (`_exPickWrap`, `_pickExFor`), and the list is that s
     - Edit profile becomes **Save** (`pfEditSave`) and Log weight becomes **Cancel** (`pfEditCancel`).
     - Save puts sex, age and height in `wkt-profile` and on `/user-settings`, as the wizard does. A changed weight or body fat is logged for today, as Log weight and LOG BF% do.
     - An impossible value saves nothing and links `help.html#profile-invalid`.
-  - **US Navy measurement** (`_pfNavyHtml`, `pfLogNavy`): neck and waist, plus hips for women, with the profile height through `navyBF`, the one Hodgdon-Beckett implementation the wizard also uses.
+  - **Log body fat, every kind of entry** (Henrik, 2026-11-14: "BF needs to allow, all kinds of entries ie new measurements or a value"):
+    - `_pfNavyHtml` and `pfLogBf` offer Tape (US Navy), Caliper (Jackson-Pollock 3- or 7-site, Durnin-Womersley 4-site; `caliperSites` and `caliperBF`, the same equations as Peptide Tracker's `tab-body.js`, tested against its results), DEXA scan, AI photo and Value.
+    - Each entry keeps its `method` (`navy`, `jp3`, `jp7`, `dw4`, `dexa`, `ai`), and a caliper entry also keeps its `skinfolds`. A plain value is `{date, bf}`, as LOG BF% stores it.
+    - Every method holds the result to 3–60 %. Caliper needs the profile age.
+    - The tape method works as below.
+  - **US Navy measurement**: neck and waist, plus hips for women, with the profile height through `navyBF`, the one Hodgdon-Beckett implementation the wizard also uses.
     - It logs today's body fat to `bf_log` and `POST /bodycomp` with `neck`, `belly` and `method:'navy'`. That data is shared with Peptide Tracker, and the sync keeps those fields.
     - A wrong entry logs nothing and links `help.html#navy-invalid`.
   - **The body charts, moved from Progress → Overview:** weight and its history, body fat % and its history, BMI, lean body mass.

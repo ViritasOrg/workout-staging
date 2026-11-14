@@ -8345,24 +8345,24 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   let rebuilt = 0; G.buildProfilePage = () => { rebuilt++; };
   const fields = {}, _gid = G.document.getElementById; G.document.getElementById = (id) => fields[id] || _gid.call(G.document, id);
   const nav = G._pfNavyHtml();
-  check('US Navy card: neck and waist for a man, no hips', nav.includes('id="pf-neck"') && nav.includes('id="pf-waist"') && !nav.includes('id="pf-hips"') && nav.includes('onclick="pfLogNavy()"'));
+  check('Log body fat starts on the US Navy tape: neck and waist for a man, no hips', nav.includes('id="pf-neck"') && nav.includes('id="pf-waist"') && !nav.includes('id="pf-hips"') && nav.includes('onclick="pfLogBf()"'));
   fields['pf-neck'] = { value: '40' }; fields['pf-waist'] = { value: '90,0' };
-  G.pfLogNavy();
+  G.pfLogBf();
   const today = new Date().toISOString().split('T')[0], last = G.bfLog[G.bfLog.length - 1];
   check('logging computes body fat, stores it for today with the measurements, and sends them to the backend',
     last.date === today && last.bf === G.navyBF('male', 180, 40, 90) && last.neck === 40 && last.belly === 90 && last.method === 'navy' &&
     pushed.some(([u, b]) => /\/bodycomp$/.test(u) && b.date === today && b.neck === 40 && b.belly === 90 && b.method === 'navy' && b.bf === last.bf) && rebuilt === 1);
   check('…and the card shows the last measurement', G._pfNavyHtml().includes('neck 40 cm') && G._pfNavyHtml().includes('waist 90 cm'));
   for (const [neck, waist, why] of [['', '90', 'neck'], ['40', 'abc', 'waist'], ['58', '55', 'larger']]) {
-    fields['pf-neck'] = { value: neck }; fields['pf-waist'] = { value: waist }; const n = G.bfLog.length; G.pfLogNavy();
+    fields['pf-neck'] = { value: neck }; fields['pf-waist'] = { value: waist }; const n = G.bfLog.length; G.pfLogBf();
     const h = G._pfNavyHtml();
     check('a wrong measurement (' + why + ') logs nothing and says what to do, with its help link', G.bfLog.length === n && h.includes('data-pf-navy-err="1"') && h.includes(why) && h.includes('href="help.html#navy-invalid"'));
   }
   G.setData('wkt-profile', { onboarded: true, gender: 'female', age: 35 });
   check('a woman also gives her hips', G._pfNavyHtml().includes('id="pf-hips"'));
-  fields['pf-neck'] = { value: '34' }; fields['pf-waist'] = { value: '75' }; fields['pf-hips'] = { value: '100' }; G.pfLogNavy();
+  fields['pf-neck'] = { value: '34' }; fields['pf-waist'] = { value: '75' }; fields['pf-hips'] = { value: '100' }; G.pfLogBf();
   check('without a height it asks for it first', G._pfNavyHtml().includes('height is missing'));
-  G.setData('wkt-profile', { onboarded: true, gender: 'female', age: 35, height: 168 }); G.pfLogNavy();
+  G.setData('wkt-profile', { onboarded: true, gender: 'female', age: 35, height: 168 }); G.pfLogBf();
   check('…and with it, uses the hips in the formula', G.bfLog[G.bfLog.length - 1].bf === G.navyBF('female', 168, 34, 75, 100) && !G._pfNavyHtml().includes('data-pf-navy-err'));
   const mstats = { from: '2026-11-01', to: '2026-11-03', metrics: { kcal: { avg: 96 }, protein: { avg: 88 }, carbs: null, fat: null },
     series: [{ date: '2026-11-01', kcal: 100, protein: 90, carbs: null, fat: null }, { date: '2026-11-02', kcal: 92, protein: 86, carbs: null, fat: null }] };
@@ -8372,6 +8372,40 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('readable: the new cards use 15px or larger and no grey', ![info, G._pfNavyHtml(), mh, G._pfMacroHtml(null)].some(h => /font-size:1[0-4]px/.test(h) || /var\(--muted\)/.test(h)));
   check('bodycomp sync keeps the measurements a US Navy entry came with', String(G.syncBodyCompFromAgent).includes('if(e.neck)o.neck=e.neck'));
   const help = fs.readFileSync(path.join(__dirname, '..', 'help.html'), 'utf8');
+  // Henrik, 2026-11-14: "BF needs to allow, all kinds of entries ie new measurements or a value".
+  {
+    G.setData('wkt-profile', { onboarded: true, gender: 'male', age: 40, height: 180 });
+    const nav2 = G._pfNavyHtml();
+    check('every kind of entry is offered: tape, caliper, DEXA, AI photo and a plain value', ['navy', 'caliper', 'dexa', 'ai', 'value'].every(m => nav2.includes('data-pf-bfm="' + m + '"')));
+    const today2 = new Date().toISOString().split('T')[0], sent2 = [];
+    G.fetch = (u, o) => { if (o && o.method === 'POST') sent2.push(JSON.parse(o.body)); return Promise.resolve({ ok: true, json: async () => ({}) }); };
+    G.pfSetCalMethod('jp3'); G.pfSetBfMethod('caliper');
+    const ch = G._pfNavyHtml();
+    check('caliper: JP 3-site asks a man for chest, abdomen and thigh', ['chest', 'abdomen', 'thigh'].every(x => ch.includes('id="pf-sf-' + x + '"')) && !ch.includes('pf-sf-triceps') && ch.includes('data-pf-cal="jp7"') && ch.includes('data-pf-cal="dw4"'));
+    fields['pf-sf-chest'] = { value: '10' }; fields['pf-sf-abdomen'] = { value: '20' }; fields['pf-sf-thigh'] = { value: '15' };
+    G.pfLogBf();
+    const cl = G.bfLog[G.bfLog.length - 1], want = G.caliperBF('jp3', 'male', 40, { chest: 10, abdomen: 20, thigh: 15 });
+    check('…logs the Jackson-Pollock result with its method and skinfolds, also to the backend', cl.date === today2 && cl.bf === want && cl.method === 'jp3' && cl.skinfolds.thigh === 15 && want > 5 && want < 25 &&
+      sent2.some(b => b.method === 'jp3' && b.skinfolds && b.skinfolds.chest === 10 && b.bf === want));
+    // Expected values computed with Peptide Tracker's own tab-body.js caliperBF on 2026-11-14: the two apps share this data.
+    check('…the same equations as Peptide Tracker (JP3, DW4, JP7)', G.caliperBF('jp3', 'male', 40, { chest: 10, abdomen: 20, thigh: 15 }) === 14.7 &&
+      G.caliperBF('dw4', 'female', 30, { biceps: 5, triceps: 12, subscapular: 10, suprailiac: 9 }) === 24.2 &&
+      G.caliperBF('jp7', 'female', 25, { chest: 5, axilla: 6, triceps: 12, subscapular: 10, abdomen: 15, suprailiac: 9, thigh: 20 }) === 16.6);
+    G.pfSetCalMethod('dw4');
+    check('…DW 4-site asks for biceps, triceps, subscapular and suprailiac', ['biceps', 'triceps', 'subscapular', 'suprailiac'].every(x => G._pfNavyHtml().includes('id="pf-sf-' + x + '"')));
+    fields['pf-sf-biceps'] = { value: '0' }; G.pfLogBf();
+    check('…a missing skinfold logs nothing and names it', G._pfNavyHtml().includes('biceps skinfold') && G.bfLog[G.bfLog.length - 1] === cl);
+    for (const [m, method] of [['dexa', 'dexa'], ['ai', 'ai'], ['value', undefined]]) {
+      G.pfSetBfMethod(m); fields['pf-bf-direct'] = { value: '14,4' }; G.pfLogBf();
+      const d = G.bfLog[G.bfLog.length - 1];
+      check(m + ': the percentage typed is logged for today' + (method ? ' as ' + method : ' as a plain value'), d.date === today2 && d.bf === 14.4 && d.method === method && G._pfNavyHtml().includes('id="pf-bf-direct"'));
+    }
+    fields['pf-bf-direct'] = { value: '75' }; G.pfLogBf();
+    check('…a body fat outside 3–60 % logs nothing and says so', G._pfNavyHtml().includes('between 3 and 60') && G.bfLog[G.bfLog.length - 1].bf === 14.4);
+    check('the card stays readable in every method', ['navy', 'caliper', 'dexa', 'ai', 'value'].every(m => { G.pfSetBfMethod(m); const h = G._pfNavyHtml(); return !/font-size:1[0-4]px/.test(h) && !/var\(--muted\)/.test(h); }));
+    G.pfSetBfMethod('navy');
+    check('bodycomp sync keeps a caliper entry\'s skinfolds', String(G.syncBodyCompFromAgent).includes('if(e.skinfolds)o.skinfolds=e.skinfolds'));
+  }
   check('help page: the US Navy warning has its section', /id="navy-invalid"[\s\S]*What it means[\s\S]*What happens if you ignore it[\s\S]*How to fix it/.test(help));
   G.fetch = _f; G.buildProfilePage = _bp; G.document.getElementById = _gid; G.weights = _w; G.bfLog = _b;
   if (saved.p === null) _ls.removeItem('wkt-profile'); else _ls.setItem('wkt-profile', saved.p);
