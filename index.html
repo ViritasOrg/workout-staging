@@ -550,6 +550,12 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="homeWeightsModal" style="z-index:510">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="homeWeightsTitle">WEIGHTS</div><button class="modal-close" onclick="homeWeightsClose()">×</button></div>
+    <div class="modal-body" id="homeWeightsBody" style="padding:16px"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="homeEquipModal" style="z-index:500">
   <div class="modal">
     <div class="modal-header"><div class="modal-title">HOME EQUIPMENT</div><button class="modal-close" onclick="closeModal('homeEquipModal')">×</button></div>
@@ -2164,31 +2170,40 @@ var EQUIP_TABS={gym:{title:'Your gym',hint:'Tick what your gym has. Programs onl
 // ── Home equipment weights (Henrik, 2026-11-14: "if user has ie Kettlebell, give them a list to pick which sizes they
 // have in kg 1-20kg and a free number field to add if they have other weights than 1-20. For dumbells etc give choices
 // like adjustable sets (common 1-10kg in 625g increments) and then 10, 12.5, 15, 17.5 etc) for actual barebell weights
-// do 1.25, 2.5, 5, 10, 15, 20, 25"). Shown in the Home equipment tab under each ticked item that has weights; saved per
-// user as 'wkt-home-weights' {item:{w:[kg…],sets:[id…]}} on the device and on the backend, like the item list.
+// do 1.25, 2.5, 5, 10, 15, 20, 25"). Picked in an overlay (Henrik, 2026-11-14: "it looks horrible, for each section only show
+// an overlay where you add the weights you have, then once clicked Save hide it, show a info symbol next to each heading
+// for home equipment to open the view again"): ticking Kettlebell, Dumbbells or Barbell + rack opens it, ⓘ on the ticked
+// item opens it again, the picks are a draft (_hwEdit) until Save, × leaves what was saved. Saved per user as 'wkt-home-weights' {item:{w:[kg…],sets:[id…]}} on the device and on the backend, like the item list.
 var HOME_WEIGHTS={
   kettlebell:{title:'Kettlebell sizes you have',opts:[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]},
   dumbbells:{title:'Dumbbells you have',sets:[{id:'adj-1-10',label:'Adjustable set, 1–10 kg in 0.625 kg steps'}],opts:[10,12.5,15,17.5,20,22.5,25,27.5,30,32.5,35,37.5,40,42.5,45,47.5,50]},
   barbell:{title:'Your barbell and plates',bars:[{id:'bar-10',kg:10,label:'Bar 10 kg'},{id:'bar-20',kg:20,label:'Bar 20 kg'}],opts:[1.25,2.5,5,10,15,20,25]}};
 // The bar itself (Henrik, 2026-11-14: "an unticked barebell will still need a 10kg or 20kg choice"): one of the two, kept in sets.
-function homeBarPick(id){var e=_homeWeightsOf('barbell'),on=e.sets.indexOf(id)>=0;e.sets=e.sets.filter(function(x){return!/^bar-/.test(x);});if(!on)e.sets.push(id);_setHomeWeights('barbell',e);buildEquipTab('home');}
+function homeBarPick(id){var e=_hwEdit&&_hwEdit.item==='barbell'?_hwEdit.e:null;if(!e)return;var on=e.sets.indexOf(id)>=0;e.sets=e.sets.filter(function(x){return!/^bar-/.test(x);});if(!on)e.sets.push(id);_renderHomeWeights();}
 function _homeBarKg(){var e=_homeWeightsOf('barbell');var b=(HOME_WEIGHTS.barbell.bars||[]).filter(function(x){return e.sets.indexOf(x.id)>=0;})[0];return b?b.kg:null;}
-var HOME_WEIGHT_HELP='help.html#home-weight-invalid',_hwWarn=null;
+var HOME_WEIGHT_HELP='help.html#home-weight-invalid',_hwWarn=null,_hwEdit=null;
 function _homeWeights(){var d=getData('wkt-home-weights',{});return(d&&typeof d==='object'&&!Array.isArray(d))?d:{};}
 function _homeWeightsOf(item){var e=_homeWeights()[item]||{};return{w:(Array.isArray(e.w)?e.w:[]).filter(function(x){return typeof x==='number'&&x>0;}),sets:Array.isArray(e.sets)?e.sets:[]};}
 function _saveHomeWeights(all){setData('wkt-home-weights',all);pushSettingsToAgent({'wkt-home-weights':all});}
 function _fmtKg(x){return String(Math.round(x*1000)/1000);}
 function _setHomeWeights(item,e){var all=_homeWeights();all[item]={w:e.w.slice().sort(function(a,b){return a-b;}),sets:e.sets.slice()};_saveHomeWeights(all);}
-function homeWeightToggle(item,kg){var e=_homeWeightsOf(item),i=e.w.indexOf(kg);if(i>=0)e.w.splice(i,1);else e.w.push(kg);_setHomeWeights(item,e);buildEquipTab('home');}
-function homeWeightSetToggle(item,id){var e=_homeWeightsOf(item),i=e.sets.indexOf(id);if(i>=0)e.sets.splice(i,1);else e.sets.push(id);_setHomeWeights(item,e);buildEquipTab('home');}
+// The overlay: a draft of one item's weights; Save stores it and closes, × closes and keeps what was saved.
+function homeWeightsOpen(item){if(!HOME_WEIGHTS[item])return;var e=_homeWeightsOf(item);_hwEdit={item:item,e:{w:e.w.slice(),sets:e.sets.slice()}};_hwWarn=null;_renderHomeWeights();openModal('homeWeightsModal');}
+function _renderHomeWeights(){if(!_hwEdit)return;var t=document.getElementById('homeWeightsTitle'),b=document.getElementById('homeWeightsBody');
+  if(t)t.textContent=HOME_WEIGHTS[_hwEdit.item].title.toUpperCase();if(b)b.innerHTML=_homeWeightsHtml(_hwEdit.item);}
+function homeWeightsSave(){if(!_hwEdit)return;_setHomeWeights(_hwEdit.item,_hwEdit.e);_hwEdit=null;_hwWarn=null;closeModal('homeWeightsModal');buildEquipTab('home');}
+function homeWeightsClose(){_hwEdit=null;_hwWarn=null;closeModal('homeWeightsModal');}
+function homeWeightToggle(item,kg){if(!_hwEdit||_hwEdit.item!==item)return;var e=_hwEdit.e,i=e.w.indexOf(kg);if(i>=0)e.w.splice(i,1);else e.w.push(kg);_renderHomeWeights();}
+function homeWeightSetToggle(item,id){if(!_hwEdit||_hwEdit.item!==item)return;var e=_hwEdit.e,i=e.sets.indexOf(id);if(i>=0)e.sets.splice(i,1);else e.sets.push(id);_renderHomeWeights();}
 // The free field: any other weight in kg, 0.1–200, comma or point. A typo shows what to type, never fails in silence.
 function homeWeightAdd(item){var el=document.getElementById('hw-add-'+item);var raw=el?String(el.value||'').trim().replace(',','.'):'';var kg=Math.round(parseFloat(raw)*1000)/1000;
-  if(!/^\d+(\.\d+)?$/.test(raw)||!(kg>=0.1&&kg<=200)){_hwWarn={item:item,msg:raw?'"'+raw+'" is not a weight the app can use.':'No weight was typed.'};buildEquipTab('home');return;}
-  _hwWarn=null;var e=_homeWeightsOf(item);if(e.w.indexOf(kg)<0)e.w.push(kg);_setHomeWeights(item,e);buildEquipTab('home');}
-function _homeWeightsHtml(item){var d=HOME_WEIGHTS[item];if(!d)return'';var e=_homeWeightsOf(item);
+  if(!_hwEdit||_hwEdit.item!==item)return;
+  if(!/^\d+(\.\d+)?$/.test(raw)||!(kg>=0.1&&kg<=200)){_hwWarn={item:item,msg:raw?'"'+raw+'" is not a weight the app can use.':'No weight was typed.'};_renderHomeWeights();return;}
+  _hwWarn=null;var e=_hwEdit.e;if(e.w.indexOf(kg)<0)e.w.push(kg);_renderHomeWeights();}
+function _homeWeightsHtml(item){var d=HOME_WEIGHTS[item];if(!d)return'';var e=_hwEdit&&_hwEdit.item===item?_hwEdit.e:_homeWeightsOf(item);
   var chip=function(on,attr,click,label){return'<label '+attr+' style="display:flex;align-items:center;gap:8px;min-width:0;padding:10px 8px;border-radius:10px;cursor:pointer;font-size:15px;color:var(--text);background:var(--surface2);border:1px solid '+(on?'var(--accent)':'var(--border)')+';">'
     +'<input type="checkbox"'+(on?' checked':'')+' onchange="'+click+'" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--accent);"><span style="min-width:0;overflow-wrap:anywhere;font-weight:'+(on?'700':'500')+';">'+label+'</span></label>';};
-  var h='<div data-home-weights="'+item+'" style="margin-top:16px;"><div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">'+d.title+'</div>';
+  var h='<div data-home-weights="'+item+'">';
   if(d.bars)h+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:8px;">'+d.bars.map(function(b){return chip(e.sets.indexOf(b.id)>=0,'data-hw-bar="'+b.kg+'"',"homeBarPick('"+b.id+"')",_escP(b.label));}).join('')+'</div>';
   (d.sets||[]).forEach(function(s){h+='<div style="margin-bottom:8px;">'+chip(e.sets.indexOf(s.id)>=0,'data-hw-set="'+s.id+'"',"homeWeightSetToggle('"+item+"','"+s.id+"')",_escP(s.label))+'</div>';});
   var all=d.opts.concat(e.w.filter(function(x){return d.opts.indexOf(x)<0;})).sort(function(a,b){return a-b;});
@@ -2198,7 +2213,7 @@ function _homeWeightsHtml(item){var d=HOME_WEIGHTS[item];if(!d)return'';var e=_h
     +'<button data-hw-add="'+item+'" onclick="homeWeightAdd(\''+item+'\')" style="flex-shrink:0;padding:10px 16px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#000;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Add</button></div>';
   if(_hwWarn&&_hwWarn.item===item)h+='<div data-hw-warn="1" style="font-size:15px;color:var(--text);line-height:1.5;margin-top:8px;padding:10px;border:1px solid var(--accent);border-radius:10px;"><b>'+_escP(_hwWarn.msg)+'</b> Type a number of kg between 0.1 and 200, for example 24 or 2.5, then tap Add. '
     +'<a href="'+HOME_WEIGHT_HELP+'" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
-  return h+'</div>';}
+  return h+'<button class="btn btn-primary" data-hw-save="1" onclick="homeWeightsSave()" style="margin-top:16px;width:100%;">SAVE</button></div>';}
 // Suggested loads on a Home program use only weights the user has (Henrik, 2026-11-14: "1 yes, kind of the whole point
 // is to make Home training better"). The kg the app proposes (Today, the Log prefill, a swapped-in card) snaps to the
 // nearest weight the exercise's item can make; a tie goes to the lighter one. Kettlebell: the sizes ticked. Dumbbells:
@@ -2230,15 +2245,16 @@ function _equipTabHtml(kind){var t=EQUIP_TABS[kind],cur=t.cur();
   t.items().forEach(function(it){var on=cur.indexOf(it.id)>=0;
     h+='<label data-equip="'+it.id+'" style="display:flex;align-items:center;gap:10px;min-width:0;padding:12px 10px;border-radius:10px;cursor:pointer;font-size:15px;color:var(--text);background:var(--surface2);border:1px solid '+(on?'var(--accent)':'var(--border)')+';">'
       +'<input type="checkbox"'+(on?' checked':'')+' onchange="equipTabToggle(\''+kind+'\',\''+it.id+'\')" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--accent);">'
-      +'<span style="min-width:0;overflow-wrap:anywhere;font-weight:'+(on?'700':'500')+';">'+_escP(it.label)+'</span></label>';});
+      +'<span style="min-width:0;overflow-wrap:anywhere;font-weight:'+(on?'700':'500')+';">'+_escP(it.label)+'</span>'
+      +(kind==='home'&&on&&HOME_WEIGHTS[it.id]?'<button data-hw-info="'+it.id+'" aria-label="Weights you have" onclick="event.preventDefault();event.stopPropagation();homeWeightsOpen(\''+it.id+'\')" style="margin-left:auto;flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1px solid var(--accent);background:none;color:var(--accent);font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;">i</button>':'')
+      +'</label>';});
   h+='</div>';
-  if(kind==='home')t.items().forEach(function(it){if(cur.indexOf(it.id)>=0)h+=_homeWeightsHtml(it.id);});
   var stale=_equipStale(kind),plain=(_programs||[]).filter(function(p){return p&&t.plain(p);}).length;
   if(stale.length)h+='<button class="btn btn-primary" data-equip-rebuild="1" onclick="rebuildEquipPrograms(\''+kind+'\')" style="margin-top:16px;width:100%;">Rebuild '+stale.length+' '+t.what+' program'+(stale.length===1?'':'s')+' for this list</button>';
   if(plain)h+='<div style="font-size:15px;color:var(--text);line-height:1.5;margin-top:14px;">'+plain+' of your programs '+(plain===1?'was':'were')+' not generated with this list and '+(plain===1?'keeps its':'keep their')+' exercises. A program you generate from now on follows it.</div>';
   return h+'</div>';}
 function buildEquipTab(kind){var el=document.getElementById(EQUIP_TABS[kind].el);if(el)el.innerHTML=_equipTabHtml(kind);}
-function equipTabToggle(kind,id){var t=EQUIP_TABS[kind],a=t.cur(),i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);t.save(a);buildEquipTab(kind);}
+function equipTabToggle(kind,id){var t=EQUIP_TABS[kind],a=t.cur(),i=a.indexOf(id),adding=i<0;if(i>=0)a.splice(i,1);else a.push(id);t.save(a);buildEquipTab(kind);if(kind==='home'&&adding&&HOME_WEIGHTS[id])homeWeightsOpen(id);}
 // Rebuilds every program generated with an older list, exactly as the program's own editor does.
 function _rebuildForEquip(kind){var t=EQUIP_TABS[kind],id=t.id(t.cur()),n=0;
   (_programs||[]).forEach(function(p,idx){if(!(p&&p.gen&&t.mine(p)&&p.equipment!==id))return;var g=p.gen;
