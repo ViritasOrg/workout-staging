@@ -2220,7 +2220,7 @@ console.log('\n── 47b. BF% pre-isolation migration ────────�
   check('migration flag wk-bf-isol-v1 stored to prevent re-run',
     src.includes("localStorage.setItem('wk-bf-isol-v1','1')"));
   check('migration placed in startup sequence (not inside onGoogleSignIn)',
-    src.includes("syncBodyCompFromAgent();syncWorkoutDraftFromAgent();(function(){if(!IS_STAGING||localStorage.getItem('wk-bf-isol-v1'))"));
+    src.includes("syncBodyCompFromAgent();syncFeaturesFromAgent();syncWorkoutDraftFromAgent();(function(){if(!IS_STAGING||localStorage.getItem('wk-bf-isol-v1'))"));
 }
 
 // ── 47c. No hardcoded personal data (2026-08-05) ─────────────────────────────
@@ -8307,6 +8307,9 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
     G.document.getElementById = (id) => els[id] || _gid1.call(G.document, id); G.document.querySelector = () => null;
     G.applyOwnerName('Henrik');
     check('the Profile button and sub-tab carry the user\'s name', els['hdr-profile-lbl'].textContent === 'Henrik' && els['tab-btn-profile'].textContent === 'Henrik');
+    // Henrik, 2026-11-14: "Title is only TRAINING on app main screen" — the name was only fetched on a fresh Google
+    // sign-in, so an app opened on a saved session never learnt it. The startup sync fetches it too.
+    check('the startup sync fetches the name, not only a fresh sign-in', /syncBodyCompFromAgent\(\);syncFeaturesFromAgent\(\);syncWorkoutDraftFromAgent\(\);\(function\(\)\{if\(!IS_STAGING/.test(src));
     G.applyOwnerName('');
     check('…and say Profile for an account with no name, never someone else\'s', els['hdr-profile-lbl'].textContent === 'Profile' && els['tab-btn-profile'].textContent === 'Profile' && G.profileLabel('  ') === 'Profile');
     check('…a long name is cut with an ellipsis, not pushed out of the header', /id="hdr-profile-lbl"[^>]*max-width:96px;overflow:hidden;text-overflow:ellipsis/.test(src));
