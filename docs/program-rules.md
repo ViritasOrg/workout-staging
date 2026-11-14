@@ -968,7 +968,12 @@ over each opens the search (`_exPickWrap`, `_pickExFor`), and the list is that s
 - **The header:** its button is **Profile** (`hdr-profile`, `switchPrimary('profile')`). It no longer shows the weight.
 - **Navigation:** `PRIMARY_GROUPS.profile` = Profile · Progress · History. The bottom bar is Today · Plan · Log · Macros · More. Macros is unchanged.
 - **The Profile page (`buildProfilePage`), top to bottom:**
-  - **Your profile** (`_pfInfoHtml`): sex, age, height, latest weight, BMI, latest body fat and lean mass. **Log weight** opens the same weight modal the header did; **Edit profile** opens the onboarding wizard.
+  - **Your profile** (`_pfInfoHtml`): sex, age, height, latest weight, BMI, latest body fat and lean mass. **Log weight** opens the same weight modal the header did.
+  - **Edit profile edits in place** (Henrik, 2026-11-14: "Edit profile should not open the onboarding but just make all fields in Profile view editable, the Edit button becomes a Save button, and Log weight a Cancel button"):
+    - `pfEditStart` turns sex (Male/Female), age, height, weight and body fat into inputs, with the current values. BMI and lean mass follow.
+    - Edit profile becomes **Save** (`pfEditSave`) and Log weight becomes **Cancel** (`pfEditCancel`).
+    - Save puts sex, age and height in `wkt-profile` and on `/user-settings`, as the wizard does. A changed weight or body fat is logged for today, as Log weight and LOG BF% do.
+    - An impossible value saves nothing and links `help.html#profile-invalid`.
   - **US Navy measurement** (`_pfNavyHtml`, `pfLogNavy`): neck and waist, plus hips for women, with the profile height through `navyBF`, the one Hodgdon-Beckett implementation the wizard also uses.
     - It logs today's body fat to `bf_log` and `POST /bodycomp` with `neck`, `belly` and `method:'navy'`. That data is shared with Peptide Tracker, and the sync keeps those fields.
     - A wrong entry logs nothing and links `help.html#navy-invalid`.

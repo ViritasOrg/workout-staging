@@ -4514,15 +4514,46 @@ var NAVY_HELP='help.html#navy-invalid',_pfNavyErr='';
 function _pfLatest(){var p=getData('wkt-profile',{})||{},w=weights&&weights.length?weights[weights.length-1].weight:(p.weight||null);
   var bf=bfLog&&bfLog.length?bfLog[bfLog.length-1]:null,h=p.height||null;
   return{gender:p.gender||'',age:p.age||null,height:h,weight:w,bmi:(w&&h)?Math.round(w/Math.pow(h/100,2)*10)/10:null,bf:bf?bf.bf:null,bfDate:bf?bf.date:'',lean:(w&&bf)?Math.round(w*(1-bf.bf/100)*10)/10:null};}
-function _pfInfoHtml(){var L=_pfLatest(),T='font-size:15px;color:var(--text);';
-  var row=function(k,v){return'<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);'+T+'"><span>'+k+'</span><span style="font-weight:700">'+v+'</span></div>';};
-  return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">'
-    +'<div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px;">Your profile</div>'
-    +row('Sex',L.gender?(L.gender==='female'?'Female':'Male'):'—')+row('Age',L.age?L.age+' yrs':'—')+row('Height',L.height?L.height+' cm':'—')
+// Edit in place (Henrik, 2026-11-14: "Edit profile should not open the onboarding but just make all fields in Profile view
+// editable, the Edit button becomes a Save button, and Log weight a Cancel button"). Sex, age, height, weight and body fat
+// are editable; BMI and lean mass follow from them. A changed weight or body fat is logged for today, as Log weight and
+// LOG BF% do; sex, age and height go into the profile, on the device and on the backend, as the wizard saves them.
+var _pfEdit=null,_pfEditErr='',PROFILE_HELP='help.html#profile-invalid';
+function _pfInfoHtml(){var L=_pfLatest(),T='font-size:15px;color:var(--text);',E=_pfEdit;
+  var row=function(k,v){return'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);'+T+'"><span>'+k+'</span><span style="font-weight:700;min-width:0">'+v+'</span></div>';};
+  var field=function(id,val,suffix){return'<span style="display:inline-flex;align-items:center;gap:6px"><input id="'+id+'" type="text" inputmode="decimal" value="'+(val==null?'':_escP(val))+'" style="width:84px;text-align:right;font-size:16px;font-weight:700;padding:8px 10px;color:var(--text);background:var(--surface2);border:1px solid var(--border-strong);border-radius:8px;font-family:inherit">'+suffix+'</span>';};
+  var chip=function(g,label){var on=E&&E.gender===g;return'<button data-pf-sex="'+g+'" onclick="pfEditSex(\''+g+'\')" style="padding:8px 14px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;background:'+(on?'var(--accent)':'var(--surface2)')+';color:'+(on?'#000':'var(--text)')+';border:1px solid '+(on?'var(--accent)':'var(--border-strong)')+'">'+label+'</button>';};
+  var h='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">'
+    +'<div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px;">Your profile</div>';
+  if(E){h+=row('Sex','<span style="display:inline-flex;gap:6px">'+chip('male','Male')+chip('female','Female')+'</span>')+row('Age',field('pf-e-age',E.age,'yrs'))+row('Height',field('pf-e-height',E.height,'cm'))
+      +row('Weight',field('pf-e-weight',E.weight!=null?kgToUnit(E.weight):null,unitLabel()))+row('BMI',L.bmi?L.bmi.toFixed(1):'—')+row('Body fat',field('pf-e-bf',E.bf,'%'))+row('Lean mass',L.lean?kgToUnit(L.lean)+' '+unitLabel():'—');
+    if(_pfEditErr)h+='<div data-pf-edit-err="1" style="'+T+'line-height:1.5;margin-top:10px;padding:10px;border:1px solid var(--danger,#ff3b30);border-radius:10px;"><b>'+_escP(_pfEditErr)+'</b> <a href="'+PROFILE_HELP+'" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
+    return h+'<div style="display:flex;gap:10px;margin-top:14px;"><button data-pf-cancel="1" onclick="pfEditCancel()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Cancel</button>'
+      +'<button class="btn btn-primary" data-pf-save="1" onclick="pfEditSave()" style="flex:1;">Save</button></div></div>';}
+  return h+row('Sex',L.gender?(L.gender==='female'?'Female':'Male'):'—')+row('Age',L.age?L.age+' yrs':'—')+row('Height',L.height?L.height+' cm':'—')
     +row('Weight',L.weight?kgToUnit(L.weight)+' '+unitLabel():'—')+row('BMI',L.bmi?L.bmi.toFixed(1):'—')
     +row('Body fat',L.bf?L.bf+' %':'—')+row('Lean mass',L.lean?kgToUnit(L.lean)+' '+unitLabel():'—')
     +'<div style="display:flex;gap:10px;margin-top:14px;"><button class="btn btn-primary" data-pf-weight="1" onclick="showWeightModal()" style="flex:1;">Log weight</button>'
-    +'<button data-pf-edit="1" onclick="openOnboarding()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Edit profile</button></div></div>';}
+    +'<button data-pf-edit="1" onclick="pfEditStart()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Edit profile</button></div></div>';}
+function pfEditStart(){var L=_pfLatest();_pfEdit={gender:L.gender||'',age:L.age,height:L.height,weight:L.weight,bf:L.bf};_pfEditErr='';_pfRenderInfo();}
+function pfEditCancel(){_pfEdit=null;_pfEditErr='';_pfRenderInfo();}
+function _pfKeepTyped(){if(!_pfEdit)return;[['age','pf-e-age'],['height','pf-e-height'],['bf','pf-e-bf']].forEach(function(f){var e=document.getElementById(f[1]);if(e)_pfEdit[f[0]]=e.value;});
+  var w=document.getElementById('pf-e-weight');if(w)_pfEdit.weightTyped=w.value;}
+function pfEditSex(g){if(!_pfEdit)return;_pfKeepTyped();_pfEdit.gender=g;var wt=_pfEdit.weightTyped;_pfRenderInfo();var w=document.getElementById('pf-e-weight');if(w&&wt!=null)w.value=wt;}
+function pfEditSave(){if(!_pfEdit)return;var v=function(id){var e=document.getElementById(id);var t=e?String(e.value||'').trim():'';return t===''?null:parseDec(t);};
+  var age=v('pf-e-age'),h=v('pf-e-height'),wu=v('pf-e-weight'),bf=v('pf-e-bf'),wkg=wu==null?null:unitToKg(String(wu));_pfEditErr='';
+  if(!_pfEdit.gender)_pfEditErr='Choose Male or Female.';
+  else if(age!=null&&!(age>=13&&age<=100))_pfEditErr='Type your age in years, between 13 and 100.';
+  else if(h!=null&&!(h>=100&&h<=250))_pfEditErr='Type your height in cm, between 100 and 250.';
+  else if(wkg!=null&&!(wkg>=20&&wkg<=300))_pfEditErr='Type your weight in '+unitLabel()+', a believable body weight.';
+  else if(bf!=null&&!(bf>=2&&bf<=60))_pfEditErr='Type body fat in %, between 2 and 60.';
+  if(_pfEditErr){_pfKeepTyped();var wt=_pfEdit.weightTyped;_pfRenderInfo();var we=document.getElementById('pf-e-weight');if(we&&wt!=null)we.value=wt;return;}
+  var L=_pfLatest(),p=getData('wkt-profile',{})||{};p.gender=_pfEdit.gender;p.age=age!=null?Math.round(age):null;p.height=h;setData('wkt-profile',p);
+  var kv={'wkt-profile':p,user_sex:p.gender};if(p.age)kv.user_age=String(p.age);if(p.height)kv.user_height=String(p.height);
+  var today=new Date().toISOString().split('T')[0];
+  if(wkg!=null&&(L.weight==null||Math.abs(wkg-L.weight)>=0.05)){wkg=Math.round(wkg*10)/10;weights=weights.filter(function(x){return x.date!==today;});weights.push({date:today,weight:wkg});weights.sort(function(a,b){return a.date.localeCompare(b.date);});setData('weight_log',weights);pushWeightToAgent(today,wkg);kv.user_weight=String(wkg);}
+  if(bf!=null&&(L.bf==null||Math.abs(bf-L.bf)>=0.05)){bf=Math.round(bf*10)/10;bfLog=bfLog.filter(function(x){return x.date!==today;});bfLog.push({date:today,bf:bf});bfLog.sort(function(a,b){return a.date.localeCompare(b.date);});setData('bf_log',bfLog);pushBodyCompToAgent(today,bf);}
+  pushSettingsToAgent(kv);_pfEdit=null;buildProfilePage();}
 function _pfRenderInfo(){var el=document.getElementById('pf-info');if(el)el.innerHTML=_pfInfoHtml();}
 function _pfNavyHtml(){var p=getData('wkt-profile',{})||{},fem=p.gender==='female',last=null;
   for(var i=(bfLog||[]).length-1;i>=0;i--){if(bfLog[i].method==='navy'||bfLog[i].neck){last=bfLog[i];break;}}
@@ -4866,6 +4897,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.394',title:'Edit your profile',text:'On Profile, Edit profile now makes the fields editable right there: change sex, age, height, weight or body fat and tap Save, or Cancel to leave it as it was.'},
   {v:'1.393',title:'Profile',text:'The button at the top right is now Profile: your details, Log weight, a US Navy body-fat measurement, and how weight, BMI, body fat, lean mass and macro adherence change over time. Progress and History are its sub-tabs.'},
   {v:'1.391',title:'Regenerate program',text:'Open a program from Plan and tap Regenerate program: it is built again with the latest program generator and your current Gym or Home equipment, keeping its name. You see what changes and choose Save or Discard.'},
   {v:'1.388',title:'Home programs use your weights',text:'On a Home program, the weight suggested on Today and in Log Workout is the nearest one you have, from the weights picked in Plan → Home equipment.'},
