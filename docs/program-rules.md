@@ -965,7 +965,10 @@ over each opens the search (`_exPickWrap`, `_pickExFor`), and the list is that s
 ### Profile (Henrik, 2026-11-14)
 > "change the top right corner weight button to a Profile button, and take user to a page showing all profile information incl us navy measurments etc, here show progress over time for weight, bmi, body fat etc same as in peptide tracker" · "also move progress and history in to this new profile section as sub tabs" · "also macros progress or adherence over time should live in the profile as well, but keep Macro reporting as a top level tab as today"
 
-- **The header:** its button is **Profile** (`hdr-profile`, `switchPrimary('profile')`). It no longer shows the weight.
+- **The header:** its button opens Profile (`hdr-profile`, `switchPrimary('profile')`). It no longer shows the weight.
+  - **The button and the first sub-tab carry the user's name** (Henrik, 2026-11-14: "Change Profile to Name of user"), from the whitelist as in the title (`profileLabel`). An account with no name keeps "Profile".
+  - **Title, car and button sit on one line, centred, with the car and the button the same height** (Henrik, 2026-11-14: "TRAINING - Car symbol - Profile button, needs to be aligned with eachother and sized in a balanced way to look good"). A long name shrinks the title (34 px down to 16 px, `_fitHeaderTitle`) rather than pushing the button off the screen.
+  - **The Polestar car is the highlight colour while climate is off, like the Profile icon, and red while it runs** (Henrik, 2026-11-14: "the car symbol for the Polestar should be the same yellow (highlight color) as the profile symbol").
 - **Navigation:** `PRIMARY_GROUPS.profile` = Profile · Progress · History. The bottom bar is Today · Plan · Log · Macros · More. Macros is unchanged.
 - **The Profile page (`buildProfilePage`), top to bottom:**
   - **Your profile** (`_pfInfoHtml`): sex, age, height, latest weight, BMI, latest body fat and lean mass. **Log weight** opens the same weight modal the header did.
