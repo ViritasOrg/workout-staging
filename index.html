@@ -5083,8 +5083,30 @@ function _flEditHtml(rows,date){
     h+=_flCard((r.time?'<div style="font-size:11px;color:var(--muted);margin-bottom:4px">'+_flEsc(r.time)+'</div>':'')+'<div style="display:flex;gap:6px;align-items:flex-end">'+'<div style="flex:1">'+inp(id,'food',r.food,'100%')+'</div>'+
       '<label style="font-size:11px;color:var(--muted);width:92px">Amount ('+(g?g.u:'g')+')<input id="fle-grams-'+id+'" value="'+(g?g.n:'')+'" inputmode="decimal" placeholder="'+_flEsc(g?'':(r.amount||''))+'" style="width:100%;box-sizing:border-box;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px"></label></div>'+
       '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px;font-size:11px;color:var(--muted)"><label>kcal'+inp(id,'kcal',r.kcal,'100%',1)+'</label><label>Protein'+inp(id,'protein',r.protein,'100%',1)+'</label><label>Carbs'+inp(id,'carbs',r.carbs,'100%',1)+'</label><label>Fat'+inp(id,'fat',r.fat,'100%',1)+'</label></div>'+
-      '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Save',"flEditSave('"+id+"')",true)+_flBtn('Delete',"flEditDelete('"+id+"')",false)+'</div>');});
+      '<div style="display:flex;gap:8px;margin-top:10px">'+_flBtn('Save',"flEditSave('"+id+"')",true)+_flBtn('Update',"flUpdOpen('"+id+"')",false)+_flBtn('Delete',"flEditDelete('"+id+"')",false)+'</div>'+
+      (_flUpd===r.id?_flUpdHtml(r,rows):''));});
   return h;}
+// Update an entry (Henrik, 2026-11-14: "Add a update for a entry so one doesn't have to delete and enter again, ie
+// store the actual input moving forward"). The backend keeps what was typed (`input`) with every entry it made;
+// Update shows that text, and Estimate again replaces this entry and the others from the same input once the new
+// estimate is in. An entry from before 2026-11-14 has no stored text and starts from its name and amount.
+var _flUpd=null,_flUpdBusy=false,_flUpdErr='';
+function _flUpdText(r){return r.input||((r.food||'')+(r.amount?' '+r.amount:''));}
+function _flUpdHtml(r,rows){var n=r.batch?rows.filter(function(x){return x.batch===r.batch;}).length:1;var id=_flEsc(r.id);
+  return '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"><div style="font-size:13px;color:var(--text);margin-bottom:6px">What you ate'+(n>1?' (replaces the '+n+' entries from this text)':'')+'</div>'+
+    '<textarea id="flu-text-'+id+'" rows="3" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:16px;font-family:inherit">'+_flEsc(_flUpdText(r))+'</textarea>'+
+    (_flUpdErr?'<div style="margin-top:6px;font-size:13px;color:var(--danger,#ff3b30)">'+_flEsc(_flUpdErr)+' The entry is unchanged.</div>':'')+
+    '<div style="display:flex;gap:8px;margin-top:8px">'+_flBtn(_flUpdBusy?'Estimating…':'Estimate again',"flUpdRun('"+id+"')",true)+_flBtn('Cancel','flUpdClose()',false)+'</div></div>';}
+function _flUpdRender(){var el=document.getElementById('food-edit-body');if(el)el.innerHTML=_flEditHtml(_flEditRows,_flEditDate);}
+function flUpdOpen(id){_flUpd=(_flUpd===id)?null:id;_flUpdErr='';_flUpdRender();}
+function flUpdClose(){_flUpd=null;_flUpdErr='';_flUpdRender();}
+async function flUpdRun(id){if(_flUpdBusy)return;var row=_flEditRows.find(function(x){return String(x.id)===String(id);});if(!row)return;
+  var t=document.getElementById('flu-text-'+id);var text=String(t?t.value:_flUpdText(row)).trim();if(!text)return;
+  _flUpdBusy=true;_flUpdErr='';_flUpdRender();var t2=document.getElementById('flu-text-'+id);if(t2)t2.value=text;
+  try{var r=await fetch(AGENT_URL+'/food-log/estimate',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({date:row.date||_flEditDate,time:row.time||'',text:text,replace:row.id})});var j=await r.json().catch(function(){return{};});
+    if(!r.ok){_flUpdErr=_flDetail(r,j);}else{_flUpd=null;}}
+  catch(e){_flUpdErr='Could not reach the server. Check your connection.';}
+  _flUpdBusy=false;if(_flUpd===null){await buildFoodEdit(_flEditDate);if(_flEditDate===_flDay()){var tr=await _flLoadRows(_flEditDate);if(tr)_flRows=tr;if(typeof _flRender==='function')_flRender();}}else{_flUpdRender();var t3=document.getElementById('flu-text-'+id);if(t3)t3.value=text;}}
 async function buildFoodEdit(date){_flEditDate=date||_flEditDate||_flDay();if(_flGoals===null)await _flLoadGoals();var rows=await _flLoadRows(_flEditDate);_flEditRows=rows||[];var el=document.getElementById('food-edit-body');if(el)el.innerHTML=rows?_flEditHtml(_flEditRows,_flEditDate):_flCard('<div style="font-size:13px;color:var(--muted)">Could not load the food log. Check your connection.</div>');}
 async function flEditSave(id){var g=function(f){var e=document.getElementById('fle-'+f+'-'+id);return e?e.value:'';};
   var body={food:String(g('food')).trim().slice(0,120),kcal:_flNum(g('kcal')),protein:_flNum(g('protein')),carbs:_flNum(g('carbs')),fat:_flNum(g('fat'))};
