@@ -8302,7 +8302,44 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   G.bfLog = [{ date: '2026-11-05', bf: 18 }];
   const info = G._pfInfoHtml();
   check('profile info: sex, age, height, latest weight, BMI, body fat and lean mass', ['Male', '40 yrs', '180 cm', '86', '26.5', '18 %', '70.5'].every(t => info.includes(t)), info.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300));
-  check('…with Log weight (the old header button) and Edit profile', info.includes('data-pf-weight="1" onclick="showWeightModal()"') && info.includes('onclick="openOnboarding()"'));
+  check('…with Log weight (the old header button) and Edit profile', info.includes('data-pf-weight="1" onclick="showWeightModal()"') && info.includes('data-pf-edit="1" onclick="pfEditStart()"'));
+  // Henrik, 2026-11-14: "Edit profile should not open the onboarding but just make all fields in Profile view editable,
+  // the Edit button becomes a Save button, and Log weight a Cancel button".
+  {
+    const ef = {}, _gid0 = G.document.getElementById, el = { innerHTML: '' }; G.document.getElementById = (id) => id === 'pf-info' ? el : (ef[id] || _gid0.call(G.document, id));
+    const sent = [], _ps = G.pushSettingsToAgent, _pw = G.pushWeightToAgent, _pb = G.pushBodyCompToAgent, _bpp = G.buildProfilePage;
+    G.pushSettingsToAgent = (kv) => sent.push(['settings', kv]); G.pushWeightToAgent = (d, w) => sent.push(['weight', d, w]); G.pushBodyCompToAgent = (d, b) => sent.push(['bf', d, b]);
+    let built = 0; G.buildProfilePage = () => { built++; };
+    let wiz = 0; const _oo = G.openOnboarding; G.openOnboarding = () => { wiz++; };
+    G.pfEditStart();
+    const eh = el.innerHTML;
+    check('Edit profile makes the fields editable in place, without the setup wizard', wiz === 0 && ['pf-e-age', 'pf-e-height', 'pf-e-weight', 'pf-e-bf'].every(id => eh.includes('id="' + id + '"')) && eh.includes('data-pf-sex="male"') && eh.includes('data-pf-sex="female"'));
+    check('…Edit becomes Save and Log weight becomes Cancel', /data-pf-save="1" onclick="pfEditSave\(\)"[^>]*>Save</.test(eh) && /data-pf-cancel="1" onclick="pfEditCancel\(\)"[^>]*>Cancel</.test(eh) && !eh.includes('data-pf-weight') && !eh.includes('data-pf-edit="1"'));
+    check('…with the current values filled in', /id="pf-e-age"[^>]*value="40"/.test(eh) && /id="pf-e-height"[^>]*value="180"/.test(eh) && /id="pf-e-bf"[^>]*value="18"/.test(eh));
+    check('…readable: 15px or larger and never greyed', !/font-size:1[0-4]px/.test(eh) && !/var\(--muted\)/.test(eh));
+    G.pfEditCancel();
+    check('Cancel goes back to the view with nothing changed', el.innerHTML.includes('data-pf-edit="1"') && sent.length === 0 && G.getData('wkt-profile', {}).age === 40);
+    G.pfEditStart();
+    ef['pf-e-age'] = { value: '41' }; ef['pf-e-height'] = { value: '181' }; ef['pf-e-weight'] = { value: '85,5' }; ef['pf-e-bf'] = { value: '17' };
+    G.pfEditSex('female');
+    check('choosing a sex keeps what was typed', G._pfEdit.gender === 'female' && G._pfEdit.age === '41');
+    ef['pf-e-height'] = { value: '90' }; G.pfEditSave();
+    check('an impossible value saves nothing and says what to do, with its help link', sent.length === 0 && el.innerHTML.includes('data-pf-edit-err="1"') && el.innerHTML.includes('height') && el.innerHTML.includes('href="help.html#profile-invalid"') && G.getData('wkt-profile', {}).height === 180);
+    ef['pf-e-height'] = { value: '181' }; G.pfEditSave();
+    const pr = G.getData('wkt-profile', {}), today = new Date().toISOString().split('T')[0];
+    check('Save stores sex, age and height in the profile, on the device and the backend', pr.gender === 'female' && pr.age === 41 && pr.height === 181 && pr.onboarded === true &&
+      sent.some(x => x[0] === 'settings' && x[1]['wkt-profile'] && x[1]['wkt-profile'].height === 181 && x[1].user_sex === 'female' && x[1].user_age === '41'));
+    check('…a changed weight and body fat are logged for today', G.weights[G.weights.length - 1].date === today && G.weights[G.weights.length - 1].weight === 85.5 && G.bfLog[G.bfLog.length - 1].bf === 17 &&
+      sent.some(x => x[0] === 'weight' && x[2] === 85.5) && sent.some(x => x[0] === 'bf' && x[2] === 17));
+    check('…and the page shows the view again', G._pfEdit === null && built === 1);
+    sent.length = 0; G.pfEditStart(); ef['pf-e-weight'] = { value: '85.5' }; ef['pf-e-bf'] = { value: '17' }; G.pfEditSave();
+    check('an unchanged weight or body fat logs nothing new', !sent.some(x => x[0] === 'weight' || x[0] === 'bf'));
+    G.document.getElementById = _gid0; G.pushSettingsToAgent = _ps; G.pushWeightToAgent = _pw; G.pushBodyCompToAgent = _pb; G.buildProfilePage = _bpp; G.openOnboarding = _oo;
+    G.setData('wkt-profile', { onboarded: true, gender: 'male', age: 40, height: 180, weight: 90 });
+    G.weights = [{ date: '2026-11-01', weight: 88 }, { date: '2026-11-10', weight: 86 }]; G.bfLog = [{ date: '2026-11-05', bf: 18 }];
+    const help0 = fs.readFileSync(path.join(__dirname, '..', 'help.html'), 'utf8');
+    check('help page: the profile warning has its section', /id="profile-invalid"[\s\S]*What it means[\s\S]*What happens if you ignore it[\s\S]*How to fix it/.test(help0));
+  }
   check('navyBF: the same Hodgdon-Beckett numbers the onboarding wizard uses', G.navyBF('male', 180, 40, 90) === (() => { G._obData.gender = 'male'; G._obData.height = '180'; G._obData.neck = '40'; G._obData.waist = '90'; return G.calcNavyBF(); })() && G.navyBF('male', 180, 40, 90) > 10 && G.navyBF('male', 180, 40, 90) < 25);
   const pushed = [], _f = G.fetch, _bp = G.buildProfilePage; G.fetch = (u, o) => { if (o && o.method === 'POST') pushed.push([u, JSON.parse(o.body)]); return Promise.resolve({ ok: true, json: async () => ({}) }); };
   let rebuilt = 0; G.buildProfilePage = () => { rebuilt++; };
