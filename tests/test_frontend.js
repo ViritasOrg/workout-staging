@@ -8210,6 +8210,8 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   const _ls = G.localStorage, saved = { home: _ls.getItem('wkt-home-equip'), gym: _ls.getItem('wkt-gym-equip') };
   const _p = G._programs, _c = G.confirm, _sp = G.savePrograms, _bp = G.buildProgramSettingsCard, _ro = G._renderProgOverlay, _rw = G.renderWorkout, _ai = G._activeProgramIndex;
   let saves = 0, overlays = 0; G.savePrograms = () => { saves++; }; G.buildProgramSettingsCard = () => {}; G._renderProgOverlay = () => { overlays++; }; G.renderWorkout = () => {};
+  const open = new Set(), rbody = { innerHTML: '' }, _gid = G.document.getElementById;
+  G.document.getElementById = (id) => id === 'progRegenBody' ? rbody : id === 'progRegenModal' ? { classList: { add: () => open.add(id), remove: () => open.delete(id) } } : _gid.call(G.document, id);
   _ls.removeItem('wkt-gym-equip');
   G.setData('wkt-home-equip', ['dumbbells']);
   const home = G._generateWorkoutProgram('hypertrophy', 'upper', 4, 'Home A', 12, [], G._homeEquipId(['bands']));
@@ -8230,11 +8232,19 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   G.confirm = () => false; G.regenerateProgram(0);
   check('cancelling the confirm changes nothing', G._programs[0] === home && saves === 0);
   G.confirm = () => true; G.regenerateProgram(0);
+  // Henrik, 2026-11-14: "I want an overlay saying regeneration completed, show updates and then give user a Save or discard choice".
+  check('regenerating shows the "Regeneration completed" overlay and replaces nothing yet', open.has('progRegenModal') && G._programs[0] === home && saves === 0 && html.includes('REGENERATION COMPLETED'));
+  check('…it shows the updates: the hand-edited exercise goes, what the Home list allows comes in', rbody.innerHTML.includes('data-regen-del="1">− Hand edit') && rbody.innerHTML.includes('data-regen-add'));
+  check('…with Save and Discard', rbody.innerHTML.includes('data-regen-save="1"') && rbody.innerHTML.includes('data-regen-discard="1"') && rbody.innerHTML.includes('onclick="regenSave()"') && rbody.innerHTML.includes('onclick="regenDiscard()"'));
+  check('…readable: 15px or larger and never greyed', !/font-size:1[0-4]px/.test(rbody.innerHTML) && !/var\(--muted\)/.test(rbody.innerHTML));
+  G.regenDiscard();
+  check('Discard closes it and keeps the program as it was', !open.has('progRegenModal') && G._programs[0] === home && saves === 0);
+  G.regenerateProgram(0); G.regenSave();
   const nh = G._programs[0];
   check('confirming rebuilds it in the same slot with the same name and the current equipment, and saves',
     nh !== home && nh.name === 'Home A' && nh.equipment === 'home:dumbbells' && nh.days.length === 4 && saves === 1 && overlays === 1 && nh.days.every(d => d.exercises.every(e => e.name !== 'Hand edit')));
   check('…and it can be regenerated again', !!G._progRegenSpec(nh));
-  G.regenerateProgram(1);
+  G.regenerateProgram(1); G.regenSave();
   const no = G._programs[1];
   check('the old program regenerates as a 6-day upper hypertrophy program with the same name, now remembering its answers',
     no !== old && no.name === '6-Day Hypertrophy — Upper' && no.days.length === 6 && no.gen && no.gen.sub === 'upper' && no.equipment === G._gymEquipId(G._gymItems()));
@@ -8242,9 +8252,21 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   const bad = [];
   for (const [g, subs] of [['strength', ['pure', 'hybrid']], ['hypertrophy', ['balanced', 'upper', 'lower']], ['aesthetic', ['fullbody', 'upperlower', 'bootylicious']], ['rehab', ['shoulder', 'back', 'knee']]])
     for (const sub of subs) for (const d of [2, 3, 4, 6]) {
-      const pr = G._generateWorkoutProgram(g, sub, d, 'X', 12, [], G._gymEquipId(G._gymItems())); G._programs = [pr]; G.regenerateProgram(0);
+      const pr = G._generateWorkoutProgram(g, sub, d, 'X', 12, [], G._gymEquipId(G._gymItems())); G._programs = [pr]; G.regenerateProgram(0); G.regenSave();
       if (!(G._programs[0] !== pr && G._programs[0].days.length && G._programs[0].days.every(x => x.exercises.length))) bad.push(`${g}/${sub} ${d}d`); }
   check('every goal, focus and day count regenerates to a full program', bad.length === 0, bad.slice(0, 4).join(' | '));
+  {
+    const a = G._generateWorkoutProgram('hypertrophy', 'upper', 4, 'Same', 12, [], G._gymEquipId(G._gymItems())), b = JSON.parse(JSON.stringify(a));
+    check('regenerating an up-to-date program says there is nothing to change', G._progRegenDiff(a, b).length === 0 && G._progRegenResultHtml(a, b).includes('data-regen-same="1"'));
+    b.days[1].exercises[0].scheme = '5×5';
+    const df = G._progRegenDiff(a, b);
+    check('a new prescription for the same exercise is listed with old → new', df.length === 1 && df[0].day === 2 && df[0].changed.length === 1 && df[0].changed[0].to === '5×5');
+    const c = JSON.parse(JSON.stringify(a)); c.days.pop();
+    check('a day the new program no longer has is listed as removed', G._progRegenDiff(a, c).some(d => d.day === 4 && d.gone) && G._progRegenResultHtml(a, c).includes('(removed)'));
+    G._programs = [a]; G.regenerateProgram(0); const other = { name: 'Other', days: [] }; G._programs[0] = other; G.regenSave();
+    check('Save never overwrites a program that changed while the overlay was open', G._programs[0] === other);
+  }
+  G.document.getElementById = _gid;
   G._programs = _p; G.confirm = _c; G.savePrograms = _sp; G.buildProgramSettingsCard = _bp; G._renderProgOverlay = _ro; G.renderWorkout = _rw; G._activeProgramIndex = _ai;
   if (saved.home === null) _ls.removeItem('wkt-home-equip'); else _ls.setItem('wkt-home-equip', saved.home);
   if (saved.gym === null) _ls.removeItem('wkt-gym-equip'); else _ls.setItem('wkt-gym-equip', saved.gym);

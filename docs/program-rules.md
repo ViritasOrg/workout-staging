@@ -936,6 +936,7 @@ A test checks Upper < Balanced < Lower on leg share for 3–7 days.
 
 - The program view (`_progViewHtml`) has a **Regenerate program** block (`_progRegenBtnHtml`). After a confirm, because hand edits are replaced, `regenerateProgram` builds the program again in the same slot with the same name.
 - **Equipment:** a Home program uses the current Home list and every other program the current Gym list (`_progRegenSpec`).
+- **Nothing is replaced before Save** (Henrik, 2026-11-14: "I want an overlay saying regeneration completed, show updates and then give user a Save or discard choice"): `regenerateProgram` opens `progRegenModal`, which lists per day the exercises added (+), removed (−) and with a new prescription (old → new) (`_progRegenDiff`, `_progRegenResultHtml`), or says the program is already up to date. **Save** (`regenSave`) puts the new program in the same slot with the same name, unless the program changed meanwhile; **Discard** (`regenDiscard`) and × keep it as it was.
 - **The answers it uses** come from `gen` (goal, focus, days, sets per muscle, injuries, picked muscles, the pull-up answer).
   - A program made before `gen` was recorded is regenerated from its `goal`, its day count, the focus in its generated name ("6-Day Hypertrophy — Upper", `PROG_SUB_LABELS`) or its picked `muscles`, its `setsPerMuscle` and `injuries`. It then remembers its answers like any new program.
   - A program none of that fits (built by hand, renamed) shows no button.
