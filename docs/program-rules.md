@@ -931,6 +931,16 @@ A test checks Upper < Balanced < Lower on leg share for 3–7 days.
 - **Saving:** `wkt-home-weights` = `{item:{w:[kg…],sets:[id…]}}`, on the device and on the backend (`/user-settings`), back in `syncSettingsFromAgent`. Unticking an item hides its i button and keeps its weights.
 - **Suggested loads use them** (Henrik, 2026-11-14: "1 yes, kind of the whole point is to make Home training better"): on a Home program the kg proposed on Today (`renderWorkout`), in the Log prefill (`prefillLog`) and on a swapped-in card (`_prefillKgFromHistory`) goes through `_homeSnapKg` after any deload. It snaps to the nearest weight the exercise's item can make (`_homeLoadItem`, `_homeAvailKg`), and a tie goes to the lighter one. Kettlebell uses the ticked sizes. Dumbbells use the fixed ones plus, with the adjustable set, 1 kg and every 0.625 kg up to 10 kg. Barbell is the bar picked plus any number of pairs of the ticked plates (no bar picked: 20 kg, the bar `roundBarbellKg` assumes; a bar and no plates: the bar alone). Nothing ticked for the item, a bodyweight exercise or a gym program: the load is unchanged. The logged weights stay what was typed.
 
+### Regenerate program (Henrik, 2026-11-14)
+> "can we have a regenerate program button, instead of having to delete and then recreate program to get the Home gym weights or other updates to the generation of programs?"
+
+- The program view (`_progViewHtml`) has a **Regenerate program** block (`_progRegenBtnHtml`). After a confirm, because hand edits are replaced, `regenerateProgram` builds the program again in the same slot with the same name.
+- **Equipment:** a Home program uses the current Home list and every other program the current Gym list (`_progRegenSpec`).
+- **The answers it uses** come from `gen` (goal, focus, days, sets per muscle, injuries, picked muscles, the pull-up answer).
+  - A program made before `gen` was recorded is regenerated from its `goal`, its day count, the focus in its generated name ("6-Day Hypertrophy — Upper", `PROG_SUB_LABELS`) or its picked `muscles`, its `setsPerMuscle` and `injuries`. It then remembers its answers like any new program.
+  - A program none of that fits (built by hand, renamed) shows no button.
+- Home weights need no regenerating: loads snap to them when shown.
+
 ### No program and no load is ever seeded (Henrik, 2026-11-13)
 "Wife gets my old 5-day split in her workout account? Delete that from the code base asap", then
 "remove anything like that". Henrik's 5-day split (`DAYS`/`DAY_TEMPLATES`) and the
