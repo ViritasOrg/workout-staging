@@ -922,6 +922,14 @@ A test checks Upper < Balanced < Lower on leg share for 3–7 days.
 - **Rebuilding:** a program generated with an older list is rebuilt by the tab's "Rebuild N … programs" button. It asks for confirmation first, the same as the program's own equipment editor, because hand edits are replaced. Programs not generated with a list keep their exercises, and the tab says how many there are.
 - **Ask AI** is sent only the exercises the active program's equipment allows (`_exCatalogueFor`).
 
+### Home equipment weights (Henrik, 2026-11-14)
+> "Home Gym equipment, if user has ie Kettlebell, give them a list to pick which sizes they have in kg 1-20kg and a free number field to add if they have other weights than 1-20. For dumbells etc give choices like adjustable sets (common 1-10kg in 625g increments) and then 10, 12.5, 15, 17.5 etc) for actual barebell weights do 1.25, 2.5, 5, 10, 15, 20, 25."
+
+- **Where:** the Home equipment tab, under the item grid, one block per ticked item that has weights (`HOME_WEIGHTS`): Kettlebell 1–20 kg in 1 kg steps; Dumbbells an "Adjustable set, 1–10 kg in 0.625 kg steps" box, then 10–50 kg in 2.5 kg steps; Barbell + rack plates 1.25, 2.5, 5, 10, 15, 20, 25 kg.
+- **The free field** under each block adds any other weight (0.1–200 kg, comma or point); an added weight shows ticked among the others and unticking removes it. A typo shows what to type and links `help.html#home-weight-invalid`.
+- **Saving:** `wkt-home-weights` = `{item:{w:[kg…],sets:[id…]}}`, on the device and on the backend (`/user-settings`), back in `syncSettingsFromAgent`. Unticking an item hides its block and keeps its weights.
+- The weights do not change program generation or suggested loads yet.
+
 ### No program and no load is ever seeded (Henrik, 2026-11-13)
 "Wife gets my old 5-day split in her workout account? Delete that from the code base asap", then
 "remove anything like that". Henrik's 5-day split (`DAYS`/`DAY_TEMPLATES`) and the
