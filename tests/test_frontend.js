@@ -8104,6 +8104,7 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('dumbbells: the adjustable 1–10 kg set in 0.625 kg steps, then 10, 12.5, 15, 17.5 …',
     dbBlock.includes('data-hw-set="adj-1-10"') && dbBlock.includes('1–10 kg in 0.625 kg steps') && ['10', '12.5', '15', '17.5', '20'].every(k => dbBlock.includes('data-hw="' + k + '"')));
   const bb = h.slice(h.indexOf('data-home-weights="barbell"')), bbBlock = bb.slice(0, bb.indexOf('data-hw-add'));
+  check('barbell: a 10 kg or 20 kg bar to pick, nothing picked yet', bbBlock.includes('data-hw-bar="10"') && bbBlock.includes('data-hw-bar="20"') && !bbBlock.includes(' checked'));
   check('barbell: plates 1.25, 2.5, 5, 10, 15, 20, 25 and nothing else', (bbBlock.match(/data-hw="/g) || []).length === 7 && ['1.25', '2.5', '5', '10', '15', '20', '25'].every(k => bbBlock.includes('data-hw="' + k + '"')));
   check('every block has a free field and an Add button', ['kettlebell', 'dumbbells', 'barbell'].every(i => h.includes('id="hw-add-' + i + '"') && h.includes('data-hw-add="' + i + '"')));
   check('readable: 15px or larger and never greyed', !/font-size:1[0-4]px/.test(h) && !/var\(--muted\)/.test(h));
@@ -8137,6 +8138,63 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   G.document.getElementById = _gid; G.pushSettingsToAgent = _push;
   if (saved.home === null) _ls.removeItem('wkt-home-equip'); else _ls.setItem('wkt-home-equip', saved.home);
   if (saved.w === null) _ls.removeItem('wkt-home-weights'); else _ls.setItem('wkt-home-weights', saved.w);
+}
+
+// ── Home programs suggest only weights the user has ──────────────────────────
+// Henrik, 2026-11-14: "1 yes, kind of the whole point is to make Home training better".
+{
+  console.log('\n── Home loads snap to owned weights ───────');
+  const _ls = G.localStorage, savedW = _ls.getItem('wkt-home-weights');
+  const home = { equipment: G._homeEquipId(['kettlebell', 'dumbbells', 'barbell', 'bench']) }, gym = { equipment: 'gym' };
+  G.setData('wkt-home-weights', { kettlebell: { w: [8, 12, 16, 24], sets: [] }, dumbbells: { w: [12.5, 15], sets: ['adj-1-10'] }, barbell: { w: [5, 10], sets: [] } });
+  const S = (n, kg, p) => G._homeSnapKg(n, kg, p || home);
+  check('kettlebell: the nearest size owned', S('Kettlebell Goblet Squat', 18) === 16 && S('Kettlebell Goblet Squat', 21) === 24 && S('Kettlebell Row', 40) === 24 && S('Kettlebell Row', 3) === 8);
+  check('…a tie goes to the lighter bell', S('Kettlebell Row', 14) === 12);
+  check('dumbbells: the adjustable set gives 1 kg then 0.625 kg steps to 10', S('Lateral Raise', 6) === 6 && S('Lateral Raise', 6.3) === 6 && S('Lateral Raise', 6.4) === 6.625 && S('Lateral Raise', 1.2) === 1);
+  check('…and the fixed ones above it', S('Incline DB Press', 13) === 12.5 && S('Incline DB Press', 14) === 15 && S('Incline DB Press', 30) === 15 && S('Hammer Curl', 11) === 10);
+  check('barbell: a 20 kg bar plus pairs of the ticked plates (here 5 and 10 → 10 kg steps)', S('Squat', 44) === 40 && S('Squat', 46) === 50 && S('Bench Press', 15) === 20 && S('Romanian Deadlift', 101) === 100);
+  G.homeBarPick('bar-10');
+  check('barbell: with the 10 kg bar picked, loads start from 10 kg', S('Squat', 33) === 30 && S('Bench Press', 4) === 10 && G._homeBarKg() === 10);
+  G.homeBarPick('bar-20');
+  check('…picking the 20 kg bar replaces the 10 kg one', G._homeBarKg() === 20 && !G._homeWeightsOf('barbell').sets.includes('bar-10') && S('Squat', 33) === 30 && S('Squat', 36) === 40);
+  G.homeBarPick('bar-20');
+  check('…and tapping it again unpicks it', G._homeBarKg() === null);
+  G.setData('wkt-home-weights', Object.assign(G._homeWeights(), { barbell: { w: [], sets: ['bar-10'] } }));
+  check('a bar and no plates: the bar alone', S('Squat', 44) === 10);
+  G.setData('wkt-home-weights', Object.assign(G._homeWeights(), { barbell: { w: [5, 10], sets: [] } }));
+  check('…a non-barbell exercise needing the barbell item is left alone', S('Lunges', 33, { equipment: G._homeEquipId(['barbell']) }) === 33);
+  check('a gym program is never touched', S('Kettlebell Goblet Squat', 18, gym) === 18 && S('Squat', 44, gym) === 44);
+  check('bodyweight work and exercises with no item are never touched', S('Push-ups', 18) === 18 && S('Band Curl', 18) === 18);
+  G.setData('wkt-home-weights', {});
+  check('nothing ticked for the item: the load stays as it was', S('Kettlebell Goblet Squat', 18) === 18 && S('Squat', 44) === 44);
+  G.setData('wkt-home-weights', { kettlebell: { w: [16, 20], sets: [] } });
+  // Today's day view.
+  {
+    const _gd = G.getActiveProgramDay, _gp = G.getActiveProgram, _doc = G.document, _l = G.logs;
+    let html = null;
+    G.logs = [{ date: '2026-11-10', day: 1, exercises: [{ name: 'Kettlebell Goblet Squat', sets: [{ kg: 18, reps: 10 }] }] }];
+    G.getActiveProgramDay = () => ({ name: 'Day 1', exercises: [{ name: 'Kettlebell Goblet Squat', sets: '10-10-10', scheme: '3×10', tag: 'volume', kg: 0 }] });
+    G.getActiveProgram = () => ({ goal: 'hypertrophy', equipment: home.equipment, days: [] });
+    G.document = { getElementById: (id) => id === 'workout-display' ? { set innerHTML(v) { html = v; } } : null };
+    try { G.renderWorkout(1); } catch (e) { html = 'THREW ' + e; }
+    check('Today shows the owned bell nearest the last weight (18 → 16 kg)', !!html && />16kg</.test(html) && !/>18kg</.test(html), String(html).slice(0, 300));
+    G.getActiveProgram = () => ({ goal: 'hypertrophy', equipment: 'gym', days: [] });
+    try { G.renderWorkout(1); } catch (e) { html = 'THREW ' + e; }
+    check('…and a gym program still shows what was logged', !!html && />18kg</.test(html));
+    G.getActiveProgramDay = _gd; G.getActiveProgram = _gp; G.document = _doc; G.logs = _l;
+  }
+  // A swapped-in card's prefill.
+  {
+    const _gp = G.getActiveProgram, _l = G.logs;
+    G.logs = [{ date: '2026-11-10', exercises: [{ name: 'Kettlebell Row', sets: [{ kg: 19, reps: 10 }] }] }];
+    G.getActiveProgram = () => ({ equipment: home.equipment, days: [] });
+    const inputs = [{ value: '', dataset: { type: 'kg' } }], card = { dataset: {}, querySelectorAll: sel => (sel.includes('kg') ? inputs : []) };
+    G._prefillKgFromHistory(card, 'Kettlebell Row');
+    check('a swapped-in card is prefilled with the owned bell nearest the last weight (19 → 20 kg)', inputs[0].value === '20', inputs[0].value);
+    G.getActiveProgram = _gp; G.logs = _l;
+  }
+  check('the Log prefill snaps the same way', String(G.prefillLog).includes('lastKg=_homeSnapKg(ex.name,lastKg,getActiveProgram())'));
+  if (savedW === null) _ls.removeItem('wkt-home-weights'); else _ls.setItem('wkt-home-weights', savedW);
 }
 
 // ── Section 101: Edit opens the session that was logged ─────────────────────
