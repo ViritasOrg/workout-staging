@@ -961,3 +961,16 @@ the name starts with the text, a word in it does ("row" → Barbell Row), every 
 order, the text is anywhere in the name, and only when none of those matched, a near miss (one typo per word, or
 the letters in order) (`_exPickScore`). The selects stay in the page, since everything reads their value; a transparent button
 over each opens the search (`_exPickWrap`, `_pickExFor`), and the list is that select's own options.
+
+### Profile (Henrik, 2026-11-14)
+> "change the top right corner weight button to a Profile button, and take user to a page showing all profile information incl us navy measurments etc, here show progress over time for weight, bmi, body fat etc same as in peptide tracker" · "also move progress and history in to this new profile section as sub tabs" · "also macros progress or adherence over time should live in the profile as well, but keep Macro reporting as a top level tab as today"
+
+- **The header:** its button is **Profile** (`hdr-profile`, `switchPrimary('profile')`). It no longer shows the weight.
+- **Navigation:** `PRIMARY_GROUPS.profile` = Profile · Progress · History. The bottom bar is Today · Plan · Log · Macros · More. Macros is unchanged.
+- **The Profile page (`buildProfilePage`), top to bottom:**
+  - **Your profile** (`_pfInfoHtml`): sex, age, height, latest weight, BMI, latest body fat and lean mass. **Log weight** opens the same weight modal the header did; **Edit profile** opens the onboarding wizard.
+  - **US Navy measurement** (`_pfNavyHtml`, `pfLogNavy`): neck and waist, plus hips for women, with the profile height through `navyBF`, the one Hodgdon-Beckett implementation the wizard also uses.
+    - It logs today's body fat to `bf_log` and `POST /bodycomp` with `neck`, `belly` and `method:'navy'`. That data is shared with Peptide Tracker, and the sync keeps those fields.
+    - A wrong entry logs nothing and links `help.html#navy-invalid`.
+  - **The body charts, moved from Progress → Overview:** weight and its history, body fat % and its history, BMI, lean body mass.
+  - **Macro adherence** (`_pfMacroHtml`, `_pfDrawMacroChart`): each logged day's kcal, protein, carbs and fat as % of that day's goals (`GET /food-log/stats` `series`), with the 100 % line and each macro's average.
