@@ -921,7 +921,9 @@ function applyOwnerName(name){
   _ownerName=String(name==null?'':name).trim();
   try{document.title=ownerTitle(_ownerName,'Training');}catch(e){}
   var l=document.querySelector('.login-logo');if(l)l.textContent=ownerTitle(_ownerName,APP_NOUN);
-  var h=document.querySelector('.header-title');if(h)h.textContent=ownerTitle(_ownerName,APP_NOUN);
+  // The main screen says TRAINING only; the name is on the Profile button (Henrik, 2026-11-14: "I want the main screen to
+  // say TRAINING (no name) - car symbol (if a polestar login exists) - Profile symbol with user name").
+  var h=document.querySelector('.header-title');if(h)h.textContent=APP_NOUN;
   // The Profile button and sub-tab carry the user's name (Henrik, 2026-11-14: "Change Profile to Name of user");
   // an account with no name in the whitelist keeps "Profile".
   var pl=profileLabel(_ownerName);['hdr-profile-lbl','tab-btn-profile'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=pl;});

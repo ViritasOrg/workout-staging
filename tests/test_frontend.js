@@ -8589,10 +8589,18 @@ console.log('\n── The app is titled with the person using it ─────
   check('signing out drops the cached title with the token',
     String(G.logout || '').includes("localStorage.removeItem('wk-owner-name')") &&
     String(G.logout || '').includes("applyOwnerName('')"));
-  check('applyOwnerName writes all three visible places',
+  check('applyOwnerName writes the document title and the login logo',
     (() => { const f = String(G.applyOwnerName || '');
-             return f.includes('document.title') && f.includes('.login-logo') &&
-                    f.includes('.header-title'); })());
+             return f.includes('document.title') && f.includes('.login-logo'); })());
+  // Henrik, 2026-11-14: "I want the main screen to say TRAINING (no name) - car symbol (if a polestar login exists) -
+  // Profile symbol with user name".
+  {
+    const t = { textContent: 'TRAINING', style: {} }, lbl = { textContent: '' }, _qs = G.document.querySelector, _gid = G.document.getElementById;
+    G.document.querySelector = (q) => q === '.header-title' ? t : null; G.document.getElementById = (id) => id === 'hdr-profile-lbl' ? lbl : _gid.call(G.document, id);
+    G.applyOwnerName('Henrik');
+    check('the main screen says TRAINING with no name; the name is on the Profile button', t.textContent === 'TRAINING' && lbl.textContent === 'Henrik');
+    G.document.querySelector = _qs; G.document.getElementById = _gid;
+  }
 }
 
 // ── Section 104: choosing the implement is the user's call ──────────────────
