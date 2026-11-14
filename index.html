@@ -1894,6 +1894,29 @@ function saveHomeEquip(){var idx=_heq.idx,p=_programs[idx];if(!p)return;_saveHom
     var np=_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items),g.muscles,{noPullUps:!!g.noPullUps});np.touchedAt=_nowStamp();
     _programs[idx]=np;savePrograms();buildProgramSettingsCard();if(idx===_activeProgramIndex&&typeof renderWorkout==='function')renderWorkout(_selectedProgramDay);}
   closeModal('homeEquipModal');_renderProgOverlay();}
+// ── Regenerate program (Henrik, 2026-11-14: "can we have a regenerate program button, instead of having to delete and
+// then recreate program to get the Home gym weights or other updates to the generation of programs?"). Builds the
+// program again in the same slot, with the same name, from the answers it was generated with (gen) and the user's
+// equipment as it is now: a Home program uses the Home list, every other program the Gym list. A program generated before
+// gen was recorded is regenerated from what it still carries: its goal, its day count, the focus in its generated name
+// ("6-Day Hypertrophy — Upper") or its picked muscles, its sets per muscle and injuries. A program none of that fits
+// (built by hand, renamed) shows no button. Hand edits are replaced, so it asks first.
+function _progRegenSpec(p){if(!p||!(p.days||[]).length)return null;var home=_isHomeEquip(p.equipment);
+  var equip=home?_homeEquipId(getData('wkt-home-equip',[])||[]):_gymEquipId(_gymItems());
+  if(p.gen&&p.gen.goal)return{goal:p.gen.goal,sub:p.gen.sub||null,nDays:p.gen.nDays||p.days.length,setsPerMuscle:p.gen.setsPerMuscle||12,injuries:(p.gen.injuries||[]).slice(),muscles:p.gen.muscles||undefined,noPullUps:!!p.gen.noPullUps,equip:equip};
+  if(!p.goal)return null;var tail=String(p.name||'').split(' — ').pop(),sub=null;
+  Object.keys(PROG_SUB_LABELS).forEach(function(k){if(PROG_SUB_LABELS[k]===tail&&String(p.name).indexOf(' — ')>0)sub=k;});
+  var muscles=(p.muscles||[]).length?p.muscles.slice():undefined;if(!sub&&!muscles)return null;
+  return{goal:p.goal,sub:sub,nDays:p.days.length,setsPerMuscle:p.setsPerMuscle||12,injuries:(p.injuries||[]).slice(),muscles:muscles,noPullUps:!!p.noPullUps,equip:equip};}
+function _progRegenBtnHtml(prog,progIdx){if(!_progRegenSpec(prog))return'';
+  return '<div data-prog-regen="1" style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:18px;">'
+    +'<div style="font-size:15px;color:var(--text);line-height:1.5;margin-bottom:10px;">Build this program again with the latest program generator and your current '+(_isHomeEquip(prog.equipment)?'Home':'Gym')+' equipment. Changes you made by hand are replaced.</div>'
+    +'<button class="btn btn-primary" onclick="regenerateProgram('+progIdx+')" style="width:100%;">Regenerate program</button></div>';}
+function regenerateProgram(idx){var p=_programs[idx],g=_progRegenSpec(p);if(!g)return;
+  if(!confirm('Regenerate "'+p.name+'"?\n\nIts exercises are built again with the latest program generator and your current equipment. Changes you made to this program by hand are replaced.'))return;
+  var np=_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,g.equip,g.muscles,{noPullUps:g.noPullUps});
+  np.touchedAt=_nowStamp();_programs[idx]=np;savePrograms();buildProgramSettingsCard();
+  if(idx===_activeProgramIndex&&typeof renderWorkout==='function')renderWorkout(_selectedProgramDay);_renderProgOverlay();}
 function _progViewHtml(prog,isActive,progIdx){
   var html='';
   if(isActive)html+='<div style="margin-bottom:14px;"><span style="background:var(--accent);color:#000;padding:3px 12px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;">ACTIVE</span></div>';
@@ -1909,6 +1932,7 @@ function _progViewHtml(prog,isActive,progIdx){
       '</div>';
   }
   if(_isHomeEquip(prog.equipment))html+=_progEquipBlockHtml(prog,progIdx);
+  html+=_progRegenBtnHtml(prog,progIdx);
   prog.days.forEach(function(day,i){
     html+='<div style="margin-bottom:16px;">';
     html+='<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;">Day '+(i+1)+(day.warmup?' \ud83d\udd25':'')+'</div>';
@@ -2267,10 +2291,11 @@ function rebuildEquipPrograms(kind){var stale=_equipStale(kind);if(!stale.length
 function _exCatalogueFor(prog){var cat=_exCatalogue(),home=_homeItemsOf(prog&&prog.equipment);
   if(home!==null)return cat.filter(function(n){return _canDoAtHome(n,home);});var g=_gymItems();return cat.filter(function(n){return _canDoAtGym(n,g);});}
 function _progWizToggleInjury(id){var a=_progWiz.injuries||(_progWiz.injuries=[]);var i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);_renderProgOverlay();}
+var PROG_SUB_LABELS={pure:'Pure',hybrid:'Hybrid',balanced:'Balanced',upper:'Upper',lower:'Lower',fullbody:'Full Body',upperlower:'Upper/Lower',bootylicious:'Bootylicious',shoulder:'Shoulder',back:'Back',knee:'Knee'};
 function _progWizDefaultName(){
   if(!_progWiz)return'New Program';
   var n={strength:'Strength',hypertrophy:'Hypertrophy',aesthetic:'Feminine Aesthetic',rehab:'Rehab'}[_progWiz.goal]||'';
-  var s={pure:'Pure',hybrid:'Hybrid',balanced:'Balanced',upper:'Upper',lower:'Lower',fullbody:'Full Body',upperlower:'Upper/Lower',bootylicious:'Bootylicious',shoulder:'Shoulder',back:'Back',knee:'Knee'}[_progWiz.sub]||'';
+  var s=PROG_SUB_LABELS[_progWiz.sub]||'';
   if(n&&s&&_progWiz.nDays)return _progWiz.nDays+'-Day '+n+' — '+s;
   if(n&&_progWiz.nDays)return _progWiz.nDays+'-Day '+n;
   if(n&&s)return n+' — '+s;
@@ -4732,6 +4757,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.391',title:'Regenerate program',text:'Open a program from Plan and tap Regenerate program: it is built again with the latest program generator and your current Gym or Home equipment, keeping its name. Changes you made to it by hand are replaced.'},
   {v:'1.388',title:'Home programs use your weights',text:'On a Home program, the weight suggested on Today and in Log Workout is the nearest one you have, from the weights picked in Plan → Home equipment.'},
   {v:'1.387',title:'Home weights',text:'Plan → Home equipment: tick Kettlebell, Dumbbells or Barbell + rack and pick the weights you have, or type any other weight and tap Add.'},
   {v:'1.376',title:'Ask AI is a chat',text:'On Plan, Ask AI now opens a chat over the app: type a message, the AI answers in the chat, and Apply sits under the change it proposes. New chat starts over.'},
