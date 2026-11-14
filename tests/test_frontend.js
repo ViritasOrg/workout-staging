@@ -8229,9 +8229,10 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('the program view has a Regenerate program button', vh.includes('data-prog-regen="1"') && vh.includes('onclick="regenerateProgram(0)"') && vh.includes('Regenerate program'));
   const rb = vh.slice(vh.indexOf('data-prog-regen'), vh.indexOf('Regenerate program</button>'));
   check('…its text is readable: 15px or larger and never greyed', !/font-size:1[0-4]px/.test(rb) && !/var\(--muted\)/.test(rb));
-  G.confirm = () => false; G.regenerateProgram(0);
-  check('cancelling the confirm changes nothing', G._programs[0] === home && saves === 0);
-  G.confirm = () => true; G.regenerateProgram(0);
+  let asked = 0; G.confirm = () => { asked++; return false; }; G.regenerateProgram(0);
+  check('no dialog before it: Regenerate program goes straight to the result', asked === 0 && open.has('progRegenModal'));
+  G.regenDiscard();
+  G.regenerateProgram(0);
   // Henrik, 2026-11-14: "I want an overlay saying regeneration completed, show updates and then give user a Save or discard choice".
   check('regenerating shows the "Regeneration completed" overlay and replaces nothing yet', open.has('progRegenModal') && G._programs[0] === home && saves === 0 && html.includes('REGENERATION COMPLETED'));
   check('…it shows the updates: the hand-edited exercise goes, what the Home list allows comes in', rbody.innerHTML.includes('data-regen-del="1">− Hand edit') && rbody.innerHTML.includes('data-regen-add'));

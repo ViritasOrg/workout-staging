@@ -1919,12 +1919,12 @@ function _progRegenBtnHtml(prog,progIdx){if(!_progRegenSpec(prog))return'';
     +'<div style="font-size:15px;color:var(--text);line-height:1.5;margin-bottom:10px;">Build this program again with the latest program generator and your current '+(_isHomeEquip(prog.equipment)?'Home':'Gym')+' equipment. Changes you made by hand are replaced.</div>'
     +'<button class="btn btn-primary" onclick="regenerateProgram('+progIdx+')" style="width:100%;">Regenerate program</button></div>';}
 function regenerateProgram(idx){var p=_programs[idx],g=_progRegenSpec(p);if(!g)return;
-  if(!confirm('Regenerate "'+p.name+'"?\n\nIts exercises are built again with the latest program generator and your current equipment. Changes you made to this program by hand are replaced.'))return;
   var np=_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,g.equip,g.muscles,{noPullUps:g.noPullUps});
   _regen={idx:idx,old:p,np:np};var b=document.getElementById('progRegenBody');if(b)b.innerHTML=_progRegenResultHtml(p,np);openModal('progRegenModal');}
 // The result is shown before anything is replaced (Henrik, 2026-11-14: "I want an overlay saying regeneration completed,
 // show updates and then give user a Save or discard choice"): each day's exercises added, removed and with a new
-// prescription; Save puts the new program in the same slot, Discard leaves the program as it was.
+// prescription; Save puts the new program in the same slot, Discard leaves the program as it was. No dialog before it
+// (Henrik, 2026-11-14, of the confirm that came first: "I did not get a confirm question at all?"): Discard is the way out.
 var _regen=null;
 function _progRegenDiff(op,np){var out=[],n=Math.max((op.days||[]).length,(np.days||[]).length);
   for(var i=0;i<n;i++){var od=(op.days||[])[i],nd=(np.days||[])[i],oe=od?od.exercises||[]:[],ne=nd?nd.exercises||[]:[];
