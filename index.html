@@ -2169,7 +2169,10 @@ var EQUIP_TABS={gym:{title:'Your gym',hint:'Tick what your gym has. Programs onl
 var HOME_WEIGHTS={
   kettlebell:{title:'Kettlebell sizes you have',opts:[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]},
   dumbbells:{title:'Dumbbells you have',sets:[{id:'adj-1-10',label:'Adjustable set, 1–10 kg in 0.625 kg steps'}],opts:[10,12.5,15,17.5,20,22.5,25,27.5,30,32.5,35,37.5,40,42.5,45,47.5,50]},
-  barbell:{title:'Barbell plates you have',opts:[1.25,2.5,5,10,15,20,25]}};
+  barbell:{title:'Your barbell and plates',bars:[{id:'bar-10',kg:10,label:'Bar 10 kg'},{id:'bar-20',kg:20,label:'Bar 20 kg'}],opts:[1.25,2.5,5,10,15,20,25]}};
+// The bar itself (Henrik, 2026-11-14: "an unticked barebell will still need a 10kg or 20kg choice"): one of the two, kept in sets.
+function homeBarPick(id){var e=_homeWeightsOf('barbell'),on=e.sets.indexOf(id)>=0;e.sets=e.sets.filter(function(x){return!/^bar-/.test(x);});if(!on)e.sets.push(id);_setHomeWeights('barbell',e);buildEquipTab('home');}
+function _homeBarKg(){var e=_homeWeightsOf('barbell');var b=(HOME_WEIGHTS.barbell.bars||[]).filter(function(x){return e.sets.indexOf(x.id)>=0;})[0];return b?b.kg:null;}
 var HOME_WEIGHT_HELP='help.html#home-weight-invalid',_hwWarn=null;
 function _homeWeights(){var d=getData('wkt-home-weights',{});return(d&&typeof d==='object'&&!Array.isArray(d))?d:{};}
 function _homeWeightsOf(item){var e=_homeWeights()[item]||{};return{w:(Array.isArray(e.w)?e.w:[]).filter(function(x){return typeof x==='number'&&x>0;}),sets:Array.isArray(e.sets)?e.sets:[]};}
@@ -2186,6 +2189,7 @@ function _homeWeightsHtml(item){var d=HOME_WEIGHTS[item];if(!d)return'';var e=_h
   var chip=function(on,attr,click,label){return'<label '+attr+' style="display:flex;align-items:center;gap:8px;min-width:0;padding:10px 8px;border-radius:10px;cursor:pointer;font-size:15px;color:var(--text);background:var(--surface2);border:1px solid '+(on?'var(--accent)':'var(--border)')+';">'
     +'<input type="checkbox"'+(on?' checked':'')+' onchange="'+click+'" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--accent);"><span style="min-width:0;overflow-wrap:anywhere;font-weight:'+(on?'700':'500')+';">'+label+'</span></label>';};
   var h='<div data-home-weights="'+item+'" style="margin-top:16px;"><div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">'+d.title+'</div>';
+  if(d.bars)h+='<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:8px;">'+d.bars.map(function(b){return chip(e.sets.indexOf(b.id)>=0,'data-hw-bar="'+b.kg+'"',"homeBarPick('"+b.id+"')",_escP(b.label));}).join('')+'</div>';
   (d.sets||[]).forEach(function(s){h+='<div style="margin-bottom:8px;">'+chip(e.sets.indexOf(s.id)>=0,'data-hw-set="'+s.id+'"',"homeWeightSetToggle('"+item+"','"+s.id+"')",_escP(s.label))+'</div>';});
   var all=d.opts.concat(e.w.filter(function(x){return d.opts.indexOf(x)<0;})).sort(function(a,b){return a-b;});
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;">';
@@ -2198,8 +2202,8 @@ function _homeWeightsHtml(item){var d=HOME_WEIGHTS[item];if(!d)return'';var e=_h
 // Suggested loads on a Home program use only weights the user has (Henrik, 2026-11-14: "1 yes, kind of the whole point
 // is to make Home training better"). The kg the app proposes (Today, the Log prefill, a swapped-in card) snaps to the
 // nearest weight the exercise's item can make; a tie goes to the lighter one. Kettlebell: the sizes ticked. Dumbbells:
-// the fixed ones plus, with the adjustable set, 1 kg then every 0.625 kg up to 10. Barbell: a 20 kg bar (the app's
-// barbell rounding assumes the same bar) plus any number of pairs of the ticked plates. Nothing ticked for that item,
+// the fixed ones plus, with the adjustable set, 1 kg then every 0.625 kg up to 10. Barbell: the bar picked (10 or 20 kg;
+// none picked = 20 kg, the bar the app's barbell rounding assumes) plus any number of pairs of the ticked plates. Nothing ticked for that item,
 // or a gym program: the load is left as it was.
 function _homeLoadItem(name,items){if(!name||isBWExName(name))return null;var n=_exNeeds(name);if(n==='machine')return null;
   for(var i=0;i<n.length;i++){var set=n[i];if(!set.every(function(x){return items.indexOf(x)>=0;}))continue;
@@ -2208,8 +2212,8 @@ function _homeLoadItem(name,items){if(!name||isBWExName(name))return null;var n=
 function _homeAvailKg(item,maxKg){var e=_homeWeightsOf(item),out=[];
   if(item==='kettlebell')out=e.w.slice();
   else if(item==='dumbbells'){out=e.w.slice();if(e.sets.indexOf('adj-1-10')>=0){for(var k=0;1+k*0.625<=10;k++)out.push(Math.round((1+k*0.625)*1000)/1000);out.push(10);}}
-  else if(item==='barbell'){var bar=20,pl=e.w.map(function(x){return Math.round(x*40);}).filter(function(x){return x>0;});
-    if(pl.length){out=[bar];var top=Math.ceil(Math.max(0,(maxKg||0)-bar)/2*40)+Math.max.apply(null,pl),ok=new Uint8Array(top+1);ok[0]=1;
+  else if(item==='barbell'){var bar=_homeBarKg(),pl=e.w.map(function(x){return Math.round(x*40);}).filter(function(x){return x>0;});
+    if(bar!==null)out=[bar];if(pl.length){if(bar===null){bar=20;out=[bar];}var top=Math.ceil(Math.max(0,(maxKg||0)-bar)/2*40)+Math.max.apply(null,pl),ok=new Uint8Array(top+1);ok[0]=1;
       for(var v=1;v<=top;v++)for(var j=0;j<pl.length;j++)if(pl[j]<=v&&ok[v-pl[j]]){ok[v]=1;break;}
       for(var v2=1;v2<=top;v2++)if(ok[v2])out.push(bar+2*v2/40);}}
   return out;}
