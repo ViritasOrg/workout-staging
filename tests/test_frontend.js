@@ -8294,6 +8294,8 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
     ['weightChart', 'weight-history-list', 'bfChart', 'bf-input', 'bmiChart', 'lbmChart'].every(id => page.includes('id="' + id + '"')) &&
     (src.match(/id="weightChart"/g) || []).length === 1);
   check('…with the macro adherence chart below', page.includes('id="pf-macros"'));
+  // Henrik, 2026-11-14: the body-fat box beside LOG BF% was squeezed flat, because .btn-primary makes a button full width.
+  check('the body-fat input keeps its room: LOG BF% takes only its own width', /onclick="saveBf\(\)" style="[^"]*width:auto;flex-shrink:0/.test(page) && /id="bf-input"[^>]*min-width:0/.test(page));
   const _ls = G.localStorage, saved = { p: _ls.getItem('wkt-profile'), bf: _ls.getItem('bf_log') }, _w = G.weights, _b = G.bfLog;
   G.setData('wkt-profile', { onboarded: true, gender: 'male', age: 40, height: 180, weight: 90 });
   G.weights = [{ date: '2026-11-01', weight: 88 }, { date: '2026-11-10', weight: 86 }];
