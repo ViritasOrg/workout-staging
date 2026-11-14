@@ -9450,6 +9450,43 @@ console.log('\n── Progress chart axis ────────────�
   check('volume, strength and exercise charts all use it', (rawScript.match(/[^ ]_chartXDomain\(days,[^l]/g) || []).length === 3);
 }
 
+// ── Food Edit: Update an entry (Henrik, 2026-11-14) ──────────────────────────
+// "Add a update for a entry so one doesn't have to delete and enter again, ie store the actual input moving forward".
+console.log('\n── Food Edit: Update an entry ─────────────────────────────');
+(async () => {
+  const _src = fs.readFileSync(htmlPath, 'utf8');
+  const blk = _src.slice(_src.indexOf('// Update an entry (Henrik, 2026-11-14'), _src.indexOf('async function buildFoodEdit('));
+  const sent = []; let reply = { ok: true, status: 200, j: { ok: true, rows: [] } }; let rebuilt = 0;
+  const U = vm.createContext({
+    AGENT_URL: 'https://agent', JSON, String, Number, authHeaders: (x) => Object.assign({}, x || {}),
+    _flEsc: (x) => String(x == null ? '' : x).replace(/</g, '&lt;'), _flBtn: (l, a) => '<button onclick="' + a + '">' + l + '</button>',
+    _flDetail: (r, j) => (j && j.detail) || ('The server answered ' + r.status + '.'),
+    _flEditHtml: () => '', _flEditDate: '2026-11-14', _flDay: () => '2026-11-14', _flLoadRows: async () => [], _flRows: [],
+    buildFoodEdit: async () => { rebuilt++; }, document: { getElementById: () => null },
+    fetch: async (url, opt) => { sent.push({ url, body: JSON.parse(opt.body) }); return { ok: reply.ok, status: reply.status, json: async () => reply.j }; },
+  });
+  vm.runInContext(blk, U);
+  const row = { id: 'a1', date: '2026-11-14', time: '10:25', food: 'coffee with milk and sugar', amount: '330 ml', input: '2 coffees (double espresso, 2dl milk)', batch: 'b1' };
+  const rows = [row, { id: 'a2', batch: 'b1', food: 'sugar' }];
+  const html = U._flUpdHtml(row, rows);
+  check('Update shows the text the entry was made from', html.includes('2 coffees (double espresso, 2dl milk)'));
+  check('…and says it replaces every entry from that text', html.includes('replaces the 2 entries from this text'));
+  check('an entry from before the text was kept starts from its name and amount',
+    U._flUpdText({ food: 'Steak', amount: '200 g' }) === 'Steak 200 g');
+  U._flEditRows = rows;
+  await U.flUpdRun('a1');
+  check('Estimate again sends the text, the entry\'s day and time, and which entry it replaces',
+    sent.length === 1 && /\/food-log\/estimate$/.test(sent[0].url) && sent[0].body.replace === 'a1' &&
+    sent[0].body.date === '2026-11-14' && sent[0].body.time === '10:25' && sent[0].body.text === '2 coffees (double espresso, 2dl milk)');
+  check('…and the day is drawn again from the server once it is in', rebuilt === 1 && U._flUpd === null);
+  reply = { ok: false, status: 503, j: { detail: 'Google is busy.' } };
+  U._flUpd = 'a1';
+  await U.flUpdRun('a1');
+  check('a failed update says why and keeps the box open', U._flUpdErr === 'Google is busy.' && U._flUpd === 'a1');
+  check('every Food Edit entry has an Update button', /_flBtn\('Update',"flUpdOpen\('/.test(_src));
+  if (failed > 0) process.exitCode = 1;
+})();
+
 const _summary = () => {
   if (_summarised) return; _summarised = true;
   console.log(`  ${passed} passed  ${failed} failed  ${passed + failed} total`);
