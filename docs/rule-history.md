@@ -8,3 +8,6 @@ Workout prod PR #334 (https://github.com/ViritasOrg/workout/pull/334) failed bec
 
 ## 2026-11-11: obvious behaviour is not a question
 Asked whether a Gym equipment list should change the programs and whether a Home list change rebuilds Home programs, Henrik: "1 obviously yes (how else would this work)? 2. Obviously yes 3. Yes we start like that".
+
+## 2026-11-15: no Peptide Tracker lines on the Workout charts
+Henrik: "also remove the dotted lines with protocol info from peptide tracker totally out of the Training app". The Volume, Strength, Exercise and Weight charts drew a dashed line per stack milestone (and, on Weight, a line per TRT injection) fetched from `/stack-milestones` and `/peptide-log`. The fetcher and every drawing of them were removed. In the same session: the Exercise tab's "No logged sets for this exercise yet." box showed permanently, because the stylesheet had no rule hiding `#exp-empty.hidden` (nor `#exp-charts.hidden`).

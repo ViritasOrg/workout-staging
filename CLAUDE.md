@@ -136,6 +136,7 @@ Single-file PWA: `index.html` (JS, CSS, HTML inline), `css/main.css`; `const VER
 - **The in-progress workout is never deleted until its log is on the backend** (2026-09-30, `docs/program-rules.md`). **More than one session a day** is allowed; never reintroduce a one-log-per-date cleanup.
 - **Never hardcode personal user data** (neutral fallbacks, no seeded records, no repair helpers); **deletes are global and say so** (`confirmGlobalDelete`); **no PIN or non-Google end-user login**, ever.
 - **Never edit stored programs unless Henrik explicitly asks** (2026-07-15): no migrations in `_ensurePrograms`; new exercises go into the seeds and the generator; the one sanctioned in-app edit is the user's own answer to the "Save this swap to your program?" prompt.
+- **No Peptide Tracker lines on the charts** (Henrik, 2026-11-15): no protocol, stack-milestone or injection marker is fetched for or drawn on any Workout chart; never bring them back.
 - **Training tags**: strength 2–6, volume 8–12, rehab 15 (the only tag above 12), derived from the reps, canonical `GET /training-rules`; the frontend and the endpoint must agree.
 - **Environment-aware code** uses `IS_STAGING`; **Push to Prod ships everything** (2026-11-04): the Push to Prod card is the only staging-only feature, every other `IS_STAGING` use is plumbing (`tests/test_frontend.js` lists them; a red there means remove the gate). **Prod has its own version number** (2026-11-04): name the staging build that was promoted, give prod's number only when read from prod.
 
