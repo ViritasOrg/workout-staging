@@ -10663,3 +10663,49 @@ Promise.resolve(globalThis.__aiCannot).then(() => {
   check('The header ‹ is Back, not Close', html.includes('<button class="wiz-back" onclick="progOverlayBack()"'));
   vm.runInContext("_progWiz=null;_progIsNew=false;_progEditIdx=-1;_progEditBuf=null;_renderProgOverlay=__bk.r;buildProgramSettingsCard=__bk.b;savePrograms=__bk.s;_programs=__bk.p;_activeProgramIndex=__bk.a;", sandbox);
 }
+
+// ── Progress charts carry no Peptide Tracker lines; the Exercise empty state hides ────────
+// Henrik, 2026-11-15: "remove the dotted lines with protocol info from peptide tracker totally
+// out of the Training app", and "the 'No logged sets for this exercise' warning taking 50% of
+// screen": nothing hid #exp-empty (the app had no rule for .hidden on it), so it always showed.
+(async () => {
+  console.log('\n── Progress charts: no protocol lines, empty state hides ──');
+  const bk = { fetch: sandbox.fetch, logs: vm.runInContext('logs', sandbox), weights: vm.runInContext('weights', sandbox) };
+  const urls = [];
+  sandbox.fetch = async (u) => { urls.push(String(u)); return { ok: true, status: 200, json: async () => [{ date: '2026-11-10', label: 'Protocol X', color: '#3b9eff' }] }; };
+  const dashes = [];
+  const ctxOf = id => { const el = sandbox.document.getElementById(id); const c = el.getContext(); c.setLineDash = d => { dashes.push(id + ':' + JSON.stringify(d)); }; el.getContext = () => c; };
+  ['vol-chart-legs', 'str-chart-legs', 'exp-chart-vol', 'exp-chart-str', 'weightChart'].forEach(ctxOf);
+  const today = new Date().toISOString().split('T')[0];
+  sandbox.__pcLogs = [{ id: 1, date: today, volume: 600, exercises: [{ name: 'Squat', sets: [{ kg: 100, reps: 5 }, { kg: 100, reps: 5 }] }] }];
+  sandbox.__pcW = [{ date: today, weight: 90 }, { date: today, weight: 91 }];
+  vm.runInContext("logs=__pcLogs;weights=__pcW;_expExercise='Squat';", sandbox);
+  // All four are started, and the fetch stub put back, in one synchronous stretch: the other
+  // async blocks in this file swap fetch too and must never see this one.
+  let ps = [];
+  try {
+    ps = [vm.runInContext('drawVolumeChart()', sandbox),
+      vm.runInContext("_strViewMode='sessions';renderStrengthCharts()", sandbox),
+      vm.runInContext("_expViewMode='sessions';renderExerciseCharts()", sandbox),
+      vm.runInContext('drawChart()', sandbox)];
+  } catch (e) { check('progress charts render', false, String(e && e.stack || e).slice(0, 300)); }
+  const empty = sandbox.document.getElementById('exp-empty'), charts = sandbox.document.getElementById('exp-charts');
+  const withSets = empty.classList.contains('hidden') && !charts.classList.contains('hidden');
+  vm.runInContext('logs=[];renderExerciseCharts()', sandbox);
+  const without = !empty.classList.contains('hidden') && charts.classList.contains('hidden');
+  sandbox.fetch = bk.fetch; sandbox.__bkL = bk.logs; sandbox.__bkW = bk.weights;
+  vm.runInContext('logs=__bkL;weights=__bkW;', sandbox);
+  await Promise.all(ps);
+  check('no chart asks the backend for stack milestones or the peptide log',
+    !urls.some(u => /stack-milestones|peptide-log/.test(u)), urls.join(' '));
+  check('no chart draws a dashed protocol or injection line',
+    !dashes.some(d => /\[3,4\]|\[4,4\]/.test(d)), dashes.join(' '));
+  check('the marker fetcher is gone', vm.runInContext("typeof fetchAllMarkers==='undefined'", sandbox));
+  check('Exercise tab with logged sets: the "No logged sets" box is hidden, the charts are not', withSets);
+  check('…with nothing logged: the box shows and the charts are hidden', without);
+  // The class only works if the stylesheet hides it: #exp-charts sets display inline, so the rule
+  // needs !important to win.
+  check('the stylesheet really hides #exp-empty and #exp-charts when they are .hidden',
+    /#exp-empty\.hidden,#exp-charts\.hidden\{display:none !important;\}/.test(html));
+  if (failed > 0) process.exitCode = 1;
+})().catch(e => { check('progress charts: async checks ran', false, String(e && e.stack || e)); process.exitCode = 1; });
