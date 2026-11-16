@@ -956,7 +956,7 @@ with L then La then Lan", then "search for Legs or Arms should show exercises fo
 exercise in the log, adding one to the log and picking one in the program editor all open `exPickModal`
 (`_openExPicker`): a search box on top and the list below. Typing keeps only names that start with the text,
 sorted; three or more letters that start a muscle group's name (Leg, Arms, Back, Chest, Shoulders) also list that
-group (`_exPickFilter`). Since the same day ("search has to be less retarded than this", on "row" finding nothing) the ranking is:
+group (`_exPickFilter`). Such a search also lists exercises that train that group but sit under another heading, e.g. Shoulders lists Rear Delt Fly, Face Pulls and Rear Delt Pullback from Back (`getExGroup`; Henrik, 2026-11-16: "if I search for shoulders I dont get it in the results"). Since the same day ("search has to be less retarded than this", on "row" finding nothing) the ranking is:
 the name starts with the text, a word in it does ("row" → Barbell Row), every typed word starts a word in any
 order, the text is anywhere in the name, and only when none of those matched, a near miss (one typo per word, or
 the letters in order) (`_exPickScore`). The selects stay in the page, since everything reads their value; a transparent button

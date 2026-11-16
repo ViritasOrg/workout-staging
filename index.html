@@ -3563,7 +3563,12 @@ function _exPickFilter(groups,q){q=_exPickNorm(q);if(!q)return groups.filter(fun
   if(hits.some(function(h){return h.s<=4;}))hits=hits.filter(function(h){return h.s<=4;});   // near misses only when nothing matches
   hits.sort(function(a,b){return a.s-b.s||a.n.localeCompare(b.n);});
   var out=hits.length?[{label:'',names:hits.map(function(h){return h.n;})}]:[];
-  grp.forEach(function(g){var rest=g.names.filter(function(n){return !seen[n];});if(rest.length)out.push({label:g.label.replace(/^✦\s*/,'').replace(/\s+—.*$/,''),names:rest});});
+  // A muscle-group search also lists what trains that group but sits under another heading (Henrik, 2026-11-16: "if I
+  // search for shoulders I dont get it in the results", of Rear Delt Pullback, which the picker files under Back).
+  var all=[];groups.forEach(function(g){g.names.forEach(function(n){if(all.indexOf(n)<0)all.push(n);});});
+  grp.forEach(function(g){var base=_exPickNorm(String(g.label||'').replace(/^✦\s*/,'').replace(/\s+—.*$/,''));
+    var more=all.filter(function(n){return g.names.indexOf(n)<0&&typeof getExGroup==='function'&&getExGroup(n)===base;});
+    var rest=g.names.concat(more).filter(function(n){if(seen[n])return false;seen[n]=1;return true;});if(rest.length)out.push({label:g.label.replace(/^✦\s*/,'').replace(/\s+—.*$/,''),names:rest});});
   return out;}
 var _exPick=null;
 function _exPickListHtml(groups,cur){if(!groups.length)return '<div style="padding:12px;font-size:15px;color:var(--text)">No exercise matches that.</div>';

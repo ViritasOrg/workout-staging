@@ -9869,6 +9869,15 @@ console.log('\n── Exercise search ──────────────
   check('Leg lists the names starting with Leg first and the rest of Legs too',
     JSON.stringify(names(legs).slice(0, 2)) === JSON.stringify(['Leg Curl', 'Leg Press']) && ['Lunges', 'Squat'].every(n => names(legs).includes(n)));
   check('one or two letters never pull in a whole group', !G._exPickFilter(groups, 'ar').some(g => g.label === 'Arms'));
+  // Henrik, 2026-11-16: "if I search for shoulders I dont get it in the results" (Rear Delt Pullback, filed under Back).
+  {
+    const g2 = [{ label: 'Shoulders', names: ['Lateral Raise', 'Overhead Press'] }, { label: 'Back', names: ['Barbell Row', 'Rear Delt Pullback', 'Rear Delt Fly', 'Face Pulls'] }];
+    const sh = G._exPickFilter(g2, 'shoulders'), shn = names(sh);
+    check('Shoulders also lists the shoulder exercises filed under another heading (Rear Delt Pullback, Rear Delt Fly, Face Pulls)',
+      ['Lateral Raise', 'Overhead Press', 'Rear Delt Pullback', 'Rear Delt Fly', 'Face Pulls'].every(x => shn.includes(x)) && !shn.includes('Barbell Row'), shn.join(', '));
+    check('…each once', new Set(shn).size === shn.length);
+    check('Back still lists them where the picker files them', ['Barbell Row', 'Rear Delt Pullback'].every(x => names(G._exPickFilter(g2, 'back')).includes(x)));
+  }
   check('the program editor\'s "✦ Legs — same muscle" group still matches Legs',
     names(G._exPickFilter([{ label: '✦ Legs — same muscle', names: ['Squat'] }], 'legs')).includes('Squat'));
   check('nothing found says so', /No exercise matches that/.test(G._exPickListHtml([], '')));
