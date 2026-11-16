@@ -988,3 +988,17 @@ over each opens the search (`_exPickWrap`, `_pickExFor`), and the list is that s
     - A wrong entry logs nothing and links `help.html#navy-invalid`.
   - **The body charts, moved from Progress → Overview:** weight and its history, body fat % and its history, BMI, lean body mass.
   - **Macro adherence** (`_pfMacroHtml`, `_pfDrawMacroChart`): each logged day's kcal, protein, carbs and fat as % of that day's goals (`GET /food-log/stats` `series`), with the 100 % line and each macro's average.
+
+### Bodyweight level (Henrik, 2026-11-16)
+> "there was a Home gym quad exercise that is impossible to pull off for a non elite athlete. We need some kind of beginers/intermideate/elite or something levels for Home body weight exercises"
+
+His staging Home program had Sissy Squat and Nordic Curl on the legs days and Archer Push-ups on both push days.
+
+- **Where it is chosen:** "Your bodyweight level" (Beginner / Intermediate / Advanced, `HOME_LEVELS`, `_homeLevelHtml`) is on the Home equipment tab and on the wizard's home equipment step. It is saved per user as `wkt-home-level` on the device and on `/user-settings`, and synced back. With nothing chosen it is Intermediate (`_homeLevel`).
+- **How it changes a Home program:** after the home swaps, each hard bodyweight movement becomes the easier one of its family (`BW_LEVEL_SUBS`), and duplicates in a day are dropped.
+  - **Intermediate:** Sissy Squat → Bulgarian Split Squat, Nordic Curl → Single-leg RDL, Archer Push-ups → Wide Push-ups.
+  - **Beginner:** also Bulgarian Split Squat → Bodyweight Squat, Single-leg RDL → Bodyweight Good Morning, and the push-up variants (decline, diamond, pike, wide, archer) → Push-ups.
+  - **Advanced:** exactly what the generator always built. A program generated without a level counts as Advanced, so nothing changes by itself.
+- **Remembering and rebuilding:** a Home program remembers its level (`gen.bwLevel`). The Home equipment tab offers to rebuild Home programs built at another level. The tab's rebuild, the program's equipment editor, Regenerate program and the wizard all build at the chosen level.
+- **Gym programs** ignore the level.
+- Swapped-in exercises have sketches and need only what is ticked (tested across equipment sets × goals × days × injuries).
