@@ -1007,6 +1007,6 @@ His staging Home program had Sissy Squat and Nordic Curl on the legs days and Ar
 > An EZ-bar rear-delt exercise: "you pull behind your self with straight arms to target rear delts" · "Add it with a stickman sketch as well as muscle dude images"
 
 - **In the catalogue:** Rear Delt Pullback is in the exercise picker next to Rear Delt Cable Fly (Back group) and needs a barbell (`EX_EQUIP`; an EZ bar counts, as for EZ Bar Curl).
-- **Sketch:** a side view, `SK['Rear Delt Pullback']`. It starts hinged forward at 62° with the bar hanging under the shoulders, then sweeps the straight arms back past the hips.
+- **Sketch:** a side view, `SK['Rear Delt Pullback']`. The knees are bent and the torso hinged forward 62°, with the bar starting behind the knees, never in front of the legs (Henrik, 2026-11-16: "you cant pull the bar through your legs, starting position is bar behind knees, so you need to bend them a bit more"). The straight arms then sweep the bar back and up past the hips.
 - **Muscles and volume:** the name matches the existing rear-delt rules. The ? card and the muscle pictures mark rear delts and upper back, and it counts as shoulder volume (`{shoulders:1}`).
 - **Programs:** no generated program picks it. It is there to choose by hand.

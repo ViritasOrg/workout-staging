@@ -4090,10 +4090,12 @@ function _skPullApart(cable){
   return _skX(mk(-6),mk(86),['top'],cable?'Cables crossed at shoulder height, arms nearly straight. Pull the hands out and back until the arms are in line with the shoulders.':'Band at shoulder height, arms straight. Pull the band apart until it touches the chest, squeeze the shoulder blades.');}
 SK['Rear Delt Cable Fly']=function(){return _skPullApart(true);};
 // Rear Delt Pullback (Henrik, 2026-11-16: "you pull behind your self with straight arms to target rear delts", with an EZ
-// bar): hinged forward like a row, arms straight, the bar swept from under the shoulders back past the hips.
+// bar): knees bent, hinged forward, arms straight, the bar swept from behind the knees back past the hips.
+// The bar starts behind the knees, never in front of the legs (Henrik, 2026-11-16: "you cant pull the bar through your legs,
+// starting position is bar behind knees, so you need to bend them a bit more").
 SK['Rear Delt Pullback']=function(){
-  var mk=function(a){var J=_skStandQ({torso:62,neck:48,thigh:[162,6],shank:190,upper:[a,8],fore:[a,6]});return{J:J,eq:[{t:'bar',at:_skBarAt(J,0,0),r:9,half:16}]};};
-  return _skX(mk(180),mk(256),['side'],'EZ bar, hinge forward with a flat back, bar hanging under the shoulders. Keep the arms straight and sweep the bar back past the hips; squeeze the rear delts, lower slowly.');};
+  var mk=function(a){var J=_skStandQ({torso:62,neck:48,thigh:[140,6],shank:210,upper:[a,8],fore:[a,6]});return{J:J,eq:[{t:'bar',at:_skBarAt(J,0,0),r:9,half:16}]};};
+  return _skX(mk(210),mk(256),['side'],'EZ bar held behind the legs. Bend the knees and hinge forward with a flat back so the bar starts behind the knees. Keep the arms straight and sweep the bar back and up past the hips; squeeze the rear delts, lower slowly.');};
 SK['Band Rear Delt Fly']=function(){return _skPullApart(false);};
 SK['Shrug']=function(){var mk=function(s){var J=_skStandQ({shrug:s,upper:[180,6],fore:[180,4]});return{J:J,eq:[{t:'bar',at:_skBarAt(J,0,-1)}]};}
   return _skX(mk(0),mk(7),['front','side'],'Arms straight, bar at the thighs. Lift the shoulders straight up toward the ears, pause, lower slowly. No rolling.');};

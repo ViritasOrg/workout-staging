@@ -8523,7 +8523,10 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('it is in the exercise picker, next to the other rear-delt exercises', G._exCatalogue().indexOf(n) === G._exCatalogue().indexOf('Rear Delt Cable Fly') + 1);
   const sk = G.SK[n] && G.SK[n]();
   check('it has a stick-figure sketch: side view, a cue, start and end poses with the bar', !!sk && sk.views.join() === 'side' && /straight/.test(sk.cue) && sk.start.eq[0].t === 'bar' && sk.end.eq[0].t === 'bar');
-  check('…the arms sweep back: the hands end behind where they start', !!sk && sk.end.J.wR[0] < sk.start.J.wR[0] - 20, sk ? sk.start.J.wR[0] + ' → ' + sk.end.J.wR[0] : '');
+  check('…the arms sweep back and up: the hands end behind and above where they start', !!sk && sk.end.J.wR[0] < sk.start.J.wR[0] - 10 && sk.end.J.wR[1] > sk.start.J.wR[1] + 10, sk ? sk.start.J.wR.slice(0, 2) + ' → ' + sk.end.J.wR.slice(0, 2) : '');
+  // Henrik, 2026-11-16: "you cant pull the bar through your legs, starting position is bar behind knees, so you need to bend them a bit more".
+  check('…the bar starts behind the knees (never in front of the legs), with the knees bent', !!sk && sk.start.J.wR[0] < sk.start.J.kR[0] - 3 && Math.abs(sk.start.J.wR[1] - sk.start.J.kR[1]) < 10 && sk.start.J.kR[0] > sk.start.J.aR[0] + 8,
+    sk ? 'wrist ' + sk.start.J.wR.slice(0, 2).map(Math.round) + ' knee ' + sk.start.J.kR.slice(0, 2).map(Math.round) : '');
   check('the muscle pictures mark the rear delts and upper back', JSON.stringify(G.exMuscles(n)) === JSON.stringify(['reardelts', 'upperback']));
   const mh = G._exMusclesHtml(n, 'male');
   check('…and the ? card names them and draws them on the body', /Trains: [^<]*Rear/i.test(mh.line) && /data-ex-body="1"/.test(mh.body) && mh.body.length > 200);
