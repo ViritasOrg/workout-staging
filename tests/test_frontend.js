@@ -7704,7 +7704,7 @@ console.log('\n── Training at home ─────────────�
     /data-home-item="dumbbells" style="[^"]*background:var\(--accent\)/.test(w) && !/data-home-item="barbell" style="[^"]*background:var\(--accent\)/.test(w));
   check('wizard: Gym is the default', /cur=cur\|\|'gym'/.test(String(G._progWizEquipHtml)));
   check('wizard: both the preview and Generate pass the ticked equipment to the generator',
-    (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\),wiz\.muscles,\{noPullUps:wiz\.pullups==='no'\}\)/g) || []).length === 1 && /wiz\.injuries,_eq,wiz\.muscles,\{noPullUps:wiz\.pullups==='no'&&!_hasLoggedPullUps\(\)\}\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
+    (String(G._renderProgWiz).match(/wiz\.injuries,_progWizEquipId\(\),wiz\.muscles,\{noPullUps:wiz\.pullups==='no',bwLevel:_homeLevel\(\)\}\)/g) || []).length === 1 && /wiz\.injuries,_eq,wiz\.muscles,\{noPullUps:wiz\.pullups==='no'&&!_hasLoggedPullUps\(\),bwLevel:_homeLevel\(\)\}\)/.test(String(G._progWizGenerate)) && /var _eq=_progWizEquipId\(\)/.test(String(G._progWizGenerate)));
   check('wizard: step 2 shows the choice, and the saved equipment is preselected', /_progWizEquipHtml\(wiz\.equip\)/.test(String(G._renderProgWiz)) && /homeItems:\(getData\('wkt-home-equip',\[\]\)/.test(html));
 }
 
@@ -7977,7 +7977,7 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   const sv = String(G.saveHomeEquip);
   check('saving equipment stores it for the user AND on the backend', String(G._saveHomeItems).includes("setData('wkt-home-equip'") && String(G._saveHomeItems).includes("pushSettingsToAgent({'wkt-home-equip'") && sv.includes('_saveHomeItems(_heq.items)'));
   check('…and rebuilds the program from its own wizard choices, after a confirm that hand edits are replaced',
-    sv.includes('confirm(') && /hand are replaced/.test(sv) && sv.includes('_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items),g.muscles,{noPullUps:!!g.noPullUps})') && sv.includes('savePrograms()'));
+    sv.includes('confirm(') && /hand are replaced/.test(sv) && sv.includes('_generateWorkoutProgram(g.goal,g.sub,g.nDays,p.name,g.setsPerMuscle,g.injuries,_homeEquipId(_heq.items),g.muscles,{noPullUps:!!g.noPullUps,bwLevel:_homeLevel()})') && sv.includes('savePrograms()'));
   check('…keeping the program in the same slot (active program and its index unchanged)', sv.includes('_programs[idx]=np'));
   check('the equipment list comes back from the backend after a cache wipe', String(G.syncSettingsFromAgent).includes("setData('wkt-home-equip',s['wkt-home-equip'])"));
   check('the equipment editor opens above the program view', /id="homeEquipModal" style="z-index:500"/.test(html));
@@ -8436,6 +8436,58 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   G.fetch = _f; G.buildProfilePage = _bp; G.document.getElementById = _gid; G.weights = _w; G.bfLog = _b;
   if (saved.p === null) _ls.removeItem('wkt-profile'); else _ls.setItem('wkt-profile', saved.p);
   if (saved.bf === null) _ls.removeItem('bf_log'); else _ls.setItem('bf_log', saved.bf);
+}
+
+// ── Bodyweight level ─────────────────────────────────────────────────────────
+// Henrik, 2026-11-16: "there was a Home gym quad exercise that is impossible to pull off for a non elite athlete. We need
+// some kind of beginers/intermideate/elite or something levels for Home body weight exercises".
+{
+  console.log('\n── Bodyweight level ───────');
+  const _ls = G.localStorage, saved = { lv: _ls.getItem('wkt-home-level'), eq: _ls.getItem('wkt-home-equip') };
+  const names = (p) => p.days.flatMap(d => d.exercises.map(e => e.name));
+  const GO = [['strength', 'pure'], ['strength', 'hybrid'], ['hypertrophy', 'balanced'], ['hypertrophy', 'upper'], ['hypertrophy', 'lower'], ['aesthetic', 'fullbody'], ['aesthetic', 'bootylicious'], ['rehab', 'knee'], ['rehab', 'shoulder']];
+  const HARD = ['Sissy Squat', 'Nordic Curl', 'Archer Push-ups'];
+  const gen = (lvl, equip, g, sub, d, inj) => G._generateWorkoutProgram(g, sub, d, 'T', 12, inj || [], equip, undefined, lvl ? { bwLevel: lvl } : undefined);
+  const bw = G._homeEquipId([]);
+  const p0 = gen(null, bw, 'hypertrophy', 'lower', 4);
+  check('the elite quad exercise is in a bodyweight lower program today (the one Henrik could not do)', names(p0).includes('Sissy Squat'));
+  check('Advanced, or no level, builds exactly what the generator always built', JSON.stringify(gen('advanced', bw, 'hypertrophy', 'lower', 4).days) === JSON.stringify(p0.days));
+  const bad = { beginner: [], intermediate: [] }, emptyDays = [], unsk = [];
+  for (const lvl of ['beginner', 'intermediate']) for (const eq of [bw, G._homeEquipId(['bands']), G._homeEquipId(['pullup']), G._homeEquipId(['dumbbells', 'bench'])]) for (const [g, sub] of GO) for (const d of [2, 3, 4, 6]) for (const inj of [[], ['knees'], ['shoulders']]) {
+    const p = gen(lvl, eq, g, sub, d, inj), n = names(p), items = G._homeItemsOf(eq), adv = new Set(names(gen('advanced', eq, g, sub, d, inj)));
+    const forbid = lvl === 'beginner' ? HARD.concat(['Bulgarian Split Squat', 'Single-leg RDL', 'Decline Push-ups', 'Pike Push-ups', 'Diamond Push-ups', 'Wide Push-ups']) : HARD;
+    n.filter(x => forbid.includes(x)).forEach(x => bad[lvl].push(`${eq} ${g}/${sub} ${d}d ${inj}: ${x}`));
+    p.days.forEach(day => { if (!day.exercises.length) emptyDays.push(`${lvl} ${eq} ${g}/${sub} ${d}d`); day.exercises.filter(e => !adv.has(e.name)).forEach(e => { if (!G._canDoAtHome(e.name, items)) unsk.push(`${lvl} ${eq}: ${e.name}`); if (typeof G.SK[e.name] !== 'function' && !/plank|dead bug|bird dog/i.test(e.name) && G.SK[e.name] === undefined) unsk.push('no sketch: ' + e.name); }); });
+  }
+  check('Beginner: none of the hard movements in any home program (4 equipment sets × goals × days × injuries)', bad.beginner.length === 0, bad.beginner.slice(0, 4).join(' | '));
+  check('Intermediate: no sissy squat, Nordic curl or archer push-up', bad.intermediate.length === 0, bad.intermediate.slice(0, 4).join(' | '));
+  check('…every exercise a level swaps in can be done with the equipment and has a sketch; no day ends up empty', unsk.length === 0 && emptyDays.length === 0, unsk.concat(emptyDays).slice(0, 4).join(' | '));
+  const pb = gen('beginner', bw, 'hypertrophy', 'lower', 4), pi = gen('intermediate', bw, 'hypertrophy', 'lower', 4);
+  check('the quad exercise: Bodyweight Squat for a beginner, Bulgarian Split Squat for an intermediate', names(pb).includes('Bodyweight Squat') && !names(pb).includes('Sissy Squat') && names(pi).includes('Bulgarian Split Squat') && !names(pi).includes('Sissy Squat'));
+  check('a home program remembers its level; a gym program has none', pb.gen.bwLevel === 'beginner' && pi.gen.bwLevel === 'intermediate' && !('bwLevel' in (gen('beginner', G._gymEquipId(G._gymItems()), 'hypertrophy', 'lower', 4).gen || {})));
+  check('a gym program ignores the level', JSON.stringify(gen('beginner', G._gymEquipId(G._gymItems()), 'hypertrophy', 'lower', 4).days) === JSON.stringify(gen(null, G._gymEquipId(G._gymItems()), 'hypertrophy', 'lower', 4).days));
+  // The choice: Home equipment tab and the wizard's home step.
+  _ls.removeItem('wkt-home-level');
+  check('no level chosen yet means Intermediate', G._homeLevel() === 'intermediate');
+  const pushed = [], _push = G.pushSettingsToAgent; G.pushSettingsToAgent = (kv) => pushed.push(kv);
+  const ht = G._equipTabHtml('home');
+  check('the Home equipment tab offers Beginner, Intermediate and Advanced, the current one marked', ['beginner', 'intermediate', 'advanced'].every(l => ht.includes('data-level="' + l + '"')) && /data-level="intermediate"[^>]*>[^]*?✓ Intermediate/.test(ht));
+  check('…and so does the wizard\'s home equipment step', G._progWizItemsScreenHtml([]).includes('data-home-level="1"'));
+  check('…readable: 15px or larger and never greyed', !/font-size:1[0-4]px/.test(G._homeLevelHtml()) && !/var\(--muted\)/.test(G._homeLevelHtml()));
+  G.setHomeLevel('beginner');
+  check('choosing a level saves it on the device and on the backend, and it comes back after a cache wipe', G._homeLevel() === 'beginner' && pushed.some(k => k['wkt-home-level'] === 'beginner') && String(G.syncSettingsFromAgent).includes("setData('wkt-home-level',s['wkt-home-level'])"));
+  // A home program built at another level is offered a rebuild, which uses the new level.
+  const _p = G._programs, _c = G.confirm, _sp = G.savePrograms; G.savePrograms = () => {}; G.confirm = () => true;
+  G.setData('wkt-home-equip', []);
+  const old = G._generateWorkoutProgram('hypertrophy', 'lower', 4, 'Home legs', 12, [], bw);
+  G._programs = [old];
+  check('a home program generated before levels counts as Advanced and is offered a rebuild at the chosen level', G._equipTabHtml('home').includes('Rebuild 1 home program'));
+  G.rebuildEquipPrograms('home');
+  check('…the rebuild uses the chosen level', G._programs[0].gen.bwLevel === 'beginner' && !names(G._programs[0]).includes('Sissy Squat') && !G._equipTabHtml('home').includes('data-equip-rebuild'));
+  check('Regenerate program also builds at the chosen level', String(G.regenerateProgram).includes('bwLevel:_homeLevel()'));
+  G._programs = _p; G.confirm = _c; G.savePrograms = _sp; G.pushSettingsToAgent = _push;
+  if (saved.lv === null) _ls.removeItem('wkt-home-level'); else _ls.setItem('wkt-home-level', saved.lv);
+  if (saved.eq === null) _ls.removeItem('wkt-home-equip'); else _ls.setItem('wkt-home-equip', saved.eq);
 }
 
 // ── Section 101: Edit opens the session that was logged ─────────────────────
