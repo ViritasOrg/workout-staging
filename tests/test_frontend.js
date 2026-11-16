@@ -8490,6 +8490,29 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   if (saved.eq === null) _ls.removeItem('wkt-home-equip'); else _ls.setItem('wkt-home-equip', saved.eq);
 }
 
+// ── Profile charts use the full width ────────────────────────────────────────
+// Henrik, 2026-11-16 (of Peptide Tracker, same code here): "profile ... doesnt use the full screen, but macro does?" — a
+// chart drawn while its page was hidden measured 0, fell back to 300px and pinned style.width to it, so later draws read
+// 300 again. Progress → Overview still draws the Profile charts while Profile is hidden.
+{
+  console.log('\n── Profile charts use the full width ───────');
+  const mk = () => ({ style: {}, width: 0, height: 0, visible: false,
+    get offsetWidth() { return !this.visible ? 0 : (this.style.width === '100%' ? 900 : parseInt(this.style.width) || 900); },
+    getContext: () => new Proxy({}, { get: (t, k) => k === 'measureText' ? () => ({ width: 10 }) : (k in t ? t[k] : () => {}), set: (t, k, v) => { t[k] = v; return true; } }) });
+  const ids = ['weightChart', 'bfChart', 'bmiChart', 'lbmChart', 'pfMacroChart'], cv = {}; ids.forEach(i => { cv[i] = mk(); });
+  const _gid = G.document.getElementById; G.document.getElementById = (id) => cv[id] || _gid.call(G.document, id);
+  const _w = G.weights, _b = G.bfLog, _p = G.getData('wkt-profile', null);
+  const d = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+  G.weights = [{ date: d(20), weight: 90 }, { date: d(10), weight: 89 }, { date: d(1), weight: 88 }]; G.bfLog = [{ date: d(15), bf: 18 }, { date: d(2), bf: 17 }];
+  G.setData('wkt-profile', { onboarded: true, gender: 'male', height: 180 });
+  const ms = { series: [{ date: d(3), kcal: 100 }, { date: d(2), kcal: 90 }] };
+  // drawChart is async but sizes its canvas before its first await, so a synchronous call is enough here.
+  const draw = () => { for (const f of [() => G.drawChart(), () => G.drawBfChart(), () => G.drawBmiChart(), () => G.drawLbmChart(), () => G._pfDrawMacroChart(ms)]) { try { const r = f(); if (r && r.catch) r.catch(() => {}); } catch (e) {} } };
+  draw(); ids.forEach(i => { cv[i].visible = true; }); draw();
+  check('Profile charts use the full width once shown, even after a draw while hidden', ids.every(i => cv[i].width >= 900 && cv[i].style.width === '100%'), ids.map(i => i + ':' + cv[i].width + '/' + cv[i].style.width).join(' '));
+  G.document.getElementById = _gid; G.weights = _w; G.bfLog = _b; if (_p === null) G.localStorage.removeItem('wkt-profile'); else G.setData('wkt-profile', _p);
+}
+
 // ── Section 101: Edit opens the session that was logged ─────────────────────
 // Henrik 2026-10-15: "when I open todays training in history it is empty when I click
 // edit?????" — his 2026-10-15 log (id 1792084147681, day 1) is a push session: Chest
