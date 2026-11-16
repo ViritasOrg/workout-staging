@@ -8552,6 +8552,25 @@ console.log('\n── Edit opens the session that was logged ──────�
     fn.includes('_edDay?_applyRehabSubs(_edDay.exercises,getActiveProgram()):[]') && !fn.includes('DAY_TEMPLATES'));
   check('…the same source prefillLog rendered the cards from',
     String(G.prefillLog || '').includes('_applyRehabSubs(_di.exercises,getActiveProgram())'));
+  // Henrik, 2026-11-16: removed exercises came back "like ghosts" when a History session was edited.
+  {
+    const log = { exercises: [{ name: 'Bench Press', sets: [{ kg: 60, reps: 8 }] }, { name: 'Cable Fly', sets: [{ kg: 20, reps: 12 }] }] };
+    check('editing History: a program exercise the session did not log is not brought back', G._editLoggedEx({ name: 'Lateral Raise' }, log) === null && G._editDropsUnlogged(log) &&
+      G._editLoggedEx({ name: 'Bench Press' }, log) === log.exercises[0]);
+    check('…its empty card is taken off the form', fn.includes("if(!histEx){if(_editDropsUnlogged(log)){var _gc=container.querySelector('[data-ex-idx=\"'+exIdx+'\"]');if(_gc)_gc.remove();}return;}"));
+    check('…a log with no exercises at all keeps the program\'s cards to fill in', !G._editDropsUnlogged({ exercises: [] }) && !G._editDropsUnlogged({}));
+  }
+  // Henrik, 2026-11-16: the Polestar question came up while adding an exercise to an old session from History.
+  {
+    const _gid = G.document.getElementById; const els = { 'log-edit-id': { value: '1792084147681' } };
+    const reps = [{ dataset: { type: 'reps' }, value: '10' }, { dataset: { type: 'reps' }, value: '' }];
+    els['structured-log'] = { querySelectorAll: () => [{ querySelectorAll: () => reps }] };
+    G.document.getElementById = (id) => els[id] || _gid.call(G.document, id);
+    check('no Polestar question while a History session is being edited', G._psIsTrigger(reps[0]) === false);
+    els['log-edit-id'].value = '';
+    check('…it still comes on the second-to-last set of a new workout', G._psIsTrigger(reps[0]) === true);
+    G.document.getElementById = _gid;
+  }
   check('a custom card grows to hold every logged set (4-set exercises kept all 4)',
     fn.includes("while(card.querySelectorAll('input[data-type=\"reps\"]').length<ex.sets.length)addSetToCard(card)") &&
     !/ex\.sets\.forEach\(function\(s,i\)\{if\(i<3\)/.test(fn));
