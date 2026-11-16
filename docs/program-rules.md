@@ -1002,3 +1002,11 @@ His staging Home program had Sissy Squat and Nordic Curl on the legs days and Ar
 - **Remembering and rebuilding:** a Home program remembers its level (`gen.bwLevel`). The Home equipment tab offers to rebuild Home programs built at another level. The tab's rebuild, the program's equipment editor, Regenerate program and the wizard all build at the chosen level.
 - **Gym programs** ignore the level.
 - Swapped-in exercises have sketches and need only what is ticked (tested across equipment sets × goals × days × injuries).
+
+### Rear Delt Pullback (Henrik, 2026-11-16)
+> An EZ-bar rear-delt exercise: "you pull behind your self with straight arms to target rear delts" · "Add it with a stickman sketch as well as muscle dude images"
+
+- **In the catalogue:** Rear Delt Pullback is in the exercise picker next to Rear Delt Cable Fly (Back group) and needs a barbell (`EX_EQUIP`; an EZ bar counts, as for EZ Bar Curl).
+- **Sketch:** a side view, `SK['Rear Delt Pullback']`. It starts hinged forward at 62° with the bar hanging under the shoulders, then sweeps the straight arms back past the hips.
+- **Muscles and volume:** the name matches the existing rear-delt rules. The ? card and the muscle pictures mark rear delts and upper back, and it counts as shoulder volume (`{shoulders:1}`).
+- **Programs:** no generated program picks it. It is there to choose by hand.
