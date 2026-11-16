@@ -6088,8 +6088,9 @@ console.log('\n── Standard machine exercises ──────────�
       unclassified.length === 0, unclassified.join(', '));
     // Exact count on purpose: adding or removing an exercise should be a conscious edit here.
     // 69 → 117 on 2026-10-12: the 48 home exercises (kettlebell, band and bodyweight).
-    check('the catalogue holds every exercise it is meant to (117)',
-      opts.length === 117, String(opts.length));
+    // 117 → 118 on 2026-11-16: Rear Delt Pullback (Henrik: "Add it with a stickman sketch as well as muscle dude images").
+    check('the catalogue holds every exercise it is meant to (118)',
+      opts.length === 118, String(opts.length));
     check('no exercise is listed twice in the picker',
       new Set(opts).size === opts.length,
       opts.filter((n, i) => opts.indexOf(n) !== i).join(', '));
@@ -8511,6 +8512,26 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   draw(); ids.forEach(i => { cv[i].visible = true; }); draw();
   check('Profile charts use the full width once shown, even after a draw while hidden', ids.every(i => cv[i].width >= 900 && cv[i].style.width === '100%'), ids.map(i => i + ':' + cv[i].width + '/' + cv[i].style.width).join(' '));
   G.document.getElementById = _gid; G.weights = _w; G.bfLog = _b; if (_p === null) G.localStorage.removeItem('wkt-profile'); else G.setData('wkt-profile', _p);
+}
+
+// ── Rear Delt Pullback ───────────────────────────────────────────────────────
+// Henrik, 2026-11-16: an EZ-bar exercise where "you pull behind your self with straight arms to target rear delts";
+// "Add it with a stickman sketch as well as muscle dude images".
+{
+  console.log('\n── Rear Delt Pullback ───────');
+  const n = 'Rear Delt Pullback';
+  check('it is in the exercise picker, next to the other rear-delt exercises', G._exCatalogue().indexOf(n) === G._exCatalogue().indexOf('Rear Delt Cable Fly') + 1);
+  const sk = G.SK[n] && G.SK[n]();
+  check('it has a stick-figure sketch: side view, a cue, start and end poses with the bar', !!sk && sk.views.join() === 'side' && /straight/.test(sk.cue) && sk.start.eq[0].t === 'bar' && sk.end.eq[0].t === 'bar');
+  check('…the arms sweep back and up: the hands end behind and above where they start', !!sk && sk.end.J.wR[0] < sk.start.J.wR[0] - 10 && sk.end.J.wR[1] > sk.start.J.wR[1] + 10, sk ? sk.start.J.wR.slice(0, 2) + ' → ' + sk.end.J.wR.slice(0, 2) : '');
+  // Henrik, 2026-11-16: "you cant pull the bar through your legs, starting position is bar behind knees, so you need to bend them a bit more".
+  check('…the bar starts behind the knees (never in front of the legs), with the knees bent', !!sk && sk.start.J.wR[0] < sk.start.J.kR[0] - 3 && Math.abs(sk.start.J.wR[1] - sk.start.J.kR[1]) < 10 && sk.start.J.kR[0] > sk.start.J.aR[0] + 8,
+    sk ? 'wrist ' + sk.start.J.wR.slice(0, 2).map(Math.round) + ' knee ' + sk.start.J.kR.slice(0, 2).map(Math.round) : '');
+  check('the muscle pictures mark the rear delts and upper back', JSON.stringify(G.exMuscles(n)) === JSON.stringify(['reardelts', 'upperback']));
+  const mh = G._exMusclesHtml(n, 'male');
+  check('…and the ? card names them and draws them on the body', /Trains: [^<]*Rear/i.test(mh.line) && /data-ex-body="1"/.test(mh.body) && mh.body.length > 200);
+  check('it counts as shoulder volume', G.getExGroup(n) === 'shoulders' && JSON.stringify(G.getExSplits(n)) === JSON.stringify({ shoulders: 1 }));
+  check('it needs a barbell (an EZ bar) at home or in the gym', G._canDoAtHome(n, ['barbell']) && !G._canDoAtHome(n, ['dumbbells']));
 }
 
 // ── Section 101: Edit opens the session that was logged ─────────────────────
