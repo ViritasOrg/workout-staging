@@ -10263,7 +10263,9 @@ console.log('\n── Polestar climate ─────────────�
   check('polestar: Settings carries the card', /<div id="ps-card"><\/div>/.test(_src));
   check('polestar: opening Settings loads it', /'settings'\)\{loadSettings\(\);buildFlKeyCard\(\);buildPolestarCard\(\);\}/.test(_src));
   check('polestar: the header car is checked at start and after sign-in', /syncWorkoutDraftFromAgent\(\);syncPolestarCar\(\);\}else/.test(_src) && /\}\)\(\);syncPolestarCar\(\);checkAgentStatus\(\)/.test(_src));
-  check('polestar: every set input reaches the check', /function _onLogInput\(e\)\{[^}]*_psCheck\(e\.target\)/.test(_src));
+  // Henrik, 2026-11-16: "I write 1 and then gets asked, it should wait until i added the full number of reps".
+  check('polestar: a finished reps box reaches the check (change, when it is left), not every keystroke',
+    /function _onLogChange\(e\)\{if\(e&&e\.target\)_psCheck\(e\.target\);\}/.test(_src) && !/function _onLogInput\(e\)\{[^}]*_psCheck/.test(_src) && /container\.oninput=_onLogInput;container\.onchange=_onLogChange/.test(_src));
 
   // A tiny DOM: cards of reps inputs, the log's date/day selects, the header icon and the Polestar card.
   const mkInp = v => ({ dataset: { type: 'reps' }, value: v });
@@ -10283,10 +10285,11 @@ console.log('\n── Polestar climate ─────────────�
       openModal: id => open.add(id), closeModal: id => open.delete(id),
       setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimeout: () => {},
       confirm: () => { throw new Error('no native confirm'); }, alert: () => { throw new Error('no native alert'); },
-      navigator: { geolocation: { getCurrentPosition: (ok) => ok({ coords: { latitude: 60.1699, longitude: 24.9384 } }) } },
+      navigator: { geolocation: { getCurrentPosition: (ok) => { calls.push({ url: 'geolocation', method: 'GET' }); ok({ coords: { latitude: 60.1699, longitude: 24.9384 } }); } } },
       document: { getElementById: id => els[id] || null },
       fetch: async (url, o) => { calls.push({ url, method: (o && o.method) || 'GET', body: o && o.body });
         if (url.startsWith('https://api.open-meteo.com/')) return { ok: true, json: async () => ({ current: { temperature_2m: opts.temp } }) };
+        if (url === 'https://agent/user-settings' && (!o || !o.method)) return opts.settings ? { ok: true, json: async () => opts.settings } : { ok: false, status: 404, json: async () => ({}) };
         if (url === 'https://agent/polestar' && (!o || !o.method)) return { ok: true, json: async () => opts.creds || { set: true, email: 'me@x.com' } };
         if (url === 'https://agent/polestar/climate' && o && o.method === 'POST') {
           if (opts.hold) await new Promise(r => { release = r; });
@@ -10317,11 +10320,21 @@ console.log('\n── Polestar climate ─────────────�
       r[1].value = ''; check('  …and only once it holds a number', !C._psIsTrigger(r[1]));
     }
     {
+      // A location already kept: the phone is not asked again, only the heat/AC question comes.
+      const { r, cards } = threeSets(); const t = ctx({ cards, temp: 30, settings: { 'wkt-ps-pos': { lat: 60.17, lon: 24.938 } } });
+      r[1].value = '8'; await t.C._psCheck(r[1]);
+      check('polestar: with a kept location the phone is not asked for it again; straight to the question', t.calls.filter(c => c.url === 'geolocation').length === 0 && t.open.has('psModal') &&
+        t.calls.some(c => /latitude=60\.170&longitude=24\.938/.test(c.url)));
+    }
+    {
       const { r, cards } = threeSets(); const t = ctx({ cards, temp: 4.2, hold: true });
       r[1].value = '8'; await t.C._psCheck(r[1]);
       const ask = t.els['ps-modal-body'].innerHTML;
       check('polestar: cold outside opens the Polestar card with the temperature', t.open.has('psModal') && /It is 4 °C outside/.test(ask) && /warm the car/.test(ask) && /psYes\(\)/.test(ask));
       check('  …the weather is read at the phone\'s location', t.calls.some(c => /latitude=60\.170&longitude=24\.938&current=temperature_2m/.test(c.url)));
+      // Henrik, 2026-11-16: "The app should ask for location permission once and then only ask if I want to turn on car heating or AC".
+      check('  …the first time, the location is asked for once and kept on the account', t.calls.filter(c => c.url === 'geolocation').length === 1 &&
+        t.calls.some(c => c.url === 'https://agent/user-settings' && c.method === 'POST' && /"wkt-ps-pos":\{"lat":60\.17,"lon":24\.938\}/.test(c.body)));
       const p = t.C.psYes(); await tick();
       check('  …Turn on shows a waiting message while the car answers', /Starting climate…/.test(t.els['ps-modal-body'].innerHTML) && /Waiting for the car/.test(t.els['ps-modal-body'].innerHTML));
       // Henrik, 2026-11-11: "Pressing X here doesnt do anything you have to wait for the response from the car! Rather have it close".
