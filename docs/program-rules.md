@@ -1014,3 +1014,10 @@ His staging Home program had Sissy Squat and Nordic Curl on the legs days and Ar
 ### Editing a History session (Henrik, 2026-11-16)
 - **No ghost exercises:** "When i edit a session in History, the exercises I removed during the sessions is suddenly back and I get asked if i want to save without filling in info for these exercises". `editLog` takes off the form every program exercise the session did not log (`_editLoggedEx`, `_editDropsUnlogged`). A log with no exercises at all keeps the program's cards.
 - **No Polestar question while editing:** "When I go to History and then Edit-Add exercise and fill it in, i get asked in the second to last set if I want to preheat the Polestar, this should not happen during edit of history sessions". `_psIsTrigger` is false while `log-edit-id` holds a session.
+
+### Polestar question: once the reps are typed, location asked once (Henrik, 2026-11-16)
+> "The app should ask for location permission once and then only ask if I want to turn on car heating or AC depending on outside temp. Also when I start editing the field ie suppose to write 10 or 12 reps, I write 1 and then gets asked, it should wait until i added the full number of reps and then ask"
+
+- **When it asks:** the check runs on `change` (`_onLogChange`, when the reps box is left or Done is tapped), not on every keystroke.
+- **Location:** the first location is kept on the account as user setting `wkt-ps-pos`, rounded to ~100 m (`_psSavePos`, `_psSavedPos`), and used from then on. The phone is not asked again, and while permission is already granted the position is refreshed in the background with no prompt.
+- **Storage:** nothing goes in localStorage; the backend is the record.
