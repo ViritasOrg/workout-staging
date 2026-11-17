@@ -1035,3 +1035,6 @@ Henrik: "add the details in a smaller text under the NAme so one can read the go
 - `_programLibraryHtml` renders every program as a card in one column, newest first (`_programsByRecency`), with `+ New program` underneath; no four-slot grid, no "More programs" list.
 - Under the name, `progDetails(p)`: goal and focus, days a week, sets per muscle, Picked muscles, Gym or Home (15px, full-contrast text; the name is 17px bold and wraps).
 - No cap on the number of programs (`MAX_PROGRAMS` is gone). The generator stores `sub` on every program it builds.
+
+## Program name on Today (2026-11-17)
+Henrik: "add program Name to Today page for the active program as well!" — `#today-program` above the day grid holds `_todayProgramHtml(getActiveProgram())` (the card's name and `progDetails` line), filled by `rebuildDayGrid` so it follows every activation; tapping it opens the program.

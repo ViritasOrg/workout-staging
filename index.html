@@ -324,6 +324,7 @@
   <div class="page active" id="page-today">
     <div id="whats-new"></div>
     <div id="today-header" style="margin-bottom:16px"><button onclick="showPage('log')" style="width:100%;background:var(--accent);color:#000;border:none;border-radius:12px;padding:14px 16px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font-ui);letter-spacing:0.3px;text-transform:uppercase;">Log Workout</button></div>
+    <div id="today-program"></div>
     <div id="day-grid-container" class="day-grid"></div>
     <div id="workout-display"></div>
   </div>
@@ -1452,8 +1453,15 @@ function getActiveProgramDay(num){
 }
 function _nextTrainingDay(){var prog=getActiveProgram();if(!prog||!prog.days.length)return 1;if(!logs.length)return 1;var last=logs[0].day;if(!last||last<1)return 1;return(last%prog.days.length)+1;}
 function getDayLabel(num){var prog=getActiveProgram();if(prog&&prog.days&&prog.days[num-1]){var n=prog.days[num-1].name;var i=n.indexOf('—');return i>=0?n.slice(i+1).trim():n;}return'Day '+num;}
+// The active program's name on Today, with its details line (Henrik, 2026-11-17: "add program Name to Today page for the
+// active program as well!"); tapping it opens the program.
+function _todayProgramHtml(prog){if(!prog)return'';
+  return '<div onclick="viewProgram('+_activeProgramIndex+')" style="cursor:pointer;margin-bottom:12px;">'
+    +'<div class="prog-card-name">'+_escP(prog.name)+'</div>'
+    +'<div class="prog-card-details">'+_escP(progDetails(prog))+'</div></div>';}
 function rebuildDayGrid(){
   var prog=getActiveProgram();var grid=document.getElementById('day-grid-container');
+  var _tp=document.getElementById('today-program');if(_tp)_tp.innerHTML=_todayProgramHtml(prog);
   if(!grid||!prog)return;
   var next=_nextTrainingDay();
   var _ad=_activeDraft();if(_ad){var _adn=parseInt(_ad.day);if(_adn>=1&&_adn<=prog.days.length)next=_adn;}
@@ -5014,6 +5022,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.406',title:'Program name on Today',text:'Today shows the name of your active program, with its goal and setup under it. Tap it to open the program.'},
   {v:'1.405',title:'Fun program names and program cards',text:'A new program gets a random fun name for its goal, like "Beyonc\u00e9 Ass", 3-Day Bootylicious or "Arnold\'s Heir", 6-Day Hypertrophy, never one another of your programs already has; programs that still had the old standard name got one too, and a name you type is kept. Plan shows every program as a card in one column with its goal, days a week, sets per muscle and Gym or Home under the name, and there is no limit on how many programs you keep.'},
   {v:'1.399',title:'Bodyweight level',text:'Plan → Home equipment: choose Beginner, Intermediate or Advanced. Home programs then pick bodyweight exercises you can do, for example split squats instead of sissy squats, and offer to rebuild for the new level.'},
   {v:'1.395',title:'Log body fat any way',text:'On Profile, Log body fat takes a tape measurement (US Navy), caliper skinfolds (3, 4 or 7 sites), a DEXA scan, an AI photo estimate or a plain value.'},
