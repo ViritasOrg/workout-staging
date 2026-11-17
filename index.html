@@ -142,7 +142,8 @@
   /* Clipped for display, not truncated in data: the whole name stays in the DOM
      and is one tap away in the program view. This card had NO truncation at all —
      peptidetracker's equivalent at least had the ellipsis and could not reach it. */
-  .prog-card-name{font-size:15px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .prog-card-name{font-size:17px;font-weight:700;color:var(--text);min-width:0;overflow-wrap:anywhere;line-height:1.3;}
+  .prog-card-details{font-size:15px;font-weight:400;color:var(--text);line-height:1.4;overflow-wrap:anywhere;}
   .prog-card-meta{font-size:13px;color:var(--muted);}
   .prog-card-empty{border:1.5px dashed rgba(255,255,255,0.12);border-radius:10px;padding:12px;background:transparent;display:flex;align-items:center;justify-content:center;min-height:80px;}
   /* Library rows. Same min-width:0 / ellipsis discipline as .prog-card above — a long
@@ -1378,8 +1379,8 @@ let _programs=[],_activeProgramIndex=0,_progReadOnly=false,_progEditBuf=null,_pr
 // just the 4 as today"). The 4 slots stay as the at-a-glance row; everything past them lives
 // in the list underneath. The cap is now only a guard on the size of the blob that goes to
 // localStorage and the backend on every save, not a UI limit.
-var MAX_PROGRAMS=20;
-var PROG_CARD_SLOTS=4;
+// No cap on the number of programs and no four-card grid (Henrik, 2026-11-17: "Programs in Plan can be cards in a single
+// column, instead of the 2x2 table today to give more space. Also remove the max 4 programs limit at the same time.").
 function _nowStamp(){return new Date().toISOString();}
 // "4 most recent" needs a notion of recent, which stored programs did not have. touchedAt is
 // written on the actions a user takes on a program — creating, editing, activating it — and
@@ -1415,6 +1416,8 @@ function _ensurePrograms(){
   // rule (removed 2026-11-10) did so and re-injected/reordered Squat & Deadlift on every load, silently reverting the user's own exercise edits (rule
   // 2026-07-24; honours "never mutate stored programs", 2026-07-15). Stored programs are the
   // user's own — leave their exercises exactly as saved.
+  // The one sanctioned rename: an old standard name becomes a fun one (Henrik, 2026-11-17); exercises untouched.
+  if(_funRenameStandardNames())changed=true;
   return changed;
 }
 function initPrograms(){
@@ -1696,61 +1699,24 @@ function _planDay(num){return _oneOffFor(num)||getActiveProgramDay(num);}
 // the ARRAY index, and a test that cannot read the rendered HTML cannot catch the two
 // drifting apart.
 function _programLibraryHtml(){
-  var SLOTS=PROG_CARD_SLOTS;
   var order=_programsByRecency();
   var html='<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:0">';
   html+=sSecHdr('programs','Programs')+sSecBody('programs');
-  // ⚠️ minmax(0,1fr), NOT 1fr — A LONG PROGRAM NAME MUST NOT RESIZE THE GRID.
-  // A `1fr` track's minimum is `auto`, which resolves to min-content, so the track
-  // grows to fit the widest unbreakable thing inside it and the card beside it is
-  // squeezed to a sliver. Program names are free text with no length cap (the
-  // wizard's name input has no maxlength), so the widest thing is whatever the
-  // user typed. Fixed in peptidetracker's protocol cards on 2026-09-09 and found
-  // here by checking for the same pattern.
-  //
-  // Pairs with min-width:0 on .prog-card and the truncation on .prog-card-name —
-  // all three are needed: the track can only shrink if the item can, the item can
-  // only shrink if the track lets it, and the name only clips once it must.
-  html+='<div style="padding:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;">';
-  for(var s4=0;s4<Math.min(order.length,SLOTS);s4++){
-    var i=order[s4];
+  // One column, every program, newest first; min-width:0 on the card and overflow-wrap on the name keep a long
+  // name inside the card.
+  html+='<div style="padding:12px;display:flex;flex-direction:column;gap:10px;">';
+  order.forEach(function(i){
     var prog=_programs[i];var isActive=i===_activeProgramIndex;
     html+='<div class="prog-card'+(isActive?' active':'')+'" onclick="viewProgram('+i+')">';
     html+=_progActivateToggle(i,isActive,'6px');
     html+='<div class="prog-card-name">'+_escP(prog.name)+'</div>';
+    html+='<div class="prog-card-details">'+_escP(progDetails(prog))+'</div>';
     var _ce=_progExtension(prog);
-    html+='<div class="prog-card-meta">'+prog.days.length+' day'+(prog.days.length!==1?'s':'')+'</div>';
-    if(_ce)html+='<div class="prog-row-meta" style="color:#7cc4ff;margin-top:0;">\u26a1 '+_escP(_ce.noun||_ce.name)+'</div>';
+    if(_ce)html+='<div class="prog-card-details" style="color:#7cc4ff;">⚡ '+_escP(_ce.noun||_ce.name)+'</div>';
     html+='</div>';
-  }
-  var firstEmpty=true;
-  for(var j=_programs.length;j<SLOTS;j++){
-    html+='<div class="prog-card-empty">';
-    if(firstEmpty){html+='<button onclick="createNewProgram()" style="background:none;border:none;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-family:inherit;font-size:12px;padding:8px;line-height:1;"><span style="font-size:22px;font-weight:300;">+</span><span>Add Program</span></button>';firstEmpty=false;}
-    html+='</div>';
-  }
-  html+='</div>';
-  // Everything past the four slots. The grid is the at-a-glance row; this is the library.
-  if(order.length>SLOTS){
-    html+='<div style="padding:0 12px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);">More programs · '+(order.length-SLOTS)+'</div>';
-    html+='<div style="padding:0 12px 12px;display:flex;flex-direction:column;gap:8px;">';
-    for(var r=SLOTS;r<order.length;r++){
-      var ri=order[r];var rp=_programs[ri];var rActive=ri===_activeProgramIndex;
-      html+='<div class="prog-row'+(rActive?' active':'')+'" onclick="viewProgram('+ri+')">';
-      html+='<div class="prog-row-main"><div class="prog-row-name">'+_escP(rp.name)+'</div>';
-      var _re=_progExtension(rp);
-      html+='<div class="prog-row-meta">'+rp.days.length+' day'+(rp.days.length!==1?'s':'')+
-        (_re?'<span style="color:#7cc4ff;"> \u00b7 \u26a1 '+_escP(_re.noun||_re.name)+'</span>':'')+'</div></div>';
-      html+=_progActivateToggle(ri,rActive,'0');
-      html+='</div>';
-    }
-    html+='</div>';
-  }
-  // The "+" tile only exists while a slot is empty, so a full library needs its own way in.
-  if(_programs.length>=SLOTS){
-    html+='<div style="padding:0 12px 12px;"><button class="prog-linkbtn" onclick="createNewProgram()">+ New program</button></div>';
-  }
-  html+='</div></div>';
+  });
+  html+='<button class="prog-linkbtn" onclick="createNewProgram()" style="font-size:15px;">+ New program</button>';
+  html+='</div></div></div>';
   return html;
 }
 // ── Templates card ────────────────────────────────────────────────────────────
@@ -1776,7 +1742,6 @@ function _templateLibraryHtml(){
 function viewProgram(idx){_progReadOnly=true;_progEditIdx=idx;_progEditBuf=JSON.parse(JSON.stringify(_programs[idx]));_openProgOverlay();}
 function _activateProg(i){if(i===_activeProgramIndex)return;_activeProgramIndex=i;_touchProgram(i);savePrograms();rebuildDayGrid();rebuildLogDaySelect();var _ls=document.getElementById('log-day');if(_ls&&_ls.value)prefillLog(_ls.value);buildProgramSettingsCard();}
 function createNewProgram(){
-  if(_programs.length>=MAX_PROGRAMS){alert('Maximum '+MAX_PROGRAMS+' programs');return;}
   _progWiz={step:0,goal:null,sub:null,muscles:[],nDays:4,setsPerMuscle:12,injuries:[],name:'',homeItems:(getData('wkt-home-equip',[])||[]).slice(),pullups:_pullUpsAnswer()};
   _openProgOverlay();
 }
@@ -1954,8 +1919,7 @@ function saveHomeEquip(){var idx=_heq.idx,p=_programs[idx];if(!p)return;_saveHom
 function _progRegenSpec(p){if(!p||!(p.days||[]).length)return null;var home=_isHomeEquip(p.equipment);
   var equip=home?_homeEquipId(getData('wkt-home-equip',[])||[]):_gymEquipId(_gymItems());
   if(p.gen&&p.gen.goal)return{goal:p.gen.goal,sub:p.gen.sub||null,nDays:p.gen.nDays||p.days.length,setsPerMuscle:p.gen.setsPerMuscle||12,injuries:(p.gen.injuries||[]).slice(),muscles:p.gen.muscles||undefined,noPullUps:!!p.gen.noPullUps,equip:equip};
-  if(!p.goal)return null;var tail=String(p.name||'').split(' — ').pop(),sub=null;
-  Object.keys(PROG_SUB_LABELS).forEach(function(k){if(PROG_SUB_LABELS[k]===tail&&String(p.name).indexOf(' — ')>0)sub=k;});
+  if(!p.goal)return null;var sub=_progKind(p).sub;
   var muscles=(p.muscles||[]).length?p.muscles.slice():undefined;if(!sub&&!muscles)return null;
   return{goal:p.goal,sub:sub,nDays:p.days.length,setsPerMuscle:p.setsPerMuscle||12,injuries:(p.injuries||[]).slice(),muscles:muscles,noPullUps:!!p.noPullUps,equip:equip};}
 function _progRegenBtnHtml(prog,progIdx){if(!_progRegenSpec(prog))return'';
@@ -2368,14 +2332,72 @@ function _exCatalogueFor(prog){var cat=_exCatalogue(),home=_homeItemsOf(prog&&pr
   if(home!==null)return cat.filter(function(n){return _canDoAtHome(n,home);});var g=_gymItems();return cat.filter(function(n){return _canDoAtGym(n,g);});}
 function _progWizToggleInjury(id){var a=_progWiz.injuries||(_progWiz.injuries=[]);var i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);_renderProgOverlay();}
 var PROG_SUB_LABELS={pure:'Pure',hybrid:'Hybrid',balanced:'Balanced',upper:'Upper',lower:'Lower',fullbody:'Full Body',upperlower:'Upper/Lower',bootylicious:'Bootylicious',shoulder:'Shoulder',back:'Back',knee:'Knee'};
+// A new program gets a fun name plus what it is (Henrik, 2026-11-17: "you often have several programs with the same name.
+// Change so Name is a separate generated name, make it fun, different names for different goals ... Bootalicious gets a
+// "Beyonce Ass", 3-Day Bootalicious name as an example. A Hyperthropy 6-day is "Arnolds heir" etc etc be bold, be funny!").
+// A pool per goal and focus (6–7 day hypertrophy has its own), one picked per wizard run (_progWiz.funSeed) and never
+// one an existing program already carries; a name the user types always wins.
+var PROG_FUN_NAMES={
+  'strength-pure':['Gravity Is a Suggestion','Iron Gospel','Barbell Therapy','Chalk & Regret','Plate Hoarder','Deadlift Diplomacy','Floor Is Lava, Bar Is Heavy','Big Three, Big Ego'],
+  'strength-hybrid':['Beauty and the Bench','Strong AND Pretty','Powerbuilder Problems','Lift Heavy, Look Expensive','Brains, Brawn & Biceps','Half Ox, Half Model'],
+  'hypertrophy-balanced':['Pump Up the Volume','Swole Patrol','Mirror Mirror on the Wall','Gains Without Borders','Built Not Bought','Sleeves Fear Me'],
+  'hypertrophy-balanced-6':["Arnold's Heir",'Golden Era Reboot','Bodybuilding Is My Cardio','Six Days of Swole','Mr. Olympia (Pending)','Rest Days Are a Myth'],
+  'hypertrophy-upper':['T-Shirt Destroyer','Upper Class','Sleeve Stretcher','Doorframe Too Narrow','Chicken Legs Deluxe','All Show, No Go'],
+  'hypertrophy-lower':['Quadzilla','Skip Leg Day? Never Heard of Her','Thunder Thighs','Jeans Don’t Fit Anymore','Stairs Are the Enemy','Wheels of Steel'],
+  'aesthetic-fullbody':['Main Character Energy','Hourglass Factory','Summer Body, Winter Effort','Snatched From Head to Toe','Glow Up Season'],
+  'aesthetic-upperlower':['Snatched & Stacked','Waist Not','Top Half, Bottom Half, All Fire','Sculpt Fiction','Glow Up Protocol'],
+  'aesthetic-bootylicious':['Beyoncé Ass','Peach Perfect','Junk in the Trunk','Back That Thing Up','Booty Call','Shelf Life','Cake by the Ocean'],
+  'rehab-knee':['Knees Please','Bionic Knee Club','Knee-d for Speed','Kneever Give Up'],
+  'rehab-shoulder':['Shoulder to Cry On','Rotator Cuff Comeback','Cold Shoulder No More','Arm Wrestle Ready'],
+  'rehab-back':['Back in Business','Spine Tingling','Got Your Back','Straight Up Comeback'],
+  'strength':['Gravity Is a Suggestion','Iron Gospel','Plate Hoarder'],'hypertrophy':['Swole Patrol','Built Not Bought','Gains Without Borders'],
+  'aesthetic':['Main Character Energy','Glow Up Season','Hourglass Factory'],'rehab':['Back in Business','Comeback Kid','Bionic Body Club']};
+var PROG_PLAIN_LABELS={'strength-pure':'Pure Strength','strength-hybrid':'Strength Hybrid','hypertrophy-balanced':'Hypertrophy','hypertrophy-upper':'Upper Hypertrophy',
+  'hypertrophy-lower':'Lower Hypertrophy','aesthetic-fullbody':'Full Body','aesthetic-upperlower':'Upper/Lower','aesthetic-bootylicious':'Bootylicious',
+  'rehab-knee':'Knee Rehab','rehab-shoulder':'Shoulder Rehab','rehab-back':'Back Rehab','strength':'Strength','hypertrophy':'Hypertrophy','aesthetic':'Feminine Aesthetic','rehab':'Rehab'};
+// Pure: the generated name for goal/sub/days, never one in `taken` (Henrik, 2026-11-17: "random, so a user can never get
+// the same name for exact the same program ever"); seed (0..1) picks the random start in the pool; when every pool name is
+// taken a sequel tag is added instead of repeating one.
+var PROG_SEQUELS=['',' Reloaded',' Strikes Back',' Returns',' 2: Electric Boogaloo',' The Sequel',' Director’s Cut',' Remastered',' Unleashed',' Origins'];
+function progFunName(goal,sub,nDays,seed,taken){var key=sub?goal+'-'+sub:goal;
+  var pool=(nDays>=6&&PROG_FUN_NAMES[key+'-6'])||PROG_FUN_NAMES[key]||PROG_FUN_NAMES[goal]||['Fresh Start'];
+  var plain=PROG_PLAIN_LABELS[key]||PROG_PLAIN_LABELS[goal]||'Program';var tail=(nDays?nDays+'-Day ':'')+plain;
+  var used={};(taken||[]).forEach(function(t){used[String(t||'').toLowerCase()]=1;});
+  var st=Math.floor((seed||0)*pool.length)%pool.length;
+  for(var r=0;r<200;r++){var tag=r<PROG_SEQUELS.length?PROG_SEQUELS[r]:' '+(r-PROG_SEQUELS.length+2);
+    for(var k=0;k<pool.length;k++){var nm='"'+pool[(st+k)%pool.length]+tag+'", '+tail;if(!used[nm.toLowerCase()])return nm;}}
+  return tail;}
+// The goal and focus of a program: what built it (gen), else its own fields, else read from the old standard name.
+var PROG_GOAL_NAMES={strength:'Strength',hypertrophy:'Hypertrophy',aesthetic:'Feminine Aesthetic',rehab:'Rehab'};
+function _progKind(p){if(!p)return{};if(p.gen&&p.gen.goal)return{goal:p.gen.goal,sub:p.gen.sub||null};
+  var sub=p.sub||null;if(!sub&&String(p.name||'').indexOf(' — ')>0){var tail=String(p.name).split(' — ').pop();
+    Object.keys(PROG_SUB_LABELS).forEach(function(k){if(PROG_SUB_LABELS[k]===tail)sub=k;});}
+  return{goal:p.goal||null,sub:sub};}
+// The details line under a program's name (Henrik, 2026-11-17: "add the details in a smaller text under the NAme so one
+// can read the goal and setup of the program easier"): goal and focus, days a week, sets per muscle, Gym or Home.
+function progDetails(p){if(!p)return'';var k=_progKind(p),parts=[];
+  var key=k.sub?k.goal+'-'+k.sub:k.goal;var lbl=k.goal?(PROG_PLAIN_LABELS[key]||PROG_GOAL_NAMES[k.goal]||''):'';
+  if(lbl&&k.goal==='aesthetic'&&k.sub)lbl='Feminine Aesthetic · '+lbl;
+  if(lbl)parts.push(lbl);var nd=(p.days||[]).length;parts.push(nd+' day'+(nd!==1?'s':'')+' a week');
+  var spm=(p.gen&&p.gen.setsPerMuscle)||p.setsPerMuscle;if(spm&&k.goal)parts.push(spm+' sets per muscle');
+  var mus=(p.gen&&p.gen.muscles)||p.muscles;if(mus&&mus.length)parts.push('Picked muscles');
+  if(p.equipment)parts.push(_isHomeEquip(p.equipment)?'Home':'Gym');
+  return parts.join(' · ');}
+// An old standard name ("4-Day Hypertrophy — Balanced", "Strength Program", ...) still on a saved program.
+function _progIsStandardName(name){var g='(Strength|Hypertrophy|Feminine Aesthetic|Rehab)',s='('+Object.keys(PROG_SUB_LABELS).map(function(k){return PROG_SUB_LABELS[k].replace('/','\\/');}).join('|')+')';
+  return new RegExp('^(?:\\d+-Day '+g+'(?: — '+s+')?|'+g+' — '+s+'|'+g+' Program)$').test(String(name||''));}
+// Saved programs that still carry the old standard name get a fun one (Henrik, 2026-11-17: "also update existing users
+// saved programs if they have the standard name still"); the focus read from the old name is kept as `sub` first, so
+// Regenerate and the details line still know it. A name the user chose is never touched. Returns true when one changed.
+function _funRenameStandardNames(){var changed=false;
+  (_programs||[]).forEach(function(p){if(!p||!_progIsStandardName(p.name))return;var k=_progKind(p);if(!k.goal)return;
+    if(k.sub&&!p.sub)p.sub=k.sub;
+    p.name=progFunName(k.goal,k.sub,(p.gen&&p.gen.nDays)||(p.days||[]).length,Math.random(),_programs.map(function(q){return q&&q.name;}));changed=true;});
+  return changed;}
 function _progWizDefaultName(){
-  if(!_progWiz)return'New Program';
-  var n={strength:'Strength',hypertrophy:'Hypertrophy',aesthetic:'Feminine Aesthetic',rehab:'Rehab'}[_progWiz.goal]||'';
-  var s=PROG_SUB_LABELS[_progWiz.sub]||'';
-  if(n&&s&&_progWiz.nDays)return _progWiz.nDays+'-Day '+n+' — '+s;
-  if(n&&_progWiz.nDays)return _progWiz.nDays+'-Day '+n;
-  if(n&&s)return n+' — '+s;
-  return n?n+' Program':'New Program';
+  if(!_progWiz||!_progWiz.goal)return'New Program';
+  if(_progWiz.funSeed==null)_progWiz.funSeed=Math.random();
+  return progFunName(_progWiz.goal,_progWiz.sub,_progWiz.nDays,_progWiz.funSeed,(_programs||[]).map(function(p){return p&&p.name;}));
 }
 function _progWizGenerate(){
   var wiz=_progWiz;var name=(wiz.name&&wiz.name.trim())||_progWizDefaultName();
@@ -2493,7 +2515,6 @@ function _uniqueProgramName(base){
 }
 function copyTemplate(id){
   var t=_findTemplate(id);if(!t)return;
-  if(_programs.length>=MAX_PROGRAMS){alert('Maximum '+MAX_PROGRAMS+' programs. Delete one before copying another template.');return;}
   var prog=_templateToProgram(t);
   prog.name=_uniqueProgramName(t.name);
   var nEx=prog.days.reduce(function(a,d){return a+(d.exercises||[]).length;},0);
@@ -2648,7 +2669,6 @@ function _findOneRmProgram(){for(var i=0;i<_programs.length;i++){if(_programs[i]
 function createOneRmProgram(){
   var existing=_findOneRmProgram();
   if(existing>=0){alert('You already have a "'+ONE_RM_PROGRAM_NAME+'" program — open it from the Program tab.');return;}
-  if(_programs.length>=MAX_PROGRAMS){alert('Maximum '+MAX_PROGRAMS+' programs. Delete one before adding the '+ONE_RM_PROGRAM_NAME+' program.');return;}
   var names=ONE_RM_TESTABLE.join(', ');
   if(!confirm('Create a "'+ONE_RM_PROGRAM_NAME+'" program?\n\n3 sessions, each warming up then ONE top set of 3 reps:\n'+names+'\n\nIt is added as a separate program — your active program is not changed.'))return;
   _programs.push(_oneRmTestProgram());
@@ -2660,7 +2680,6 @@ function createOneRmProgram(){
   alert('"'+ONE_RM_PROGRAM_NAME+'" created. Pick it on the Program tab when you want to test.\n\nLog the reps you actually hit — a set of 2-3 is what produces a trustworthy estimate here.');
 }
 function _progBuildManual(){
-  if(_programs.length>=MAX_PROGRAMS){alert('Maximum '+MAX_PROGRAMS+' programs');return;}
   var prog={name:'My Program',goal:'hypertrophy',touchedAt:_nowStamp(),days:[{name:'Day 1',warmup:false,exercises:[{name:'',scheme:'3×10',tag:'volume',sets:'10-10-10',kg:0}]}]};
   _programs.push(prog);buildProgramSettingsCard();
   _progWiz=null;_progReadOnly=false;_progEditIdx=_programs.length-1;_progEditBuf=JSON.parse(JSON.stringify(_programs[_progEditIdx]));_progIsNew=true;_renderProgOverlay();
@@ -3205,7 +3224,7 @@ function _generateWorkoutProgram(goal,sub,nDays,name,setsPerMuscle,injuries,equi
   // tag is volume — near-failure bodyweight sets are hypertrophy work, and a strength tag would
   // hand them 4-minute rests.
   if(_home&&(equip==='home-bw'||_custom))days.forEach(function(day){(day.exercises||[]).forEach(function(ex){if(ex.tag==='rehab')return;if(_custom&&!(_swapped.indexOf(ex)>=0&&isBWExName(ex.name)))return;var n=_nSets(ex);var a=[];for(var i=0;i<n;i++)a.push('max');ex.sets=a.join('-');ex.tag='volume';ex.scheme=n+'×max — stop 1–2 reps short of failure';});});
-  var _out={name:name,days:days,goal:goal,setsPerMuscle:setsPerMuscle,injuries:injuries||[]};
+  var _out={name:name,days:days,goal:goal,setsPerMuscle:setsPerMuscle,injuries:injuries||[]};if(sub)_out.sub=sub;
   if(_mp)_out.muscles=_mp.slice();
   // A home program keeps what built it, so the program view can rebuild it for new equipment.
   if(_home||_gymIt){_out.equipment=equip;_out.gen={goal:goal,sub:sub,nDays:nDays,setsPerMuscle:setsPerMuscle,injuries:(injuries||[]).slice()};if(_bwLv)_out.gen.bwLevel=_bwLv;if(_mp)_out.gen.muscles=_mp.slice();if(_noPU)_out.gen.noPullUps=true;}
@@ -4995,6 +5014,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.405',title:'Fun program names and program cards',text:'A new program gets a random fun name for its goal, like "Beyonc\u00e9 Ass", 3-Day Bootylicious or "Arnold\'s Heir", 6-Day Hypertrophy, never one another of your programs already has; programs that still had the old standard name got one too, and a name you type is kept. Plan shows every program as a card in one column with its goal, days a week, sets per muscle and Gym or Home under the name, and there is no limit on how many programs you keep.'},
   {v:'1.399',title:'Bodyweight level',text:'Plan → Home equipment: choose Beginner, Intermediate or Advanced. Home programs then pick bodyweight exercises you can do, for example split squats instead of sissy squats, and offer to rebuild for the new level.'},
   {v:'1.395',title:'Log body fat any way',text:'On Profile, Log body fat takes a tape measurement (US Navy), caliper skinfolds (3, 4 or 7 sites), a DEXA scan, an AI photo estimate or a plain value.'},
   {v:'1.394',title:'Edit your profile',text:'On Profile, Edit profile now makes the fields editable right there: change sex, age, height, weight or body fat and tap Save, or Cancel to leave it as it was.'},
