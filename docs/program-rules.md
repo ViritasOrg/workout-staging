@@ -1021,3 +1021,17 @@ His staging Home program had Sissy Squat and Nordic Curl on the legs days and Ar
 - **When it asks:** the check runs on `change` (`_onLogChange`, when the reps box is left or Done is tapped), not on every keystroke.
 - **Location:** the first location is kept on the account as user setting `wkt-ps-pos`, rounded to ~100 m (`_psSavePos`, `_psSavedPos`), and used from then on. The phone is not asked again, and while permission is already granted the position is refreshed in the background with no prompt.
 - **Storage:** nothing goes in localStorage; the backend is the record.
+
+
+## Fun program names (2026-11-17)
+Henrik: "Change so Name is a separate generated name, make it fun, different names for different goals, so if a user doesnt manually edit the name field it is set to something with humor. Bootalicious gets a "Beyonce Ass", 3-Day Bootalicious name ... A Hyperthropy 6-day is "Arnolds heir"" and "random, so a user can never get the same name for exact the same prgoram ever".
+- `progFunName(goal, sub, nDays, seed, taken)` builds `"<fun name>", <N>-Day <plain label>` from `PROG_FUN_NAMES` (one pool per goal-focus; 6–7 day balanced Hypertrophy has its own `-6` pool; muscle-picked programs use the goal pool).
+- The start in the pool is random (`_progWiz.funSeed`, set once per wizard run so the name does not change while the wizard is open); a name any existing program carries is skipped; when the whole pool is taken a sequel tag (Reloaded, Strikes Back, …, then a number) is added, never a repeat.
+- A name the user types (`nameTyped`) always wins. Old programs without `gen` are still parsed by `_progRegenSpec` from their plain names.
+- Saved programs whose name is still an old standard one (`_progIsStandardName`: "4-Day Hypertrophy — Balanced", "5-Day Strength", "Strength Program", …) are renamed once on load by `_funRenameStandardNames` in `_ensurePrograms` (Henrik, 2026-11-17: "also update existing users saved programs if they have the standard name still"); the focus read from the old name is stored as `sub` first so Regenerate and the details line keep it; exercises are never touched; a chosen name is never renamed.
+
+## Program cards in Plan (2026-11-17)
+Henrik: "add the details in a smaller text under the NAme so one can read the goal and setup of the program easier. Programs in Plan can be cards in a single column, instead of the 2x2 table today to give more space. Also remove the max 4 programs limit at the same time."
+- `_programLibraryHtml` renders every program as a card in one column, newest first (`_programsByRecency`), with `+ New program` underneath; no four-slot grid, no "More programs" list.
+- Under the name, `progDetails(p)`: goal and focus, days a week, sets per muscle, Picked muscles, Gym or Home (15px, full-contrast text; the name is 17px bold and wraps).
+- No cap on the number of programs (`MAX_PROGRAMS` is gone). The generator stores `sub` on every program it builds.
