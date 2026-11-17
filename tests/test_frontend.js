@@ -3975,6 +3975,18 @@ if (typeof G._generateWorkoutProgram === 'function' && typeof G._musclePlanPool 
       check('rename: a second load changes nothing', vm.runInContext('_ensurePrograms()', sandbox) === false);
       vm.runInContext('_programs=[]', sandbox);
     }
+    // Henrik, 2026-11-17: "add program Name to Today page for the active program as well!"
+    {
+      vm.runInContext("_programs=[{name:'\"Swole Patrol\", 4-Day Hypertrophy',goal:'hypertrophy',sub:'balanced',setsPerMuscle:12,days:[{},{},{},{}]},{name:'<b>x</b>',days:[{}]}];_activeProgramIndex=0", sandbox);
+      const th = G._todayProgramHtml(G.getActiveProgram());
+      check('Today: shows the active program name and its details', th.includes('Swole Patrol') && th.includes('Hypertrophy · 4 days a week · 12 sets per muscle') && th.includes('viewProgram(0)'), th);
+      vm.runInContext('_activeProgramIndex=1', sandbox);
+      const th2 = G._todayProgramHtml(G.getActiveProgram());
+      check('Today: follows the active program and escapes the name', th2.includes('&lt;b&gt;x&lt;/b&gt;') && th2.includes('viewProgram(1)'), th2);
+      check('Today: no program, nothing shown', G._todayProgramHtml(null) === '');
+      check('Today: rebuildDayGrid fills it every time the day grid is built', /getElementById\('today-program'\)[^;]*;if\(_tp\)_tp\.innerHTML=_todayProgramHtml\(prog\)/.test(String(G.rebuildDayGrid)));
+      vm.runInContext('_programs=[];_activeProgramIndex=0', sandbox);
+    }
     G._progWizGoal('strength');
     check('wizard back: a different goal starts the muscles and focus afresh', vm.runInContext('_progWiz.muscles.length===0&&_progWiz.sub===null&&!_progWiz.keptMuscles', sandbox));
     vm.runInContext('_renderProgOverlay=__rpoG;_progWiz=null', sandbox);
