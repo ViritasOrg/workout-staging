@@ -266,6 +266,8 @@
   .hurry-panel .hurry-btn{background:var(--surface);margin-top:10px;}
   .hurry-label{font-size:18px;font-weight:700;color:var(--text);}
   .hurry-line{font-size:15px;color:var(--text);margin-top:8px;line-height:1.4;}
+  .hurry-est{font-weight:700;}
+  .hurry-est:empty{display:none;}
   #hurry-off{white-space:pre-line;}
   #hurry-range{width:100%;margin:10px 0 0;padding:0;height:32px;accent-color:var(--accent);}
   .exc-head{display:flex;align-items:flex-start;gap:8px;}
@@ -4382,7 +4384,7 @@ function _renderGearChip(card){var el=card&&card.querySelector&&card.querySelect
 // done nothing at all to shorten the day"). A set that holds reps is never cut and exercises the user added are never
 // touched. Sliding back up puts the sets and exercises back. The saved log carries hurry_pct, so a cut session is left
 // out of the day's average and the average stays the time of the FULL day. Rules: docs/program-rules.md.
-var _hurryPct=100,_hurryOpen=false,HURRY_MIN_SETS=2,_hurryStopList=[];
+var _hurryPct=100,_hurryOpen=false,HURRY_MIN_SETS=2,_hurryStopList=[],_hurryAvg=null;
 function _hurryClamp(p){p=Math.round((parseFloat(p)||100)/5)*5;return Math.max(45,Math.min(100,p));}
 function _hurryIsOff(card){return !!(card&&card.dataset&&card.dataset.hurryOff);}
 function _dayAvgTime(list,day){var a=[];(list||[]).forEach(function(l){if(!l||l.hurry_pct||parseInt(l.day)!==parseInt(day))return;var d=_validSessionMin(l);if(d!=null)a.push(d);});return{n:a.length,avg:a.length?a.reduce(function(x,y){return x+y;},0)/a.length:null};}
@@ -4414,13 +4416,17 @@ function _hurryCutText(names,items,plan){var fewer=[],out=[];names.forEach(funct
   if(!fewer.length&&!out.length)return 'The full day, nothing cut.';
   return (fewer.length?'Fewer sets: '+fewer.join(', ')+'.':'')+(fewer.length&&out.length?'\n':'')+(out.length?'Left out today: '+out.join(', ')+'.':'');}
 function _hurryAvgText(day,st){return st&&st.n?'Day '+day+' takes '+_hurryMinText(st.avg)+' on average in full ('+st.n+' session'+(st.n===1?'':'s')+' logged).':'';}
+// The time the day should take at the chosen share (Henrik, 2026-11-18: "add the estimated time at the chosen % to the
+// panel"): the day's own average scaled by the sets kept, to the nearest 5 minutes. Nothing for a day never logged, and
+// nothing at 100%, where the average line already says it.
+function _hurryEstText(st,kept,total){if(!st||!st.n||!(total>0)||kept>=total)return '';return 'About '+_hurryMinText(Math.max(5,Math.round(st.avg*kept/total/5)*5))+' at this setting.';}
 function _hurryHtml(open,pct,plan,day,st){
   var btn='<button type="button" class="hurry-btn" aria-expanded="'+(open?'true':'false')+'" onclick="hurryToggle()">'+(open?'Back to the full day':'I\'m in a hurry')+'</button>';
   if(!open)return btn;
   var avg=_hurryAvgText(day,st);
   return '<div class="hurry-panel"><div class="hurry-label" id="hurry-label">'+_hurryLabel(pct,plan.kept,plan.total)+'</div>'
     +'<input type="range" id="hurry-range" aria-label="Share of the day\'s sets" min="0" max="'+(plan.stops.length-1)+'" step="1" value="'+Math.max(0,plan.stops.indexOf(_hurryClamp(pct)))+'" oninput="hurrySlide(this.value)">'
-    +(avg?'<div class="hurry-line">'+_escP(avg)+'</div>':'')
+    +(avg?'<div class="hurry-line">'+_escP(avg)+'</div><div class="hurry-line hurry-est" id="hurry-est">'+_escP(_hurryEstText(st,plan.kept,plan.total))+'</div>':'')
     +'<div class="hurry-line" id="hurry-off">'+_escP(_hurryCutText(plan.names,plan.items,plan))+'</div>'+btn+'</div>';}
 function _hurryCards(){var c=document.getElementById('structured-log');if(!c)return [];return Array.prototype.slice.call(c.querySelectorAll('.ex-card:not([data-custom="true"])'));}
 function _hurryEditing(){var e=document.getElementById('log-edit-id');return !!(e&&e.value);}
@@ -4438,10 +4444,10 @@ function _hurryApply(){var cards=_hurryCards();
     if(p.off[i]||p.sets[i]<items[i].full)card.dataset.hurryFull=String(items[i].full);else delete card.dataset.hurryFull;});
   p.items=items;p.names=cards.map(_exCardName);_updateLogProgress();return p;}
 // Not while a History session is being edited: that form holds what was done, not a plan to cut.
-function _hurryRender(){var el=document.getElementById('log-hurry');if(_hurryEditing()){_hurryPct=100;_hurryOpen=false;}if(_hurryPct<100)_hurryOpen=true;var p=_hurryApply();if(!el)return p;if(_hurryEditing()||p.total<2){el.innerHTML='';return p;}var c=document.getElementById('structured-log');var day=parseInt(c&&c.dataset.logDay)||1;_hurryStopList=p.stops;el.innerHTML=_hurryHtml(_hurryOpen,_hurryPct,p,day,_dayAvgTime(logs,day));return p;}
+function _hurryRender(){var el=document.getElementById('log-hurry');if(_hurryEditing()){_hurryPct=100;_hurryOpen=false;}if(_hurryPct<100)_hurryOpen=true;var p=_hurryApply();if(!el)return p;if(_hurryEditing()||p.total<2){el.innerHTML='';return p;}var c=document.getElementById('structured-log');var day=parseInt(c&&c.dataset.logDay)||1;_hurryStopList=p.stops;_hurryAvg=_dayAvgTime(logs,day);el.innerHTML=_hurryHtml(_hurryOpen,_hurryPct,p,day,_hurryAvg);return p;}
 function hurryToggle(){_hurryOpen=!_hurryOpen;if(!_hurryOpen)_hurryPct=100;_hurryRender();scheduleDraft();}
 function hurrySlide(i){var st=_hurryStopList.length?_hurryStopList:[100];return hurrySet(st[Math.max(0,Math.min(st.length-1,parseInt(i)||0))]);}
-function hurrySet(v){_hurryPct=_hurryClamp(v);var p=_hurryApply();var l=document.getElementById('hurry-label');if(l)l.textContent=_hurryLabel(_hurryPct,p.kept,p.total);var o=document.getElementById('hurry-off');if(o)o.textContent=_hurryCutText(p.names,p.items,p);if(p.stops.join()!==_hurryStopList.join())_hurryRender();scheduleDraft();return p;}
+function hurrySet(v){_hurryPct=_hurryClamp(v);var p=_hurryApply();var l=document.getElementById('hurry-label');if(l)l.textContent=_hurryLabel(_hurryPct,p.kept,p.total);var o=document.getElementById('hurry-off');if(o)o.textContent=_hurryCutText(p.names,p.items,p);var e=document.getElementById('hurry-est');if(e)e.textContent=_hurryEstText(_hurryAvg,p.kept,p.total);if(p.stops.join()!==_hurryStopList.join())_hurryRender();scheduleDraft();return p;}
 // An exercise is done when every set has reps; the Save bar counts them.
 function _updateLogProgress(){var c=document.getElementById('structured-log');if(!c)return;var cards=Array.prototype.slice.call(c.querySelectorAll('.ex-card')).filter(function(card){return !_hurryIsOff(card);});var n=0;
   cards.forEach(function(card){var r=Array.prototype.slice.call(card.querySelectorAll('input[data-type="reps"]'));var d=r.length>0&&r.every(function(i){return parseInt(i.value)>0;});if(d){n++;card.classList.add('ex-done');}else card.classList.remove('ex-done');});
@@ -5105,6 +5111,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.412',title:'In a hurry shows the time',text:'The I\'m in a hurry panel in Log Workout now shows about how long the day takes at the setting you slide to, worked out from that day\'s average time.'},
   {v:'1.408',title:'In a hurry cuts sets first',text:'The I\'m in a hurry slider in Log Workout now shortens the day by sets: the exercises with the most sets lose one at a time, down to two each, and only then are the last exercises left out. Anything under 100% cuts at least one set.'},
   {v:'1.407',title:'I\'m in a hurry',text:'Log Workout has an I\'m in a hurry button: slide between 50% and 100% of the day\'s exercises and the last ones are left out. When the day has been logged before, it shows how long it takes on average.'},
   {v:'1.406',title:'Program name on Today',text:'Today shows the name of your active program, with its goal and setup under it. Tap it to open the program.'},
