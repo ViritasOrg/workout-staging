@@ -7554,6 +7554,16 @@ console.log('\n── Save never discards a workout in silence ─────�
   }
 }
 
+// ── Dropdown arrow (Henrik, 2026-11-18: "fix the down arrow being to close in all pages in all apps everywhere") ──
+// The browser's own arrow hugs the border, so every <select> draws its own, 14px in from the right, in its own text colour.
+{
+  const _selCss = html;
+  const _selRule = (_selCss.match(/select:not\(\[multiple\]\):not\(\[size\]\)\{[^}]*\}/) || [''])[0];
+  check('dropdown arrow: one rule covers every dropdown and turns the browser arrow off', /-webkit-appearance:none !important;appearance:none !important/.test(_selRule));
+  check('…the arrow is drawn 14px in from the right edge, in the dropdown\'s own colour', /background-position:right 20px center,right 14px center !important/.test(_selRule) && /currentColor/.test(_selRule));
+  check('…the text stops short of it, and an inline style cannot undo any of it', /padding-right:34px !important/.test(_selRule) && (_selRule.match(/!important/g) || []).length >= 7);
+}
+
 // ── Section: session-time summary on History (2026-10-12) ────────────────────
 // Median over believable stamps only (KCAL_DUR_MIN..KCAL_DUR_MAX); averages over the
 // latest 7 and 30 believable sessions, so they never read "—" while the median shows.
