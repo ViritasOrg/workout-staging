@@ -256,7 +256,9 @@
   .ex-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 12px 10px;margin-bottom:10px;}
   .ex-card.ex-done{border-color:#2f6b4a;}
   .ex-card[data-hurry-off]{display:none;}
-  #log-hurry{margin-bottom:12px;}
+  #log-hurry{flex:1 1 0;min-width:0;}
+  #log-hurry:has(.hurry-panel){flex:1 1 100%;}
+  #log-hurry>.hurry-btn{height:100%;font-size:15px;padding:7px 10px;}
   .hurry-btn{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:16px;font-weight:600;border-radius:10px;padding:10px 12px;cursor:pointer;font-family:var(--font-ui);}
   .hurry-panel{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;}
   .hurry-panel .hurry-btn{background:var(--surface);margin-top:10px;}
@@ -353,8 +355,8 @@
           <option value="1">Day 1</option>
         </select>
         <input type="date" id="log-date" aria-label="Date">
+        <div id="log-hurry"></div>
       </div>
-      <div id="log-hurry"></div>
       <div id="structured-log"></div>
       <div class="log-savebar"><button class="btn btn-primary" onclick="saveLog()">SAVE WORKOUT</button><div id="log-progress"></div></div>
     </div>

@@ -7919,7 +7919,7 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   G.logs = _l;
 
   // Page: one top row, Save stays on screen with progress, accent cleanup
-  check('Date and Day share one compact row', /<div class="log-top">\s*<select id="log-day"[\s\S]*?<input type="date" id="log-date"[^>]*>\s*<\/div>/.test(html));
+  check('Date and Day share one compact row', /<div class="log-top">\s*<select id="log-day"[\s\S]*?<input type="date" id="log-date"[^>]*>\s*(?:<div id="log-hurry"><\/div>\s*)?<\/div>/.test(html));
   check('Save sits in a bar that stays on screen above the tabs, with the progress line',
     /<div class="log-savebar"><button class="btn btn-primary" onclick="saveLog\(\)">SAVE WORKOUT<\/button><div id="log-progress"><\/div><\/div>/.test(html) && /\.log-savebar\{position:sticky;bottom:calc\(/.test(html));
   check('typing a rep updates the draft AND the progress', String(G.prefillLog).includes('container.oninput=_onLogInput') && String(G._onLogInput).includes('scheduleDraft()') && String(G._onLogInput).includes('_updateLogProgress()'));
@@ -8717,7 +8717,9 @@ console.log('\n── Edit opens the session that was logged ──────�
 
     // Wiring: the form, the draft and the saved log.
     const pf = String(G.prefillLog), sl = String(G.saveLog);
-    check('hurry: the Log form has its slot above the exercises', /<div id="log-hurry"><\/div>\s*<div id="structured-log">/.test(html));
+    check('hurry: the button shares the date\'s row, above the exercises (Henrik, 2026-11-18: day, date and hurry "take half a page")',
+      /<input type="date" id="log-date"[^>]*>\s*<div id="log-hurry"><\/div>\s*<\/div>\s*<div id="structured-log">/.test(html) && /#log-hurry\{flex:1 1 0;min-width:0;\}/.test(html));
+    check('…and the open panel takes the full width under them', /#log-hurry:has\(\.hurry-panel\)\{flex:1 1 100%;\}/.test(html));
     check('…a fresh form starts at the full day and then takes the draft\'s share', pf.includes('_hurryPct=100;_hurryOpen=false;restoreDraft(day);_hurryRender();'));
     check('…the draft carries the share and gives it back', String(G.saveDraft).includes('if(_hurryPct<100)d.hurry=_hurryPct;') && String(G.restoreDraft).includes('if(d.hurry)_hurryPct=_hurryClamp(d.hurry);'));
     check('…the saved log is stamped hurry_pct, and an edit keeps the stamp it had', sl.includes('else if(_hurryPct<100)_timing.hurry_pct=_hurryPct;') && sl.includes('if(_oh&&_oh.hurry_pct)_timing.hurry_pct=_oh.hurry_pct;'));
