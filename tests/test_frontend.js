@@ -8630,7 +8630,7 @@ console.log('\n── Edit opens the session that was logged ──────�
     const off = cards => cards.filter(c => c.dataset.hurryOff).map(c => c.dataset.tplName);
     const rows = cards => cards.map(c => c._sr.children.length).join();
 
-    check('hurry: the slider runs from 50 to 100 in steps of 5', G._hurryClamp(10) === 50 && G._hurryClamp(200) === 100 && G._hurryClamp(72) === 70 && G._hurryClamp('85') === 85 && G._hurryClamp(undefined) === 100);
+    check('hurry: shares run from 45 to 100 in steps of 5', G._hurryClamp(10) === 45 && G._hurryClamp(200) === 100 && G._hurryClamp(72) === 70 && G._hurryClamp('85') === 85 && G._hurryClamp(undefined) === 100);
 
     // The plan, pure. A day of 5+4+3+3+3 = 18 sets.
     const day = [5, 4, 3, 3, 3].map(f => ({ full: f, done: 0 }));
@@ -8656,10 +8656,12 @@ console.log('\n── Edit opens the session that was logged ──────�
     // The slider only stops where the day changes (Henrik, 2026-11-18: "no diff between 90% and 85% ... a change by the slide MUST result in a change").
     const d12 = [3, 3, 3, 3].map(f => ({ full: f, done: 0 }));
     check('hurry stops: on a 12-set day 85% is the same day as 90%, so it is not a stop', G._hurrySig(G._hurrySetPlan(d12, 85)) === G._hurrySig(G._hurrySetPlan(d12, 90)) && G._hurryStops(d12).indexOf(85) < 0 && G._hurryStops(d12).indexOf(90) >= 0, G._hurryStops(d12).join());
-    check('…the stops there are 55, 65, 70, 80, 90, 95 and 100', G._hurryStops(d12).join() === '55,65,70,80,90,95,100', G._hurryStops(d12).join());
+    check('…the stops there are 45, 55, 65, 70, 80, 90, 95 and 100', G._hurryStops(d12).join() === '45,55,65,70,80,90,95,100', G._hurryStops(d12).join());
+    check('…45% is added only when 50% is not a stop of its own (Henrik, 2026-11-18: "if you remove 50% you need to add 45%")', G._hurryStops(d12).indexOf(50) < 0 && G._hurrySetPlan(d12, 45).kept === 5 &&
+      [[5, 5, 5, 5], [3, 3, 3, 3], [5, 4, 3, 3, 3], [4, 4, 4, 3, 3, 3, 2]].every(d => { const st = G._hurryStops(d.map(f => ({ full: f, done: 0 }))); return (st.indexOf(50) >= 0) !== (st.indexOf(45) >= 0) && st[0] <= 50; }));
     check('…every stop is a different schedule from the one before, on any day', [[3, 3, 3, 3], [5, 4, 3, 3, 3], [2, 2], [4], [3, 3, 3, 3, 3, 3, 3], [1, 1, 1], [4, 4, 4, 3, 3, 3, 2]].every(d => { const it = d.map(f => ({ full: f, done: 0 })); const st = G._hurryStops(it);
       return st[st.length - 1] === 100 && st.length >= 2 && st.every((pc, i) => i === 0 || (pc > st[i - 1] && G._hurrySig(G._hurrySetPlan(it, pc)) !== G._hurrySig(G._hurrySetPlan(it, st[i - 1])))); }));
-    check('…a share that is not a stop goes to the stop with the same day', G._hurrySnap(85, G._hurryStops(d12)) === 90 && G._hurrySnap(50, G._hurryStops(d12)) === 55 && G._hurrySnap(100, G._hurryStops(d12)) === 100 &&
+    check('…a share that is not a stop goes to the stop with the same day', G._hurrySnap(85, G._hurryStops(d12)) === 90 && G._hurrySnap(50, G._hurryStops(d12)) === 55 && G._hurrySnap(45, G._hurryStops(d12)) === 45 && G._hurrySnap(100, G._hurryStops(d12)) === 100 &&
       G._hurrySig(G._hurrySetPlan(d12, 50)) === G._hurrySig(G._hurrySetPlan(d12, 55)));
     check('…a day that is all done has one stop, the full day', G._hurryStops([{ full: 3, done: 3 }, { full: 2, done: 2 }]).join() === '100');
 
@@ -8716,7 +8718,7 @@ console.log('\n── Edit opens the session that was logged ──────�
     p = G._hurryRender();
     check('hurry: sets that already have reps stay, and so does an exercise with reps', cards[0]._sr.children.length === 5 && !cards[4].dataset.hurryOff && cards[4]._sr.children[0]._inp.value === '12' && off(cards).indexOf('Squat') < 0, rows(cards) + ' off ' + off(cards));
     check('…and an exercise the user added is never touched', !own.dataset.hurryOff && own._sr.children.length === 4 && p.total === 18);
-    check('…a draft restored at 50% comes back with the panel open', /type="range"[^>]*value="0"/.test(els['log-hurry'].innerHTML) && /Back to the full day/.test(els['log-hurry'].innerHTML));
+    check('…a draft restored at 50% comes back with the panel open', /type="range"[^>]*value="1"/.test(els['log-hurry'].innerHTML) && /Back to the full day/.test(els['log-hurry'].innerHTML));
 
     // The Polestar question follows the last exercise still on the form.
     cards = [hCard('Squat', ['8', '8', '']), hCard('Plank', ['', '']), hCard('Dead Bug', ['', ''])];

@@ -4383,7 +4383,7 @@ function _renderGearChip(card){var el=card&&card.querySelector&&card.querySelect
 // touched. Sliding back up puts the sets and exercises back. The saved log carries hurry_pct, so a cut session is left
 // out of the day's average and the average stays the time of the FULL day. Rules: docs/program-rules.md.
 var _hurryPct=100,_hurryOpen=false,HURRY_MIN_SETS=2,_hurryStopList=[];
-function _hurryClamp(p){p=Math.round((parseFloat(p)||100)/5)*5;return Math.max(50,Math.min(100,p));}
+function _hurryClamp(p){p=Math.round((parseFloat(p)||100)/5)*5;return Math.max(45,Math.min(100,p));}
 function _hurryIsOff(card){return !!(card&&card.dataset&&card.dataset.hurryOff);}
 function _dayAvgTime(list,day){var a=[];(list||[]).forEach(function(l){if(!l||l.hurry_pct||parseInt(l.day)!==parseInt(day))return;var d=_validSessionMin(l);if(d!=null)a.push(d);});return{n:a.length,avg:a.length?a.reduce(function(x,y){return x+y;},0)/a.length:null};}
 // Pure. items: [{full: sets the day prescribes, done: sets that already hold reps}] in program order.
@@ -4403,9 +4403,11 @@ function _hurrySetPlan(items,pct){
 function _hurryMinText(min){var m=Math.round(min),h=Math.floor(m/60),r=m%60;return h?(h+' h'+(r?' '+r+' min':'')):(r+' min');}
 // The slider only stops where the day changes (Henrik, 2026-11-18: "there is no diff between 90% and 85%, in that case only
 // allow 90% 80% 70% etc, a change by the slide MUST result in a change in the schedule"): of 50..100 in steps of 5, a share
-// whose plan is the same as the next higher one is not a stop. Ascending; 100 is always the last.
+// whose plan is the same as the next higher one is not a stop. Ascending; 100 is always the last. When 50 falls away like
+// that, 45 is added below so the slider still reaches a half day (Henrik, 2026-11-18: "if you remove 50% you need to add 45%").
 function _hurrySig(p){return p.sets.join()+'|'+p.off.join();}
-function _hurryStops(items){var out=[],last=null;for(var pc=100;pc>=50;pc-=5){var g=_hurrySig(_hurrySetPlan(items,pc));if(g!==last){out.unshift(pc);last=g;}}return out;}
+function _hurryStops(items){var out=[],last=null;for(var pc=100;pc>=50;pc-=5){var g=_hurrySig(_hurrySetPlan(items,pc));if(g!==last){out.unshift(pc);last=g;}}
+  if(out[0]!==50){var g45=_hurrySig(_hurrySetPlan(items,45));if(g45!==last)out.unshift(45);}return out;}
 function _hurrySnap(pct,stops){pct=_hurryClamp(pct);for(var i=0;i<stops.length;i++)if(stops[i]>=pct)return stops[i];return 100;}
 function _hurryLabel(pct,kept,total){return _hurryClamp(pct)+'% · '+kept+' of '+total+' sets';}
 function _hurryCutText(names,items,plan){var fewer=[],out=[];names.forEach(function(nm,i){if(plan.off[i])out.push(nm);else if(plan.sets[i]<items[i].full)fewer.push(nm+' '+plan.sets[i]+' of '+items[i].full);});
