@@ -1038,3 +1038,11 @@ Henrik: "add the details in a smaller text under the NAme so one can read the go
 
 ## Program name on Today (2026-11-17)
 Henrik: "add program Name to Today page for the active program as well!" — `#today-program` above the day grid holds `_todayProgramHtml(getActiveProgram())` (the card's name and `progDetails` line), filled by `rebuildDayGrid` so it follows every activation; tapping it opens the program.
+
+## "I'm in a hurry" in the Log (Henrik, 2026-11-18)
+Henrik: "Workout app needs a "I am in a hurry" button in the Log view for the times when you dont have time for the full program, when pressed let the user use a slider to choose a % between 50-100% of the full days exercises, also if the day been logged before show average time for the specific day to help guide the user."
+- `#log-hurry` sits between the day/date row and the exercise cards. Closed it is one button, "I'm in a hurry"; pressed it opens a panel with a 50–100% slider (steps of 5), "60% · 3 of 5 exercises", the names left out, and "Back to the full day" (which closes it and returns to 100%).
+- **What the share cuts:** the day's program exercises in program order; the first `_hurryKeep(total, pct)` stay (rounded up, never fewer than one) and the last ones are taken off the form. Off means hidden (`data-hurry-off`), never removed: sliding back up brings them back. A card that already has reps is never taken off, and an exercise the user added is never touched (`_hurryPlan`).
+- A card taken off is not counted by the Save bar, not named by the "no reps filled in" or "Are you done?" questions, and the Polestar question moves to the last exercise still on the form. The saved log is exactly what a session with those exercises left blank always was.
+- **Average time:** `_dayAvgTime(logs, day)` is the mean `duration_min` of that day number's believable sessions (`_validSessionMin`), shown only when there is one: "Day 1 takes 1 h 10 min on average in full (3 sessions logged)." A session saved under 100% carries `hurry_pct` on its log (backend `WorkoutLog.hurry_pct`) and is left out, so the figure stays the time of the full day.
+- The share is kept in the draft (`d.hurry`) and comes back with it; a fresh form starts at the full day. No button while a History session is edited, nor for a day with one exercise.

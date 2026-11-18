@@ -8595,6 +8595,106 @@ console.log('\n── Edit opens the session that was logged ──────�
     check('…it still comes on the second-to-last set of a new workout', G._psIsTrigger(reps[0]) === true);
     G.document.getElementById = _gid;
   }
+
+  // ── "I'm in a hurry" (Henrik, 2026-11-18) ──────────────────────────────────
+  // A button in the Log view, a 50-100% slider over the day's exercises, and the day's average time.
+  {
+    const hCard = (name, reps, custom) => {
+      const cols = reps.map(r => ({ querySelector: sel => (sel.includes('reps') ? { value: r } : null) }));
+      const inps = reps.map(r => ({ value: r }));
+      const ds = custom ? { custom: 'true' } : { tplName: name };
+      return { dataset: ds, classList: { add() {}, remove() {} }, _nameSel: { value: name },
+        querySelector(sel) { return sel === '.sets-row' ? { children: cols } : (sel.includes('custom-name') ? this._nameSel : null); },
+        querySelectorAll(sel) { return sel.includes('reps') ? inps : []; } };
+    };
+    const _gid = G.document.getElementById;
+    const mount = (cards, editId) => {
+      const els = { 'log-edit-id': { value: editId || '' }, 'log-hurry': { innerHTML: 'x' }, 'log-progress': { textContent: '' },
+        'hurry-label': { textContent: '' }, 'hurry-off': { textContent: '' },
+        'structured-log': { dataset: { logDay: '3' }, querySelectorAll: sel => (/not\(\[data-custom/.test(sel) ? cards.filter(c => !c.dataset.custom) : (sel === '.ex-card' ? cards : [])) } };
+      G.document.getElementById = id => els[id] || _gid.call(G.document, id);
+      return els;
+    };
+    const setPct = (p, open) => vm.runInContext('_hurryPct=' + p + ';_hurryOpen=' + (open ? 'true' : 'false'), sandbox);
+    const off = cards => cards.filter(c => c.dataset.hurryOff).map(c => c.dataset.tplName);
+
+    check('hurry: the slider runs from 50 to 100 in steps of 5', G._hurryClamp(10) === 50 && G._hurryClamp(200) === 100 && G._hurryClamp(72) === 70 && G._hurryClamp('85') === 85 && G._hurryClamp(undefined) === 100);
+    check('…a share of the day\'s exercises, rounded up, never none', G._hurryKeep(7, 100) === 7 && G._hurryKeep(7, 50) === 4 && G._hurryKeep(6, 50) === 3 && G._hurryKeep(10, 70) === 7 && G._hurryKeep(1, 50) === 1 && G._hurryKeep(0, 50) === 0);
+
+    // The average time of THIS day, over believable full sessions only.
+    const L = (day, m, x) => Object.assign({ date: '2026-11-01', day, duration_min: m }, x || {});
+    const hist = [L(3, 60), L(3, 80), L(3, 70), L(2, 120), L(3, 2), L(3, 400), L(3, 40, { hurry_pct: 60 }), { date: '2026-11-02', day: 3 }];
+    const st = G._dayAvgTime(hist, 3);
+    check('hurry: the average is this day\'s own sessions', st.n === 3 && st.avg === 70, JSON.stringify(st));
+    check('…a session cut short with the slider is left out of it', G._dayAvgTime([L(3, 60), L(3, 30, { hurry_pct: 50 })], 3).avg === 60);
+    check('…a day never logged has no average', G._dayAvgTime(hist, 5).n === 0 && G._dayAvgTime(hist, 5).avg === null && G._hurryAvgText(5, G._dayAvgTime(hist, 5)) === '');
+    check('…shown in hours and minutes', G._hurryAvgText(3, st) === 'Day 3 takes 1 h 10 min on average in full (3 sessions logged).' && G._hurryMinText(48.4) === '48 min' && G._hurryMinText(119.6) === '2 h' && /\(1 session logged\)/.test(G._hurryAvgText(1, { n: 1, avg: 45 })));
+
+    // The button and the panel.
+    const names = ['Squat', 'Leg Press', 'Leg Curl', 'Calf Raise', 'Plank', 'Dead Bug'];
+    let cards = names.map(n => hCard(n, ['', '', '']));
+    let els = mount(cards); setPct(100, false);
+    let p = G._hurryRender();
+    check('hurry: the Log view shows an "I\'m in a hurry" button, the whole day still on the form', /<button[^>]*onclick="hurryToggle\(\)"[^>]*>I'm in a hurry<\/button>/.test(els['log-hurry'].innerHTML) && !/type="range"/.test(els['log-hurry'].innerHTML) && p.keep === 6 && off(cards).length === 0);
+    G.hurryToggle();
+    const open = els['log-hurry'].innerHTML;
+    check('…pressing it opens a slider from 50 to 100%', /<input type="range"[^>]*min="50"[^>]*max="100"[^>]*value="100"[^>]*oninput="hurrySet\(this\.value\)"/.test(open) && /100% · 6 of 6 exercises/.test(open));
+    check('…with no average for a day never logged', !/on average/.test(open));
+    check('…readable: 15px or larger and never greyed', !/font-size:1[0-4]px/.test(open) && !/var\(--muted\)/.test(open) &&
+      (html.match(/\.hurry-[a-z]+\{[^}]*\}/g) || []).every(r => !/font-size:1[0-4]px/.test(r) && !/var\(--muted\)/.test(r)));
+    p = G.hurrySet('50');
+    check('hurry: 50% keeps the first half and takes the last exercises off the form', p.keep === 3 && off(cards).join() === 'Calf Raise,Plank,Dead Bug' &&
+      els['hurry-label'].textContent === '50% · 3 of 6 exercises' && els['hurry-off'].textContent === 'Left out today: Calf Raise, Plank, Dead Bug.');
+    check('…the stylesheet hides a card taken off', /\.ex-card\[data-hurry-off\]\{display:none;\}/.test(html));
+    check('…the Save bar counts only what is left', els['log-progress'].textContent === '0 of 3 exercises done');
+    check('…the "no reps filled in" question does not name them', G._incompleteExCards().length === 3 && G._incompleteExCards().every(c => !c.dataset.hurryOff));
+    const rv = G._saveReview(els['structured-log']);
+    check('…nor does "Are you done?"', rv.empty.join() === 'Squat,Leg Press,Leg Curl');
+    p = G.hurrySet('70');
+    check('hurry: sliding up brings exercises back', p.keep === 5 && off(cards).join() === 'Dead Bug');
+    G.hurryToggle();
+    check('…and "Back to the full day" brings back all of them', off(cards).length === 0 && vm.runInContext('_hurryPct', sandbox) === 100 && !/type="range"/.test(els['log-hurry'].innerHTML));
+
+    // Reps already typed are never hidden; exercises the user added are never touched.
+    cards = names.map((n, i) => hCard(n, i === 5 ? ['12', '', ''] : ['', '', '']));
+    const own = hCard('Cable Curl', ['', ''], true); cards.push(own);
+    els = mount(cards); setPct(50, true);
+    p = G._hurryRender();
+    check('hurry: an exercise that already has reps stays on the form', off(cards).join() === 'Calf Raise,Plank' && p.keep === 4 && !cards[5].dataset.hurryOff);
+    check('…and an exercise the user added is never taken off', !own.dataset.hurryOff && p.total === 6);
+    check('…a draft restored at 50% comes back with the panel open', /type="range"[^>]*value="50"/.test(els['log-hurry'].innerHTML) && /Back to the full day/.test(els['log-hurry'].innerHTML));
+
+    // The Polestar question follows the last exercise still on the form.
+    cards = [hCard('Squat', ['8', '8', '']), hCard('Plank', ['', '', ''])];
+    els = mount(cards); setPct(50, true); G._hurryRender();
+    const last = cards[0].querySelectorAll('reps');
+    last[1].dataset = { type: 'reps' };
+    check('hurry: the Polestar question comes on the last exercise that is left', cards[1].dataset.hurryOff === '1' && G._psIsTrigger(last[1]) === true);
+
+    // The day's average, on the panel.
+    cards = names.map(n => hCard(n, ['', '']));
+    els = mount(cards); setPct(100, true);
+    const _bk = vm.runInContext('logs', sandbox);
+    sandbox.__hL = hist; vm.runInContext('logs=__hL', sandbox);
+    G._hurryRender();
+    check('hurry: a day logged before shows its average time', /Day 3 takes 1 h 10 min on average in full \(3 sessions logged\)\./.test(els['log-hurry'].innerHTML));
+    sandbox.__hL = _bk; vm.runInContext('logs=__hL', sandbox);
+
+    // Not while a History session is edited, and not for a one-exercise day.
+    els = mount(cards, '1792084147681'); setPct(60, true); G._hurryRender();
+    check('hurry: no button while a History session is being edited, nothing taken off', els['log-hurry'].innerHTML === '' && off(cards).length === 0);
+    els = mount([hCard('Squat', ['', ''])]); setPct(100, false); G._hurryRender();
+    check('…and none for a day with one exercise', els['log-hurry'].innerHTML === '');
+    G.document.getElementById = _gid; setPct(100, false);
+
+    // Wiring: the form, the draft and the saved log.
+    const pf = String(G.prefillLog), sl = String(G.saveLog);
+    check('hurry: the Log form has its slot above the exercises', /<div id="log-hurry"><\/div>\s*<div id="structured-log">/.test(html));
+    check('…a fresh form starts at the full day and then takes the draft\'s share', pf.includes('_hurryPct=100;_hurryOpen=false;restoreDraft(day);_hurryRender();'));
+    check('…the draft carries the share and gives it back', String(G.saveDraft).includes('if(_hurryPct<100)d.hurry=_hurryPct;') && String(G.restoreDraft).includes('if(d.hurry)_hurryPct=_hurryClamp(d.hurry);'));
+    check('…the saved log is stamped hurry_pct, and an edit keeps the stamp it had', sl.includes('else if(_hurryPct<100)_timing.hurry_pct=_hurryPct;') && sl.includes('if(_oh&&_oh.hurry_pct)_timing.hurry_pct=_oh.hurry_pct;'));
+    check('WHATS_NEW announces it', G.WHATS_NEW.some(e => /in a hurry/.test(e.title) && /50% and 100%/.test(e.text)));
+  }
   check('a custom card grows to hold every logged set (4-set exercises kept all 4)',
     fn.includes("while(card.querySelectorAll('input[data-type=\"reps\"]').length<ex.sets.length)addSetToCard(card)") &&
     !/ex\.sets\.forEach\(function\(s,i\)\{if\(i<3\)/.test(fn));
