@@ -262,6 +262,7 @@
   .hurry-panel .hurry-btn{background:var(--surface);margin-top:10px;}
   .hurry-label{font-size:18px;font-weight:700;color:var(--text);}
   .hurry-line{font-size:15px;color:var(--text);margin-top:8px;line-height:1.4;}
+  #hurry-off{white-space:pre-line;}
   #hurry-range{width:100%;margin:10px 0 0;padding:0;height:32px;accent-color:var(--accent);}
   .exc-head{display:flex;align-items:flex-start;gap:8px;}
   .exc-name{flex:1;min-width:0;font-size:16px;font-weight:650;color:var(--text);line-height:1.3;padding-top:8px;}
@@ -4370,35 +4371,63 @@ function _gearChipText(card){if(!card)return '';var p=[];if(parseFloat(card.data
 function _renderGearChip(card){var el=card&&card.querySelector&&card.querySelector('.exc-gear');if(!el)return;var t=_gearChipText(card);el.textContent=t;el.hidden=!t;}
 // ── "I'm in a hurry" (Henrik, 2026-11-18: "a 'I am in a hurry' button in the Log view for the times when you dont have
 // time for the full program ... a slider to choose a % between 50-100% of the full days exercises, also if the day been
-// logged before show average time for the specific day"). The slider keeps the first N program exercises and takes the
-// rest off the form (hidden, never deleted: sliding back brings them back). A card that already holds reps is never
-// taken off, and exercises the user added are never touched. The saved log carries hurry_pct, so a cut session is left
+// logged before show average time for the specific day"). The share is a share of the day's SETS, and sets go first
+// (Henrik, 2026-11-18: "dropping an exercise is the final step not the first. A 4-5 sets of one exercise gets first cut
+// down to 3 sets etc"): one set at a time from whichever exercise has the most, down to two each, and only then whole
+// exercises from the end of the day. Anything under 100% cuts at least one set ("if I go down to 90% you cant just have
+// done nothing at all to shorten the day"). A set that holds reps is never cut and exercises the user added are never
+// touched. Sliding back up puts the sets and exercises back. The saved log carries hurry_pct, so a cut session is left
 // out of the day's average and the average stays the time of the FULL day. Rules: docs/program-rules.md.
-var _hurryPct=100,_hurryOpen=false;
+var _hurryPct=100,_hurryOpen=false,HURRY_MIN_SETS=2;
 function _hurryClamp(p){p=Math.round((parseFloat(p)||100)/5)*5;return Math.max(50,Math.min(100,p));}
-function _hurryKeep(total,pct){if(!(total>0))return 0;return Math.max(1,Math.min(total,Math.ceil(total*_hurryClamp(pct)/100-1e-9)));}
 function _hurryIsOff(card){return !!(card&&card.dataset&&card.dataset.hurryOff);}
 function _dayAvgTime(list,day){var a=[];(list||[]).forEach(function(l){if(!l||l.hurry_pct||parseInt(l.day)!==parseInt(day))return;var d=_validSessionMin(l);if(d!=null)a.push(d);});return{n:a.length,avg:a.length?a.reduce(function(x,y){return x+y;},0)/a.length:null};}
-function _hurryPlan(cards,pct){var keep=_hurryKeep(cards.length,pct),off=[];cards.forEach(function(card,i){if(i>=keep&&!_cardHasCompletedSets(card))off.push(card);});return{keep:cards.length-off.length,total:cards.length,off:off};}
+// Pure. items: [{full: sets the day prescribes, done: sets that already hold reps}] in program order.
+// Returns the sets each exercise keeps, which exercises are left out, and the totals.
+function _hurrySetPlan(items,pct){
+  pct=_hurryClamp(pct);var n=items.length,i,cur=items.map(function(x){return x.full;}),off=items.map(function(){return false;});
+  var total=cur.reduce(function(a,b){return a+b;},0),sum=total;
+  if(pct>=100||total<2)return{sets:cur,off:off,total:total,kept:sum};
+  var target=Math.max(1,Math.min(total-1,Math.floor(total*pct/100+1e-9)));
+  var min=items.map(function(x){return Math.max(x.done||0,Math.min(HURRY_MIN_SETS,x.full));});
+  while(sum>target){var b=-1;for(i=0;i<n;i++)if(cur[i]>min[i]&&(b<0||cur[i]>=cur[b]))b=i;if(b<0)break;cur[b]--;sum--;}
+  var live=n;
+  while(sum>target&&live>1){var d=-1;for(i=n-1;i>=0;i--)if(!off[i]&&!(items[i].done>0)){d=i;break;}if(d<0)break;off[d]=true;sum-=cur[d];live--;}
+  while(sum<target){var g=-1;for(i=0;i<n;i++)if(!off[i]&&cur[i]<items[i].full&&(g<0||cur[i]<cur[g]))g=i;if(g<0)break;cur[g]++;sum++;}
+  if(sum===total){var z=-1;for(i=0;i<n;i++)if(cur[i]>Math.max(items[i].done||0,1)&&(z<0||cur[i]>=cur[z]))z=i;if(z>=0){cur[z]--;sum--;}}
+  return{sets:cur,off:off,total:total,kept:sum};}
 function _hurryMinText(min){var m=Math.round(min),h=Math.floor(m/60),r=m%60;return h?(h+' h'+(r?' '+r+' min':'')):(r+' min');}
-function _hurryLabel(pct,keep,total){return _hurryClamp(pct)+'% · '+keep+' of '+total+' exercises';}
-function _hurryOffText(names){return names&&names.length?'Left out today: '+names.join(', ')+'.':'The full day, nothing left out.';}
+function _hurryLabel(pct,kept,total){return _hurryClamp(pct)+'% · '+kept+' of '+total+' sets';}
+function _hurryCutText(names,items,plan){var fewer=[],out=[];names.forEach(function(nm,i){if(plan.off[i])out.push(nm);else if(plan.sets[i]<items[i].full)fewer.push(nm+' '+plan.sets[i]+' of '+items[i].full);});
+  if(!fewer.length&&!out.length)return 'The full day, nothing cut.';
+  return (fewer.length?'Fewer sets: '+fewer.join(', ')+'.':'')+(fewer.length&&out.length?'\n':'')+(out.length?'Left out today: '+out.join(', ')+'.':'');}
 function _hurryAvgText(day,st){return st&&st.n?'Day '+day+' takes '+_hurryMinText(st.avg)+' on average in full ('+st.n+' session'+(st.n===1?'':'s')+' logged).':'';}
 function _hurryHtml(open,pct,plan,day,st){
   var btn='<button type="button" class="hurry-btn" aria-expanded="'+(open?'true':'false')+'" onclick="hurryToggle()">'+(open?'Back to the full day':'I\'m in a hurry')+'</button>';
   if(!open)return btn;
   var avg=_hurryAvgText(day,st);
-  return '<div class="hurry-panel"><div class="hurry-label" id="hurry-label">'+_hurryLabel(pct,plan.keep,plan.total)+'</div>'
-    +'<input type="range" id="hurry-range" aria-label="Share of the day\'s exercises" min="50" max="100" step="5" value="'+_hurryClamp(pct)+'" oninput="hurrySet(this.value)">'
+  return '<div class="hurry-panel"><div class="hurry-label" id="hurry-label">'+_hurryLabel(pct,plan.kept,plan.total)+'</div>'
+    +'<input type="range" id="hurry-range" aria-label="Share of the day\'s sets" min="50" max="100" step="5" value="'+_hurryClamp(pct)+'" oninput="hurrySet(this.value)">'
     +(avg?'<div class="hurry-line">'+_escP(avg)+'</div>':'')
-    +'<div class="hurry-line" id="hurry-off">'+_escP(_hurryOffText(plan.off.map(_exCardName)))+'</div>'+btn+'</div>';}
+    +'<div class="hurry-line" id="hurry-off">'+_escP(_hurryCutText(plan.names,plan.items,plan))+'</div>'+btn+'</div>';}
 function _hurryCards(){var c=document.getElementById('structured-log');if(!c)return [];return Array.prototype.slice.call(c.querySelectorAll('.ex-card:not([data-custom="true"])'));}
 function _hurryEditing(){var e=document.getElementById('log-edit-id');return !!(e&&e.value);}
-function _hurryApply(){var cards=_hurryCards(),p=_hurryPlan(cards,_hurryPct);cards.forEach(function(card){if(p.off.indexOf(card)>=0)card.dataset.hurryOff='1';else delete card.dataset.hurryOff;});_updateLogProgress();return p;}
+// The form follows the plan: empty set rows are taken off from the end and put back with addSetToCard; an exercise left
+// out is hidden (data-hurry-off), never removed. data-hurry-full remembers how many sets the card had.
+function _hurryApply(){var cards=_hurryCards();
+  var items=cards.map(function(card){var sr=card.querySelector('.sets-row');var rows=sr?sr.children.length:0;var done=_setCols(card).done.length;return{full:Math.max(parseInt(card.dataset.hurryFull)||rows,done),done:done};});
+  var p=_hurrySetPlan(items,_hurryPct);
+  cards.forEach(function(card,i){var sr=card.querySelector('.sets-row');if(sr){var want=p.sets[i],g;
+      for(g=0;sr.children.length<want&&g<40;g++)addSetToCard(card);
+      for(g=sr.children.length-1;g>=0&&sr.children.length>want;g--){var col=sr.children[g],ri=col.querySelector('input[data-type="reps"]');if(!(ri&&parseInt(ri.value)>0))sr.removeChild(col);}
+      Array.prototype.slice.call(sr.children).forEach(function(col,k){var lbl=col.firstElementChild;if(lbl&&/^S\d+$/.test(String(lbl.textContent||'').trim()))lbl.textContent='S'+(k+1);});}
+    if(p.off[i])card.dataset.hurryOff='1';else delete card.dataset.hurryOff;
+    if(p.off[i]||p.sets[i]<items[i].full)card.dataset.hurryFull=String(items[i].full);else delete card.dataset.hurryFull;});
+  p.items=items;p.names=cards.map(_exCardName);_updateLogProgress();return p;}
 // Not while a History session is being edited: that form holds what was done, not a plan to cut.
 function _hurryRender(){var el=document.getElementById('log-hurry');if(_hurryEditing()){_hurryPct=100;_hurryOpen=false;}if(_hurryPct<100)_hurryOpen=true;var p=_hurryApply();if(!el)return p;if(_hurryEditing()||p.total<2){el.innerHTML='';return p;}var c=document.getElementById('structured-log');var day=parseInt(c&&c.dataset.logDay)||1;el.innerHTML=_hurryHtml(_hurryOpen,_hurryPct,p,day,_dayAvgTime(logs,day));return p;}
 function hurryToggle(){_hurryOpen=!_hurryOpen;if(!_hurryOpen)_hurryPct=100;_hurryRender();scheduleDraft();}
-function hurrySet(v){_hurryPct=_hurryClamp(v);var p=_hurryApply();var l=document.getElementById('hurry-label');if(l)l.textContent=_hurryLabel(_hurryPct,p.keep,p.total);var o=document.getElementById('hurry-off');if(o)o.textContent=_hurryOffText(p.off.map(_exCardName));scheduleDraft();return p;}
+function hurrySet(v){_hurryPct=_hurryClamp(v);var p=_hurryApply();var l=document.getElementById('hurry-label');if(l)l.textContent=_hurryLabel(_hurryPct,p.kept,p.total);var o=document.getElementById('hurry-off');if(o)o.textContent=_hurryCutText(p.names,p.items,p);scheduleDraft();return p;}
 // An exercise is done when every set has reps; the Save bar counts them.
 function _updateLogProgress(){var c=document.getElementById('structured-log');if(!c)return;var cards=Array.prototype.slice.call(c.querySelectorAll('.ex-card')).filter(function(card){return !_hurryIsOff(card);});var n=0;
   cards.forEach(function(card){var r=Array.prototype.slice.call(card.querySelectorAll('input[data-type="reps"]'));var d=r.length>0&&r.every(function(i){return parseInt(i.value)>0;});if(d){n++;card.classList.add('ex-done');}else card.classList.remove('ex-done');});
@@ -5062,6 +5091,7 @@ function obSkip(){if(_obTourOnly){_obCloseTour();return;}obFinish();}
 // onboarded account means the card never existed for it yet: it gets the whole list.
 // Add a row here when a feature ships that a user would not find on their own.
 var WHATS_NEW=[
+  {v:'1.408',title:'In a hurry cuts sets first',text:'The I\'m in a hurry slider in Log Workout now shortens the day by sets: the exercises with the most sets lose one at a time, down to two each, and only then are the last exercises left out. Anything under 100% cuts at least one set.'},
   {v:'1.407',title:'I\'m in a hurry',text:'Log Workout has an I\'m in a hurry button: slide between 50% and 100% of the day\'s exercises and the last ones are left out. When the day has been logged before, it shows how long it takes on average.'},
   {v:'1.406',title:'Program name on Today',text:'Today shows the name of your active program, with its goal and setup under it. Tap it to open the program.'},
   {v:'1.405',title:'Fun program names and program cards',text:'A new program gets a random fun name for its goal, like "Beyonc\u00e9 Ass", 3-Day Bootylicious or "Arnold\'s Heir", 6-Day Hypertrophy, never one another of your programs already has; programs that still had the old standard name got one too, and a name you type is kept. Plan shows every program as a card in one column with its goal, days a week, sets per muscle and Gym or Home under the name, and there is no limit on how many programs you keep.'},
