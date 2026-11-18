@@ -8684,7 +8684,7 @@ console.log('\n── Edit opens the session that was logged ──────�
     G.hurryToggle();
     const open = els['log-hurry'].innerHTML;
     check('…pressing it opens a slider with one position per stop, at the full day', new RegExp('<input type="range"[^>]*min="0"[^>]*max="' + (G._hurryStops(day).length - 1) + '"[^>]*step="1"[^>]*value="' + (G._hurryStops(day).length - 1) + '"[^>]*oninput="hurrySlide\\(this\\.value\\)"').test(open) && /100% · 18 of 18 sets/.test(open) && /The full day, nothing cut\./.test(open));
-    check('…with no average for a day never logged', !/on average/.test(open));
+    check('…with no average and no estimate for a day never logged', !/on average/.test(open) && !/hurry-est/.test(open));
     check('…readable: 15px or larger and never greyed', !/font-size:1[0-4]px/.test(open) && !/var\(--muted\)/.test(open) &&
       (html.match(/\.hurry-[a-z]+\{[^}]*\}/g) || []).every(r => !/font-size:1[0-4]px/.test(r) && !/var\(--muted\)/.test(r)));
     p = G.hurrySet('90');
@@ -8734,6 +8734,18 @@ console.log('\n── Edit opens the session that was logged ──────�
     sandbox.__hL = hist; vm.runInContext('logs=__hL', sandbox);
     G._hurryRender();
     check('hurry: a day logged before shows its average time', /Day 3 takes 1 h 10 min on average in full \(3 sessions logged\)\./.test(els['log-hurry'].innerHTML));
+    // The estimated time at the chosen share (Henrik, 2026-11-18: "add the estimated time at the chosen % to the panel").
+    check('hurry estimate: the day\'s average scaled by the sets kept, to the nearest 5 minutes', G._hurryEstText({ n: 3, avg: 70 }, 9, 18) === 'About 35 min at this setting.' && G._hurryEstText({ n: 3, avg: 70 }, 16, 18) === 'About 1 h at this setting.' && G._hurryEstText({ n: 1, avg: 100 }, 17, 18) === 'About 1 h 35 min at this setting.');
+    check('…nothing at the full day, and nothing for a day never logged', G._hurryEstText({ n: 3, avg: 70 }, 18, 18) === '' && G._hurryEstText({ n: 0, avg: null }, 9, 18) === '' && G._hurryEstText(null, 9, 18) === '');
+    check('…at 100% the panel holds the line, empty', /<div class="hurry-line hurry-est" id="hurry-est"><\/div>/.test(els['log-hurry'].innerHTML) && /\.hurry-est:empty\{display:none;\}/.test(html));
+    els['hurry-est'] = { textContent: '' };
+    G.hurrySet('60');
+    check('…sliding to 60% of the 18-set day shows about 40 min', els['hurry-est'].textContent === 'About 40 min at this setting.', els['hurry-est'].textContent);
+    G.hurrySet('100');
+    check('…and back at 100% it is gone', els['hurry-est'].textContent === '');
+    setPct(60, true); G._hurryRender();
+    check('…a panel opened at 60% carries it from the start', /id="hurry-est">About 40 min at this setting\.<\/div>/.test(els['log-hurry'].innerHTML));
+    setPct(100, true); G._hurryRender();
     sandbox.__hL = _bk; vm.runInContext('logs=__hL', sandbox);
 
     // Not while a History session is edited, and not for a one-set day.
