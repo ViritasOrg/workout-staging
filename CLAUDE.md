@@ -1,7 +1,7 @@
 # Workout Staging — Claude Instructions
 
-<!-- BEGIN ORG-WIDE RULES v26. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there; the Sync org rules workflow opens the PRs that copy this block into every other ViritasOrg repo, and the daily drift check reports any copy that differs. -->
-## Org-wide rules: every ViritasOrg repo (canonical v26, 2026-11-19)
+<!-- BEGIN ORG-WIDE RULES v27. Canonical copy: ViritasOrg/claude-agent-backend docs/org-rules.md. Edit it there; the Sync org rules workflow opens the PRs that copy this block into every other ViritasOrg repo, and the daily drift check reports any copy that differs. -->
+## Org-wide rules: every ViritasOrg repo (canonical v27, 2026-11-19)
 
 Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file adds repo-specific rules. If one seems to contradict this block, say so to Henrik instead of picking one. They bind every session, whatever started it (Claude Code, claude.ai, a Project, a scheduled task, an agent). The quote and incident behind each rule: https://github.com/ViritasOrg/claude-agent-backend/blob/main/docs/org-rules-history.md.
 
@@ -97,6 +97,7 @@ Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file 
 ### Every page has its own icon, and is readable for Henrik
 - **Every page or app ships its icon in its first PR**: favicon, PWA manifest with 192, 512 and maskable PNGs, `apple-touch-icon`; distinct per app, clear colours on black; production and staging never look alike (own title, manifest name and icon); a test that every page links them.
 - **High contrast, nothing small and grey** (https://github.com/ViritasOrg/flyt/issues/766, https://github.com/ViritasOrg/btcpay/issues/175): every text colour at least 7:1 (WCAG AAA) in every theme, no informational text under 15px, secondary text marked by size or weight never by greying; a `readable` test per page. **Bigger text never spills out of its card** (https://github.com/ViritasOrg/flyt/issues/847): layout tests busy and quiet, desktop to phone.
+- **A click never shifts the view** (Henrik, 2026-11-19, https://github.com/ViritasOrg/btcpay/issues/371): in every page and app, picking, selecting, sorting, filtering, opening or closing something changes that part in place; never a page load that puts the window back at the top, never content that jumps, resizes or reorders under the pointer, never a refresh that moves what he is looking at. Scroll position (both ways) and running drawings stay; a full page load is only for going to another page. A new picker, list or refresh gets this in the same PR, with a test.
 
 ### Security, auth and money
 - **Security takes precedence over convenience** (2026-10-11): build the more secure option and say what it costs. **No PIN or non-Google end-user login, ever**; the `x-api-secret` and read-only keys are Claude's tooling only, GET-only where read-only, never widened.
@@ -121,7 +122,7 @@ Identical in every repo's `CLAUDE.md` under `ViritasOrg`; the rest of each file 
 
 ### CLAUDE.md holds rules, not records
 - A repo's root `CLAUDE.md` is loaded into every session, so it stays under 200 lines: imperative rules, one line each, an issue URL as provenance, at most one line of why. Quotes, incident stories, feature logs, "current state" and design notes go to `docs/` (pointed to from `CLAUDE.md` in one line), or to `.claude/rules/<area>.md` with `paths:` frontmatter when a rule only matters for part of the repo. A rule Henrik gives goes in as a rule; the quote goes to `docs/rule-history.md`.
-<!-- END ORG-WIDE RULES v26 -->
+<!-- END ORG-WIDE RULES v27 -->
 
 ## This repo
 Single-file PWA: `index.html` (JS, CSS, HTML inline), `css/main.css`; `const VERSION` matches `version.json`, both bumped by the version-bump workflow on merge. GitHub Pages deploys on push to `main` (the live `version.json` cannot be fetched from a session). All development happens here; `workout` (prod) is read-only for Claude. Shared infrastructure with `peptidetracker-staging` (Push to Prod, settings sync, update checker, auth, backend calls, `IS_STAGING`): **a fix in one app is made in the other in the same session**. Tests: `node tests/test_frontend.js`, 0 failures before any PR. **Program generation, the Log screen, drafts, 1RM, sketches, home equipment, Ask AI and Polestar have their own rule file, `docs/program-rules.md`: read it before touching any of them and update it in the same PR.** The old `CLAUDE.md` is `docs/claude-md-archive-2026-11-05.md`; a new rule goes below as one line, its story into `docs/rule-history.md`. **Scan the conversation for rules each session** and extract what Henrik gave into this file; point out a contradiction rather than silently picking one.
