@@ -7928,10 +7928,14 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('…an exercise never logged shows nothing', G._lastTimeText('Hip Thrust', 'kg') === '' && /hidden/.test(G._lastTimeHtml('Hip Thrust', 'kg')));
   G.logs = _l;
 
-  // Page: one top row, Save stays on screen with progress, accent cleanup
+  // Page: one top row, Save at the end of the page with progress, accent cleanup
   check('Date and Day share one compact row', /<div class="log-top">\s*<select id="log-day"[\s\S]*?<input type="date" id="log-date"[^>]*>\s*(?:<div id="log-hurry"><\/div>\s*)?<\/div>/.test(html));
-  check('Save sits in a bar that stays on screen above the tabs, with the progress line',
-    /<div class="log-savebar"><button class="btn btn-primary" onclick="saveLog\(\)">SAVE WORKOUT<\/button><div id="log-progress"><\/div><\/div>/.test(html) && /\.log-savebar\{position:sticky;bottom:calc\(/.test(html));
+  // Henrik, 2026-11-21: "The Save Workout should be bottom of page and not take screen space unless I browse down to it"
+  const _saveBarCss = (html.match(/\.log-savebar\{([^}]*)\}/) || [])[1];
+  check('Save is the last thing in the Log form, after the exercises, with the progress line',
+    /<div id="structured-log"><\/div>\s*<div class="log-savebar"><button class="btn btn-primary" onclick="saveLog\(\)">SAVE WORKOUT<\/button><div id="log-progress"><\/div><\/div>\s*<\/div>/.test(html));
+  check('…and it scrolls with the page: never sticky or fixed over the exercises',
+    typeof _saveBarCss === 'string' && !/position\s*:|bottom\s*:|z-index\s*:/.test(_saveBarCss), _saveBarCss);
   check('typing a rep updates the draft AND the progress', String(G.prefillLog).includes('container.oninput=_onLogInput') && String(G._onLogInput).includes('scheduleDraft()') && String(G._onLogInput).includes('_updateLogProgress()'));
   check('the version label is muted, not yellow', html.includes('<span style="color:var(--muted);font-weight:600" id="header-version">'));
 }

@@ -321,7 +321,8 @@ its questions: *"Remove rest timers. 1 yes 2 no remove the timers totally 3 yes 
 - **"Last (8 Oct): 25 kg × 10, 10, 9"** under the prescription, from the newest stored log holding that exercise
   (`_lastTimeText`), skipping the log being edited. Read-only; it never writes anything.
 - **An exercise is done when every set has reps** (no tick buttons: Henrik said no to set ✓). Done cards get a
-  green edge and the Save bar, which stays on screen above the tabs, counts them.
+  green edge and the Save bar counts them. **The Save bar is the last thing on the page and scrolls with it** (Henrik,
+  2026-11-21): never sticky or fixed over the exercises; it takes no screen space until he scrolls down to it.
 - **The header and every full-screen layer clear the iOS status bar**: `viewport-fit=cover`, the header and
   overlays pad by `env(safe-area-inset-top)`, and a fixed `body::before` strip keeps scrolled content from
   showing under the clock (the app asks for a see-through `black-translucent` status bar).
