@@ -1012,6 +1012,15 @@ His staging Home program had Sissy Squat and Nordic Curl on the legs days and Ar
 - **Muscles and volume:** the name matches the existing rear-delt rules. The ? card and the muscle pictures mark rear delts and upper back, and it counts as shoulder volume (`{shoulders:1}`).
 - **Programs:** no generated program picks it. It is there to choose by hand.
 
+### Bayesian Curl (Henrik, 2026-11-22)
+> "Add Baisian curls in a 1/2 gear cable machine"
+
+- **In the catalogue:** Bayesian Curl is in the exercise picker right after Cable Bicep Curl (Arms group) and needs a cable machine (`EX_EQUIP`).
+- **Cable exercise:** the name has no "cable" in it, so `EXERCISE_SPLITS` carries `["bayesian",{arms:1,cable:1}]`; that is what makes `isCableEx` true and puts ½ gear and 2× cable in the card's ⋯ menu. ½ gear is the user's own per-exercise setting (`wk-gear-<name>`, synced as `wo_gear_toggles`), never a default written into the code.
+- **Sketch:** a side view, `SK['Bayesian Curl']`: facing away from a low pulley, one arm hanging behind the body, curled to the shoulder with the elbow staying behind.
+- **Muscles and volume:** biceps on the ? card and the muscle pictures; counts as arm volume.
+- **Programs:** no generated program picks it. It is there to choose by hand.
+
 ### Editing a History session (Henrik, 2026-11-16)
 - **No ghost exercises:** "When i edit a session in History, the exercises I removed during the sessions is suddenly back and I get asked if i want to save without filling in info for these exercises". `editLog` takes off the form every program exercise the session did not log (`_editLoggedEx`, `_editDropsUnlogged`). A log with no exercises at all keeps the program's cards.
 - **No Polestar question while editing:** "When I go to History and then Edit-Add exercise and fill it in, i get asked in the second to last set if I want to preheat the Polestar, this should not happen during edit of history sessions". `_psIsTrigger` is false while `log-edit-id` holds a session.

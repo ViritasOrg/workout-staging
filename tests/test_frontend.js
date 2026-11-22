@@ -6144,8 +6144,9 @@ console.log('\n── Standard machine exercises ──────────�
     // Exact count on purpose: adding or removing an exercise should be a conscious edit here.
     // 69 → 117 on 2026-10-12: the 48 home exercises (kettlebell, band and bodyweight).
     // 117 → 118 on 2026-11-16: Rear Delt Pullback (Henrik: "Add it with a stickman sketch as well as muscle dude images").
-    check('the catalogue holds every exercise it is meant to (118)',
-      opts.length === 118, String(opts.length));
+    // 118 → 119 on 2026-11-22: Bayesian Curl (Henrik: "Add Baisian curls in a 1/2 gear cable machine").
+    check('the catalogue holds every exercise it is meant to (119)',
+      opts.length === 119, String(opts.length));
     check('no exercise is listed twice in the picker',
       new Set(opts).size === opts.length,
       opts.filter((n, i) => opts.indexOf(n) !== i).join(', '));
@@ -8570,6 +8571,25 @@ check('…regular, wide, diamond and archer push-ups keep 64%',
   check('…and the ? card names them and draws them on the body', /Trains: [^<]*Rear/i.test(mh.line) && /data-ex-body="1"/.test(mh.body) && mh.body.length > 200);
   check('it counts as shoulder volume', G.getExGroup(n) === 'shoulders' && JSON.stringify(G.getExSplits(n)) === JSON.stringify({ shoulders: 1 }));
   check('it needs a barbell (an EZ bar) at home or in the gym', G._canDoAtHome(n, ['barbell']) && !G._canDoAtHome(n, ['dumbbells']));
+}
+
+// ── Bayesian Curl ────────────────────────────────────────────────────────────
+// Henrik, 2026-11-22: "Add Baisian curls in a 1/2 gear cable machine".
+{
+  console.log('\n── Bayesian Curl ───────');
+  const n = 'Bayesian Curl';
+  check('it is in the exercise picker, right after Cable Bicep Curl', G._exCatalogue().indexOf(n) === G._exCatalogue().indexOf('Cable Bicep Curl') + 1);
+  check('…and in the swap list under Arms', html.includes("'Cable Bicep Curl','Bayesian Curl','Band Curl'"));
+  check('it is a cable exercise, so the card offers ½ gear and 2× cable', G.isCableEx(n) && /\u00bd gear/.test(G._gearBtnsHtml(n, 1, 1, 1)) && /2\u00d7 cable/.test(G._gearBtnsHtml(n, 1, 1, 1)));
+  check('…½ gear shows as switched on once it is set', G._gearBtnsHtml(n, 0.5, 1, 1).includes('data-gear="0.5"') && G._gearBtnsHtml(n, 0.5, 1, 1).includes(G._gearBtnStyle(true)));
+  check('it counts as arm volume', G.getExGroup(n) === 'arms' && G.getExSplits(n).arms === 1);
+  check('the muscle pictures mark the biceps', JSON.stringify(G.exMuscles(n)) === JSON.stringify(['biceps']));
+  check('it needs a cable machine', G._canDoAtHome(n, ['cable']) && !G._canDoAtHome(n, ['dumbbells']));
+  const sk = G.SK[n] && G.SK[n]();
+  check('it has a stick-figure sketch: side view, a cue, start and end poses with the cable and handle', !!sk && sk.views.join() === 'side' && /away from a low cable/.test(sk.cue) && sk.start.eq[0].t === 'line' && sk.end.eq[0].t === 'line');
+  check('…the working arm starts straight and behind the body', !!sk && sk.start.J.wR[0] < sk.start.J.sh[0] - 8 && sk.start.J.eR[0] < sk.start.J.sh[0], sk ? 'wrist ' + sk.start.J.wR.slice(0, 2).map(Math.round) + ' shoulder ' + sk.start.J.sh.slice(0, 2).map(Math.round) : '');
+  check('…the hand curls up to the shoulder while the elbow stays behind', !!sk && sk.end.J.wR[1] > sk.start.J.wR[1] + 15 && Math.abs(sk.end.J.eR[0] - sk.start.J.eR[0]) < 1 && sk.end.J.eR[0] < sk.end.J.sh[0], sk ? sk.start.J.wR.slice(0, 2).map(Math.round) + ' → ' + sk.end.J.wR.slice(0, 2).map(Math.round) : '');
+  check('…and the cable runs down to a low pulley behind the lifter', !!sk && sk.start.eq[0].b[0] < sk.start.J.sh[0] - 20 && sk.start.eq[0].b[1] < 10);
 }
 
 // ── Section 101: Edit opens the session that was logged ─────────────────────
