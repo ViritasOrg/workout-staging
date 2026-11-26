@@ -334,8 +334,11 @@ to ask me if i want to turn on Polestar ventilation when I enter a value in the 
 exercise … in settigns we need to add a Polestar card where a user can add their credentials."*
 
 - The block between `// ── Polestar climate (Henrik, 2026-11-04) ──` and `// ── end polestar ──` in `index.html`.
-  `_onLogInput` hands every set input to `_psCheck`; it fires on the reps box of the **second-to-last set of the last
-  exercise card**, once it holds a number, at most once per workout (log date + day).
+  `_onLogInput` hands every set input to `_psCheck`; it fires on the reps box that leaves **exactly one set of the whole
+  workout still empty**, once it holds a number, at most once per workout (log date + day). The order on the form does
+  not matter (Henrik, 2026-11-26: "it isnt alway possible to do exercises in order, so starting the heating in the car
+  needs to happen when you do your last set, not the set lowest on the list"); it was the second-to-last set of the
+  bottom card until then. Exercises left out by the hurry slider are not counted.
 - The temperature is Open-Meteo's `current.temperature_2m` at the phone's location (`navigator.geolocation`); below
   `PS_COLD_C` (10) or above `PS_HOT_C` (22) it asks "Turn on Polestar climate?", and yes calls `POST /polestar/climate`
   (claude-agent-backend `routers/polestar.py`, which starts climate at 21 °C).
