@@ -351,6 +351,16 @@ exercise … in settigns we need to add a Polestar card where a user can add the
   turns red when it works. A refusal, or no answer within `PS_ANSWER_MS` (90 s), puts a yellow triangle on the header car
   (`_psWarn`, `_psWarnSvg`), for a start and for a stop. Tapping the car shows the reason, **Try again** and a link to
   `help.html#polestar-no-answer` (copied to prod by the Sync step). **OK** or a later answer that works removes the triangle.
+- **The starting card has a Close button and says the start carries on** (Henrik, 2026-11-27: "I cannot leave that screen
+  without canceling the turn on heating action"): closing never cancels; the header car turns red when climate is on.
+- **Polestar's one-time code** (2026-11-27): Polestar's login texts a code after the password. The backend answers 409; the
+  card shows **Enter the code from Polestar** (`_psAskCode`, `#ps-code`, `autocomplete="one-time-code"`), **Send code**
+  posts `POST /polestar/code`, and what was asked for (start, stop, or saving the Polestar ID in Settings) runs again. A
+  wrong code stays on the code step with Polestar's words. The backend keeps the sign-in, so later calls need no code.
+- **A failure links the help that fits it** (Henrik, 2026-11-27: the page "isnt describing the real issue"): a sign-in,
+  password or code failure links `help.html#polestar-sign-in`, anything else `help.html#polestar-no-answer` (`_psHelpFor`).
+- **Every "What this means" link opens its help section inside the app** (`openHelp`, `#helpModal` with ×), never
+  help.html as a page (Henrik, 2026-11-27: "there is no way to close that page without swiping away the whole pwa app").
 - While climate runs, a **red car with a heat (orange waves) or AC (blue snowflake) symbol** sits in the header
   (`#hdr-car`, `_psCarSvg`; Henrik: "In the main app view a red car with a heating/ac symbol should be shown"). The app
   asks `GET /polestar/climate` every 3 minutes and removes it when the car is neither active nor starting, or after

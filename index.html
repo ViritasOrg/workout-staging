@@ -567,6 +567,12 @@
     <div class="modal-body" id="ps-modal-body"></div>
   </div>
 </div>
+<div class="modal-overlay" id="helpModal" style="z-index:600">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">HELP</div><button class="modal-close" onclick="closeModal('helpModal')">×</button></div>
+    <div class="modal-body" id="help-modal-body"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="weightModal">
   <div class="modal">
     <div class="modal-header"><div class="modal-title">LOG WEIGHT</div><button class="modal-close" onclick="closeModal('weightModal')">×</button></div>
@@ -2299,7 +2305,7 @@ function _homeWeightsHtml(item){var d=HOME_WEIGHTS[item];if(!d)return'';var e=_h
   h+='</div><div style="display:flex;gap:8px;margin-top:10px;align-items:stretch;"><input id="hw-add-'+item+'" type="text" inputmode="decimal" placeholder="Other weight, kg" style="flex:1;min-width:0;font-size:16px;padding:10px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text);font-family:inherit;">'
     +'<button data-hw-add="'+item+'" onclick="homeWeightAdd(\''+item+'\')" style="flex-shrink:0;padding:10px 16px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#000;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Add</button></div>';
   if(_hwWarn&&_hwWarn.item===item)h+='<div data-hw-warn="1" style="font-size:15px;color:var(--text);line-height:1.5;margin-top:8px;padding:10px;border:1px solid var(--accent);border-radius:10px;"><b>'+_escP(_hwWarn.msg)+'</b> Type a number of kg between 0.1 and 200, for example 24 or 2.5, then tap Add. '
-    +'<a href="'+HOME_WEIGHT_HELP+'" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
+    +'<a href="'+HOME_WEIGHT_HELP+'" onclick="return openHelp(this)" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
   return h+'<button class="btn btn-primary" data-hw-save="1" onclick="homeWeightsSave()" style="margin-top:16px;width:100%;">SAVE</button></div>';}
 // Suggested loads on a Home program use only weights the user has (Henrik, 2026-11-14: "1 yes, kind of the whole point
 // is to make Home training better"). The kg the app proposes (Today, the Log prefill, a swapped-in card) snaps to the
@@ -4520,6 +4526,17 @@ function showExSketch(btn){_openExSketch(_exCardName(btn.closest('.ex-card')));}
 function _exSketchBtnHtml(onclick){return '<button onclick="'+_escP(onclick)+'" title="How to do it" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;cursor:pointer;font-family:var(--font-ui);line-height:1;padding:0;background:rgba(77,163,255,0.12);border:1px solid #4da3ff;color:#4da3ff;font-size:19px;font-weight:700;flex-shrink:0">?</button>';}
 // ── end exercise sketches ──
 function openModal(id){document.getElementById(id).classList.add('open');}
+// A warning's "What this means" link opens its help.html section inside the app, in a card with ×. Opening the page
+// itself trapped the installed app on it with no way back (Henrik, 2026-11-27: "there is no way to close that page
+// without swiping away the whole pwa app and restart it").
+function _helpSection(html,id){try{var d=new DOMParser().parseFromString(html,'text/html');var sec=id&&d.getElementById(id);return sec?sec.innerHTML:'';}catch(e){return '';}}
+function openHelp(a){var href=typeof a==='string'?a:(a&&a.getAttribute?a.getAttribute('href'):'')||'';var id=href.split('#')[1]||'';
+  var b=document.getElementById('help-modal-body');if(!b)return false;
+  b.innerHTML='<div style="font-size:15px;color:var(--text)">Loading…</div>';openModal('helpModal');
+  fetch(href.split('#')[0]||'help.html').then(function(r){return r.ok?r.text():'';}).then(function(t){var h=_helpSection(t,id);
+    b.innerHTML=h?'<div class="help-sec" style="font-size:15px;color:var(--text);line-height:1.55">'+h+'</div>':'<div style="font-size:15px;color:var(--text)">Could not load this help text. Check your connection and try again.</div>';})
+  .catch(function(){b.innerHTML='<div style="font-size:15px;color:var(--text)">Could not load this help text. Check your connection and try again.</div>';});
+  return false;}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function showWeightModal(){openModal('weightModal');}
 function saveWeight(){const val=unitToKg(document.getElementById('weight-input').value);if(!val||val<=0)return;const today=new Date().toISOString().split('T')[0];weights.push({date:today,weight:val});weights.sort((a,b)=>a.date.localeCompare(b.date));setData('weight_log',weights);updateCurrentWeight();document.getElementById('weight-input').value='';renderWeightHistory();renderProgress();if(_currentPage==='profile')buildProfilePage();pushWeightToAgent(today,val);}
@@ -4703,7 +4720,7 @@ function _pfInfoHtml(){var L=_pfLatest(),T='font-size:15px;color:var(--text);',E
     +'<div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px;">Your profile</div>';
   if(E){h+=row('Sex','<span style="display:inline-flex;gap:6px">'+chip('male','Male')+chip('female','Female')+'</span>')+row('Age',field('pf-e-age',E.age,'yrs'))+row('Height',field('pf-e-height',E.height,'cm'))
       +row('Weight',field('pf-e-weight',E.weight!=null?kgToUnit(E.weight):null,unitLabel()))+row('BMI',L.bmi?L.bmi.toFixed(1):'—')+row('Body fat',field('pf-e-bf',E.bf,'%'))+row('Lean mass',L.lean?kgToUnit(L.lean)+' '+unitLabel():'—');
-    if(_pfEditErr)h+='<div data-pf-edit-err="1" style="'+T+'line-height:1.5;margin-top:10px;padding:10px;border:1px solid var(--danger,#ff3b30);border-radius:10px;"><b>'+_escP(_pfEditErr)+'</b> <a href="'+PROFILE_HELP+'" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
+    if(_pfEditErr)h+='<div data-pf-edit-err="1" style="'+T+'line-height:1.5;margin-top:10px;padding:10px;border:1px solid var(--danger,#ff3b30);border-radius:10px;"><b>'+_escP(_pfEditErr)+'</b> <a href="'+PROFILE_HELP+'" onclick="return openHelp(this)" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
     return h+'<div style="display:flex;gap:10px;margin-top:14px;"><button data-pf-cancel="1" onclick="pfEditCancel()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Cancel</button>'
       +'<button class="btn btn-primary" data-pf-save="1" onclick="pfEditSave()" style="flex:1;">Save</button></div></div>';}
   return h+row('Sex',L.gender?(L.gender==='female'?'Female':'Male'):'—')+row('Age',L.age?L.age+' yrs':'—')+row('Height',L.height?L.height+' cm':'—')
@@ -4771,7 +4788,7 @@ function _pfNavyHtml(){var p=getData('wkt-profile',{})||{},fem=p.gender==='femal
       +sites.map(function(st){return inp('pf-sf-'+st,PF_SITE_LABEL[st]+' (mm)','e.g. 12');}).join('');}
   else h+='<div style="'+T+'">'+PF_BF_DIRECT_HELP[m]+'</div>'+inp('pf-bf-direct','Body fat (%)','e.g. 15.0');
   h+='</div><button class="btn btn-primary" data-pf-navy="1" onclick="pfLogBf()" style="width:100%;margin-top:12px;">Log body fat</button>'
-    +(_pfNavyErr?'<div data-pf-navy-err="1" style="'+T+'margin-top:10px;padding:10px;border:1px solid var(--danger,#ff3b30);border-radius:10px;"><b>'+_escP(_pfNavyErr)+'</b> <a href="'+NAVY_HELP+'" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>':'')
+    +(_pfNavyErr?'<div data-pf-navy-err="1" style="'+T+'margin-top:10px;padding:10px;border:1px solid var(--danger,#ff3b30);border-radius:10px;"><b>'+_escP(_pfNavyErr)+'</b> <a href="'+NAVY_HELP+'" onclick="return openHelp(this)" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>':'')
     +(last?'<div data-pf-bf-last="1" style="'+T+'margin-top:10px;">Last: '+_escP(last.date)+' · '+last.bf+' % body fat'+(PF_METHOD_LABEL[last.method]?' · '+PF_METHOD_LABEL[last.method]:'')+(last.neck?' · neck '+last.neck+' cm':'')+(last.belly?' · waist '+last.belly+' cm':'')+'</div>':'');
   return h+'</div>';}
 function _pfRenderNavy(){var el=document.getElementById('pf-navy');if(el)el.innerHTML=_pfNavyHtml();}
@@ -5615,7 +5632,14 @@ var _psStep='',_psTemp=null,_psMsg='',_psCar=null,_psRun=0,_psTimer=null;
 // close and if car doesn't respond show a warning triangle over the car symbol". The card closes at any time; the request
 // carries on. A car that refuses, or gives no answer within PS_ANSWER_MS, puts a warning triangle on the header car
 // (_psWarn) until a later answer succeeds or the user taps OK on the card the car opens.
-var PS_ANSWER_MS=90000,_psWarn=null,PS_HELP='help.html#polestar-no-answer';
+var PS_ANSWER_MS=90000,_psWarn=null,PS_HELP='help.html#polestar-no-answer',PS_SIGNIN_HELP='help.html#polestar-sign-in';
+// A failed sign-in links its own help section, not the one about a car that did not answer (Henrik, 2026-11-27: the page
+// "isnt describing the real issue").
+function _psHelpFor(msg){return /sign-in|sign in|password|code|Polestar ID/i.test(msg||'')?PS_SIGNIN_HELP:PS_HELP;}
+// Polestar's login sends a one-time code by text message after the password (2026-11-27). The backend answers 409 then;
+// the card asks for the code, POST /polestar/code finishes the sign-in, and what was asked for (start, stop, saving the
+// Polestar ID) runs again. Later calls need no code: the backend keeps the sign-in.
+var _psCodeThen='',_psCodeErr='';
 function _psNeedsClimate(t){return typeof t==='number'&&isFinite(t)&&(t<PS_COLD_C||t>PS_HOT_C);}
 // The reps box that leaves exactly one set of the whole workout still to do, once it holds a number: the question comes as
 // the last set starts, in the order the sets are actually done. It was the second-to-last set of the bottom card, which
@@ -5666,7 +5690,14 @@ var _PS_BTN='flex:1;padding:12px 14px;border-radius:8px;font-size:14px;font-weig
 function _psModalHtml(){var t=_psTemp==null?'':Math.round(_psTemp)+' °C';var cold=_psTemp!=null&&_psTemp<PS_COLD_C;
   if(_psStep==='ask')return '<div style="font-size:15px;color:var(--text);line-height:1.5">It is '+t+' outside.<br>Turn on Polestar climate'+(cold?' to warm the car':' to cool the car')+'?</div>'
     +'<div style="display:flex;gap:8px;margin-top:16px"><button onclick="psYes()" style="'+_PS_BTN+'background:var(--accent);color:#000;border:none">Turn on</button><button onclick="psClose()" style="'+_PS_BTN+'background:var(--surface2);color:var(--text);border:1px solid var(--border)">Not now</button></div>';
-  if(_psStep==='starting')return '<div style="display:flex;align-items:center;gap:12px">'+_psCarSvg(cold?'heat':'cool',40)+'<div style="font-size:15px;color:var(--text);line-height:1.5"><b>Starting climate…</b><br><span style="color:var(--muted);font-size:13px">Waiting for the car to answer. This can take up to a minute.</span></div></div>';
+  // Close leaves the start running (Henrik, 2026-11-27: "I cannot leave that screen without canceling the turn on heating
+  // action"): the car at the top turns red when climate is on, or shows a warning triangle if it fails.
+  if(_psStep==='starting')return '<div style="display:flex;align-items:center;gap:12px">'+_psCarSvg(cold?'heat':'cool',40)+'<div style="font-size:15px;color:var(--text);line-height:1.5"><b>Starting climate…</b><br><span style="color:var(--muted);font-size:13px">Waiting for the car to answer. This can take up to a minute. You can close this: the start carries on, and the car at the top turns red when climate is on.</span></div></div>'
+    +'<div style="display:flex;gap:8px;margin-top:16px"><button onclick="psClose()" style="'+_PS_BTN+'background:var(--surface2);color:var(--text);border:1px solid var(--border)">Close</button></div>';
+  if(_psStep==='code'||_psStep==='sendingcode')return '<div style="font-size:15px;color:var(--text);line-height:1.5"><b>Enter the code from Polestar</b><br><span style="color:var(--muted);font-size:13px">'+_escP(_psMsg)+'</span></div>'
+    +'<input id="ps-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code" style="width:100%;box-sizing:border-box;margin-top:12px;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:20px;letter-spacing:4px">'
+    +(_psCodeErr?'<div style="margin-top:8px;font-size:14px;color:var(--danger,#ff3b30)">'+_escP(_psCodeErr)+'</div>':'')
+    +'<div style="display:flex;gap:8px;margin-top:16px"><button onclick="psSendCode()" '+(_psStep==='sendingcode'?'disabled ':'')+'style="'+_PS_BTN+'background:var(--accent);color:#000;border:none">'+(_psStep==='sendingcode'?'Checking…':'Send code')+'</button><button onclick="psClose()" style="'+_PS_BTN+'background:var(--surface2);color:var(--text);border:1px solid var(--border)">Cancel</button></div>';
   var two=function(a,b){return '<div style="display:flex;gap:8px;margin-top:16px">'+a+b+'</div>';};
   var pri=function(l,f){return '<button onclick="'+f+'" style="'+_PS_BTN+'background:var(--accent);color:#000;border:none">'+l+'</button>';};
   var sec=function(l,f){return '<button onclick="'+f+'" style="'+_PS_BTN+'background:var(--surface2);color:var(--text);border:1px solid var(--border)">'+l+'</button>';};
@@ -5676,7 +5707,7 @@ function _psModalHtml(){var t=_psTemp==null?'':Math.round(_psTemp)+' °C';var co
   if(_psStep==='off')return row(_psCarSvg('off',40),'Climate is off','Turn it on and the car heats or cools to 21 °C for '+PS_RUN_MIN+' minutes.')
     +two(pri('Turn on','psTurnOn()'),sec('Close','psClose()'));
   if(_psStep==='stopping')return row(_psCarSvg(_psCar||'on',40),'Stopping climate…','Waiting for the car to answer. This can take up to a minute.');
-  var help='<div style="font-size:15px;margin-top:10px"><a href="'+PS_HELP+'" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
+  var help='<div style="font-size:15px;margin-top:10px"><a href="'+_psHelpFor(_psMsg)+'" onclick="return openHelp(this)" style="color:var(--accent);font-weight:700">What this means and how to fix it</a></div>';
   if(_psStep==='stopfailed')return '<div style="font-size:15px;color:var(--text);line-height:1.5"><b>Climate did not stop</b><br><span style="color:var(--muted);font-size:13px">'+_escP(_psMsg)+'</span></div>'+help+two(pri('Try again','psTurnOff()'),sec('OK','psDismiss()'));
   return '<div style="font-size:15px;color:var(--text);line-height:1.5"><b>Climate did not start</b><br><span style="color:var(--muted);font-size:13px">'+_escP(_psMsg)+'</span></div>'+help+two(pri('Try again','psTurnOn()'),sec('OK','psDismiss()'));}
 function _psRenderModal(){var b=document.getElementById('ps-modal-body');if(b)b.innerHTML=_psModalHtml();}
@@ -5690,14 +5721,30 @@ function _psAwait(kind,run){var done=false;
   return run().then(function(res){done=true;return res;});}
 // From the Log's question the outside temperature says heat or cool; from the header car it is not known until the car says.
 async function psYes(){var mode=_psTemp==null?'on':_psTemp<PS_COLD_C?'heat':'cool';_psStep='starting';_psRenderModal();
-  var res=await _psAwait('start',function(){return _psStart();});_psStep=res.ok?'on':'failed';_psMsg=res.msg;
+  var res=await _psAwait('start',function(){return _psStart();});if(res.code)return _psAskCode('start',res.msg);_psStep=res.ok?'on':'failed';_psMsg=res.msg;
   _psWarn=res.ok?null:{kind:'start',msg:res.msg};if(res.ok)_psShowCar(mode);else _psRenderCar();_psRenderModal();}
 function psTurnOn(){_psTemp=null;return psYes();}
 async function psTurnOff(){_psStep='stopping';_psRenderModal();var res=await _psAwait('stop',function(){return _psStart('/stop');});
+  if(res.code)return _psAskCode('stop',res.msg);
   if(res.ok){_psWarn=null;_psHideCar();_psStep='off';}else{_psStep='stopfailed';_psMsg=res.msg;_psWarn={kind:'stop',msg:res.msg};_psRenderCar();}_psRenderModal();}
+function _psAskCode(then,msg){_psCodeThen=then;_psCodeErr='';_psStep='code';_psMsg=msg;_psRenderModal();openModal('psModal');
+  setTimeout(function(){var i=document.getElementById('ps-code');if(i&&i.focus)i.focus();},50);}
+async function psSendCode(){var i=document.getElementById('ps-code');var code=i?String(i.value||'').replace(/\D/g,''):'';
+  if(code.length<4){_psCodeErr='Type the digits of the code Polestar sent you.';return _psRenderModal();}
+  _psStep='sendingcode';_psCodeErr='';_psRenderModal();
+  try{var r=await fetch(AGENT_URL+'/polestar/code',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({code:code})});var j=await r.json().catch(function(){return{};});
+    if(!r.ok){if(r.status===400){_psStep='code';_psCodeErr=j.detail||'Polestar did not accept that code.';return _psRenderModal();}
+      _psStep=_psCodeThen==='stop'?'stopfailed':'failed';_psMsg=j.detail||('Could not finish signing in (error '+r.status+').');return _psRenderModal();}
+    if(j&&j.set){_ps=j;_psChanging=false;_psErr='';_psRender();_psRenderCar();}}
+  catch(e){_psStep='code';_psCodeErr='Could not reach the server. Check your connection and try again.';return _psRenderModal();}
+  var then=_psCodeThen;_psCodeThen='';
+  if(then==='stop')return psTurnOff();
+  if(then==='save'){_psStep=_psCar?'on':'off';return _psRenderModal();}
+  return psYes();}
 async function _psStart(path){
   try{var r=await fetch(AGENT_URL+'/polestar/climate'+(path||''),{method:'POST',headers:authHeaders()});var j=await r.json().catch(function(){return{};});
     if(r.ok&&j.ok)return {ok:true,msg:''};
+    if(r.status===409)return {ok:false,code:true,msg:j.detail||'Polestar sent you a one-time code. Enter it to finish signing in.'};
     return {ok:false,msg:j.detail||(j.status?'The car answered '+j.status+'.':'Unknown error.')};}
   catch(e){return {ok:false,msg:'Could not reach the server. Check your connection.'};}}
 // Header icon (Henrik, 2026-11-04: "keep a grey car in title if credentials are available in the app"): a grey car
@@ -5759,6 +5806,7 @@ async function psSave(){var e=document.getElementById('ps-email'),p=document.get
   var email=e?String(e.value||'').trim():'',pw=p?String(p.value||''):'';if(!email||!pw){_psErr='Enter both the email and the password.';return _psRender();}
   _psErr='Checking with Polestar…';_psRender();
   try{var r=await fetch(AGENT_URL+'/polestar',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({email:email,password:pw})});var j=await r.json().catch(function(){return{};});
+    if(r.status===409){_psErr='';_psRender();return _psAskCode('save',j.detail||'Polestar sent you a one-time code. Enter it to finish signing in.');}
     if(!r.ok){_psErr=j.detail||('Could not save (error '+r.status+').');return _psRender();}_ps=j;_psChanging=false;_psErr='';}
   catch(err){_psErr='Could not reach the server. Check your connection and try again.';}
   _psRender();_psRenderCar();}

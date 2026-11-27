@@ -10689,10 +10689,85 @@ console.log('\n── Polestar climate ─────────────�
       t.C.psOpenStatus();
       check('  …and its card offers to try the stop again', /Climate did not stop/.test(t.els['ps-modal-body'].innerHTML) && /psTurnOff\(\)/.test(t.els['ps-modal-body'].innerHTML));
     }
+    // Henrik, 2026-11-27: "I cannot leave that screen without canceling the turn on heating action".
+    {
+      const t = ctx({ cards: [], hold: true });
+      await t.C.syncPolestarCar(); t.C.psOpenStatus();
+      const p = t.C.psTurnOn(); await tick();
+      const card = t.els['ps-modal-body'].innerHTML;
+      check('polestar: the starting card has a Close button and says the start carries on', /Starting climate…/.test(card) && /psClose\(\)/.test(card) && />Close</.test(card) && /the start carries on/.test(card));
+      t.C.psClose(); t.release(); await p;
+      check('  …closing it does not cancel: the start still turns the car red', !t.open.has('psModal') && /#e53935/.test(t.els['hdr-car'].innerHTML));
+    }
+    // Polestar's login texts a one-time code after the password (2026-11-27); the backend answers 409 for it.
+    {
+      const code = { n: 0, ok: '095752' };
+      const t = ctx({ cards: [] });
+      await t.C.syncPolestarCar();
+      const _f = t.C.fetch;
+      let signedIn = false;
+      t.C.fetch = async (url, o) => {
+        if (url === 'https://agent/polestar/climate' && o && o.method === 'POST' && !signedIn) { t.calls.push({ url, method: 'POST' });
+          return { ok: false, status: 409, json: async () => ({ detail: 'Polestar sent you a one-time code by text message. Enter it to finish signing in.' }) }; }
+        if (url === 'https://agent/polestar/code') { t.calls.push({ url, method: 'POST', body: o.body }); code.n++;
+          if (JSON.parse(o.body).code !== code.ok) return { ok: false, status: 400, json: async () => ({ detail: 'Polestar did not accept that code: Invalid code' }) };
+          signedIn = true; return { ok: true, json: async () => ({ set: true, email: 'me@x.com', code_pending: false }) }; }
+        return _f(url, o); };
+      await t.C.psTurnOn();
+      const card = t.els['ps-modal-body'].innerHTML;
+      check('polestar: when Polestar sends a code the card asks for it, no failure or triangle', t.open.has('psModal') && /Enter the code from Polestar/.test(card) && /id="ps-code"/.test(card) && /autocomplete="one-time-code"/.test(card) && /text message/.test(card) && !/ps-warn/.test(t.els['hdr-car'].innerHTML));
+      t.els['ps-code'] = { value: '111111' }; await t.C.psSendCode();
+      check('  …a wrong code says so and lets you type again', /Invalid code/.test(t.els['ps-modal-body'].innerHTML) && /id="ps-code"/.test(t.els['ps-modal-body'].innerHTML));
+      t.els['ps-code'] = { value: ' 095 752 ' }; await t.C.psSendCode();
+      const sent = t.calls.filter(c => c.url === 'https://agent/polestar/code').pop();
+      check('  …the right code goes to the backend as digits', JSON.parse(sent.body).code === '095752');
+      check('  …and the start runs again and turns the car red', /Climate is on/.test(t.els['ps-modal-body'].innerHTML) && /#e53935/.test(t.els['hdr-car'].innerHTML));
+    }
+    {
+      const t = ctx({ cards: [], creds: { set: false, email: '' } });
+      t.els['ps-card'] = { innerHTML: '' }; await t.C.buildPolestarCard();
+      const _f = t.C.fetch;
+      t.C.fetch = async (url, o) => {
+        if (url === 'https://agent/polestar' && o && o.method === 'PUT') return { ok: false, status: 409, json: async () => ({ detail: 'Polestar sent you a one-time code by text message. Enter it to finish signing in.' }) };
+        if (url === 'https://agent/polestar/code') return { ok: true, json: async () => ({ set: true, email: 'me@x.com', code_pending: false }) };
+        return _f(url, o); };
+      t.els['ps-email'] = { value: 'me@x.com' }; t.els['ps-pw'] = { value: 'pw' };
+      await t.C.psSave();
+      check('polestar card: saving the Polestar ID asks for the code too', t.open.has('psModal') && /Enter the code from Polestar/.test(t.els['ps-modal-body'].innerHTML));
+      t.els['ps-code'] = { value: '095752' }; await t.C.psSendCode();
+      check('  …and once sent, Settings shows who is signed in and the car appears', /Signed in as me@x\.com/.test(t.els['ps-card'].innerHTML) && /ps-car-off/.test(t.els['hdr-car'].innerHTML) && /Climate is off/.test(t.els['ps-modal-body'].innerHTML));
+    }
+    // Henrik, 2026-11-27: "there is no way to close that page without swiping away the whole pwa app".
+    {
+      const links = _src.match(/<a href="'\+[A-Z_]*HELP[^>]*>/g) || [];
+      check('help links: every "What this means" link opens in the app, none as a page (4 kinds)', links.length >= 3 && links.every(a => /onclick="return openHelp\(this\)"/.test(a) && !/target=/.test(a)), links.join(' | '));
+      const fnSrc = _src.slice(_src.indexOf('function _helpSection('), _src.indexOf('return false;}', _src.indexOf('function openHelp(')) + 'return false;}'.length);
+      const els = { 'help-modal-body': { innerHTML: '' } }, open = new Set();
+      const page = '<section id="a"><h2>A</h2><p>alpha</p></section><section id="b"><p>beta</p></section>';
+      const H = vm.createContext({ document: { getElementById: id => els[id] || null }, openModal: id => open.add(id),
+        DOMParser: function () { this.parseFromString = html => ({ getElementById: id => { const m = html.match(new RegExp('<section id="' + id + '">([\\s\\S]*?)</section>')); return m ? { innerHTML: m[1] } : null; } }); },
+        fetch: async url => ({ ok: url === 'help.html', text: async () => page }) });
+      vm.runInContext(fnSrc, H);
+      const ret = H.openHelp({ getAttribute: () => 'help.html#b' });
+      await tick(); await tick();
+      check('  …openHelp shows only that section in the help card and keeps the app where it was', ret === false && open.has('helpModal') && /beta/.test(els['help-modal-body'].innerHTML) && !/alpha/.test(els['help-modal-body'].innerHTML));
+      check('  …the help card has its own × to close it', /id="helpModal"[\s\S]{0,300}closeModal\('helpModal'\)/.test(_src));
+    }
+    // Henrik, 2026-11-27: the help page "isnt describing the real issue".
+    {
+      const t = ctx({ cards: [], answer: { ok: false } });
+      await t.C.syncPolestarCar();
+      const _f = t.C.fetch;
+      t.C.fetch = async (url, o) => url === 'https://agent/polestar/climate' && o && o.method === 'POST'
+        ? { ok: false, status: 502, json: async () => ({ detail: "Polestar sign-in failed: Polestar's sign-in stopped at its page 'x'" }) } : _f(url, o);
+      await t.C.psTurnOn();
+      check('polestar: a failed sign-in links the sign-in help, not "the car did not answer"', /href="help\.html#polestar-sign-in"/.test(t.els['ps-modal-body'].innerHTML) && !/polestar-no-answer/.test(t.els['ps-modal-body'].innerHTML));
+      check('  …and the link opens inside the app, never as a page the installed app cannot leave', /onclick="return openHelp\(this\)"/.test(t.els['ps-modal-body'].innerHTML) && !/target="_blank"/.test(t.els['ps-modal-body'].innerHTML));
+    }
     {
       const help = fs.readFileSync(path.join(__dirname, '..', 'help.html'), 'utf8');
       check('help page: the Polestar warning has its section, saying what it means, what happens and how to fix it',
-        /id="polestar-no-answer"/.test(help) && /What it means/.test(help) && /What happens if you ignore it/.test(help) && /How to fix it/.test(help));
+        /id="polestar-no-answer"/.test(help) && /id="polestar-sign-in"[\s\S]*?What it means[\s\S]*?What happens if you ignore it[\s\S]*?How to fix it[\s\S]*?Send code/.test(help) && /What it means/.test(help) && /What happens if you ignore it/.test(help) && /How to fix it/.test(help));
       check('help page: it carries the app icon and manifest', /rel="icon"[^>]*training-icon\.png/.test(help) && /rel="apple-touch-icon"/.test(help) && /rel="manifest"/.test(help));
       check('help page: readable, no text under 15px and no grey', !/font-size:\s*1[0-4]px/.test(help) && !/#[89a-c][0-9a-f]{5}\b/i.test(help.replace(/#7fd0ff/i, '')));
     }
